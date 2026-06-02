@@ -1,4 +1,20 @@
+# B? qua thu vi?n node_modules
 node_modules/
+frontend/node_modules/
+
+# B? qua các thu m?c build d?u ra
 dist/
+frontend/dist/
+backend/target/
+
+# B? qua file c?u hình môi tru?ng và cài d?t IDE
 .env
+.env.local
 .vscode/
+.idea/
+.codegraph/
+
+# B? qua các file nén d? phòng (tránh làm n?ng kho luu tr?)
+*.rar
+*.zip
+*.tar.gz
