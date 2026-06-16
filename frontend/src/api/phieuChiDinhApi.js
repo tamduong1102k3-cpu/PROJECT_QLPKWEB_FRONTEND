@@ -1,5 +1,5 @@
 import fetchClient from './fetchClient';
-const API_URL = 'http://localhost:8080/api/phieu-chi-dinh';
+const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/phieu-chi-dinh';
 
 /**
  * 1. Lấy danh sách chờ thực hiện CLS (Dành cho KTV)
@@ -233,4 +233,4 @@ export const getCdhaResultsByPhieuKhamApi = async (maPhieuKham) => {
     console.error("Error in getCdhaResultsByPhieuKhamApi:", error);
     throw error;
   }
-};
+};

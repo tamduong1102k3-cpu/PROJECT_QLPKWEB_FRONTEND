@@ -1,7 +1,7 @@
 import { getAllApi as _getAllAppointments, deleteApi } from '../../../api/appointmentApi';
 import { apiClient } from "../../../api/apiClient";
 import React, { useState, useEffect } from 'react';
-const API = 'http://localhost:8080/api/appointments';
+const API = 'https://qlpk-backend-spring-boot.onrender.com/api/appointments';
 const formatStatus = status => {
   switch (status) {
     case 'CHUA_DEN':

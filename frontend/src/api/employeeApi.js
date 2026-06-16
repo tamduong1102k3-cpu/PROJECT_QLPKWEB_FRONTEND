@@ -1,6 +1,6 @@
 import fetchClient from './fetchClient';
 
-const API_URL = 'http://localhost:8080/api/nhan_vien';
+const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
 
 /**
  * Helper: parse response text hoặc JSON

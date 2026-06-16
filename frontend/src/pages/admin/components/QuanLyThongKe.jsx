@@ -1,6 +1,6 @@
 import { apiClient } from "../../../api/apiClient";
 import React, { useState, useEffect } from 'react';
-const BASE = 'http://localhost:8080/api/thong-ke';
+const BASE = 'https://qlpk-backend-spring-boot.onrender.com/api/thong-ke';
 const MONTHS = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
 const fmt = val => {
   if (!val || val === 0) return '0';

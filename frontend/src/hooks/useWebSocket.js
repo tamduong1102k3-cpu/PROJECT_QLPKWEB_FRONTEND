@@ -8,14 +8,14 @@ import Stomp from 'stompjs';
  * @param {Object} options
  * @param {string[]} options.topics - Danh sách topic cần subscribe, ví dụ ['/topic/phieu-kham', '/topic/vitals']
  * @param {function} options.onMessage - Callback khi nhận được message, signature: (topic, data) => void
- * @param {string} options.url - URL WebSocket endpoint (mặc định: http://localhost:8080/ws)
+ * @param {string} options.url - URL WebSocket endpoint (mặc định: https://qlpk-backend-spring-boot.onrender.com/ws)
  * @param {function} options.onConnect - Callback khi kết nối thành công
  * @param {function} options.onDisconnect - Callback khi mất kết nối
  */
 const useWebSocket = ({
   topics = [],
   onMessage,
-  url = 'http://localhost:8080/ws',
+  url = 'https://qlpk-backend-spring-boot.onrender.com/ws',
   onConnect,
   onDisconnect,
 } = {}) => {

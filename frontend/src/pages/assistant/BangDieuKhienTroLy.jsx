@@ -21,7 +21,7 @@ import UserMenu from '../../components/UserMenu';
 import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 
 // KHAI BÁO API_BASE
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = 'https://qlpk-backend-spring-boot.onrender.com/api';
 
 const BangDieuKhienTroLy = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('dashboard');

@@ -1,5 +1,5 @@
 import fetchClient from './fetchClient';
-const API_URL = 'http://localhost:8080/api/ket-qua-cdha';
+const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/ket-qua-cdha';
 
 // Lấy kết quả CĐHA dựa trên mã chi tiết chỉ định (Dùng cho Modal xem ảnh/kết quả)
 // ĐƯỜNG DẪN MỚI: /api/ket-qua-cdha/chi-tiet/{id}

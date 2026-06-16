@@ -1,5 +1,5 @@
 import fetchClient from './fetchClient';
-const API_URL = 'http://localhost:8080/api/danhmuc';
+const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/danhmuc';
 
 /**
  * GET /chuc-vu

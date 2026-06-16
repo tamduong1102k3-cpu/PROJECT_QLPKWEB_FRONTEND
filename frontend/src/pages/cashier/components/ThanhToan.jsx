@@ -9,8 +9,8 @@ import InHoaDon from './InHoaDon';
 import SockJS from 'sockjs-client/dist/sockjs.min.js';
 import Stomp from 'stompjs';
 
-const API_NHAN_VIEN = 'http://localhost:8080/api/nhan_vien';
-const API_PHIEU_KHAM = 'http://localhost:8080/api/phieu-kham';
+const API_NHAN_VIEN = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
+const API_PHIEU_KHAM = 'https://qlpk-backend-spring-boot.onrender.com/api/phieu-kham';
 
 const formatCurrency = (amount) => {
   if (amount == null) return '—';
@@ -82,7 +82,7 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
       const url = keyword ? `${API_PHIEU_KHAM}/completed-patients?keyword=${encodeURIComponent(keyword)}` : `${API_PHIEU_KHAM}/completed-patients`;
       const [pkRes, invRes] = await Promise.all([
         apiClient(url),
-        apiClient('http://localhost:8080/api/hoa-don'),
+        apiClient('https://qlpk-backend-spring-boot.onrender.com/api/hoa-don'),
       ]);
       setCompletedPatients(pkRes.ok ? await pkRes.json() : []);
       setInvoices(invRes.ok ? await invRes.json() : []);
@@ -163,7 +163,7 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
       );
       if (!inv) {
         inv = await createInvoiceFromPhieuKhamApi(patient.maPhieuKham, { maNhanVien: getMaNhanVien() });
-        const invRes = await apiClient('http://localhost:8080/api/hoa-don');
+        const invRes = await apiClient('https://qlpk-backend-spring-boot.onrender.com/api/hoa-don');
         if (invRes.ok) setInvoices(await invRes.json() || []);
       }
       setCurrentInvoice(inv);
@@ -212,13 +212,13 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
     setShowPaymentModal(false);
     const vnpayWindow = window.open('', '_blank');
     if (!vnpayWindow) {
-      const response = await apiClient(`http://localhost:8080/api/payment/vnpay/create/${currentInvoice.maHoaDon}`, { method: 'POST' });
+      const response = await apiClient(`https://qlpk-backend-spring-boot.onrender.com/api/payment/vnpay/create/${currentInvoice.maHoaDon}`, { method: 'POST' });
       if (response.ok) window.location.href = (await response.json()).url;
       else throw new Error((await response.json()).error || 'Lỗi VNPay');
       return;
     }
     try {
-      const response = await apiClient(`http://localhost:8080/api/payment/vnpay/create/${currentInvoice.maHoaDon}`, { method: 'POST' });
+      const response = await apiClient(`https://qlpk-backend-spring-boot.onrender.com/api/payment/vnpay/create/${currentInvoice.maHoaDon}`, { method: 'POST' });
       if (response.ok) {
         vnpayWindow.location.href = (await response.json()).url;
       } else {

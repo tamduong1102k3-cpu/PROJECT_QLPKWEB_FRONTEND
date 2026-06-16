@@ -1,5 +1,5 @@
 import fetchClient from './fetchClient';
-const API_URL = 'http://localhost:8080/api/dang-ky';
+const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/dang-ky';
 
 /**
  * GET /today?keyword=xxx

@@ -45,7 +45,7 @@ const QuyTrinhTiepDon = ({
     ghiChu: ''
   });
 
-  const API_BASE = 'http://localhost:8080/api';
+  const API_BASE = 'https://qlpk-backend-spring-boot.onrender.com/api';
 
   const loadPatients = useCallback(async () => {
     setSearching(true);

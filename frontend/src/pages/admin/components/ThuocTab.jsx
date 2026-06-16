@@ -3,7 +3,7 @@ import { deleteThuocApi as _deleteThuocApi } from '../../../api/khoThuocApi';
 import { apiClient } from "../../../api/apiClient";
 import { card, th, td, formatCurrency } from './styles';
 
-const API = 'http://localhost:8080/api/kho-thuoc';
+const API = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
 
 const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
   const [search, setSearch] = useState('');

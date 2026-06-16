@@ -30,13 +30,13 @@ const BangDieuKhienAdmin = ({
   });
   useEffect(() => {
     // Fetch thuốc sắp hết
-    apiClient('http://localhost:8080/api/kho-thuoc/sap-het?threshold=20').then(r => r.ok ? r.json() : []).then(data => {
+    apiClient('https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc/sap-het?threshold=20').then(r => r.ok ? r.json() : []).then(data => {
       setSapHet(data);
       setSapHetLoading(false);
     }).catch(() => setSapHetLoading(false));
 
     // Fetch dashboard summary
-    apiClient('http://localhost:8080/api/thong-ke/dashboard-summary').then(res => res.ok ? res.json() : null).then(data => {
+    apiClient('https://qlpk-backend-spring-boot.onrender.com/api/thong-ke/dashboard-summary').then(res => res.ok ? res.json() : null).then(data => {
       if (data) setSummary(data);
     }).catch(err => console.error("Error fetching dashboard summary:", err));
   }, []);

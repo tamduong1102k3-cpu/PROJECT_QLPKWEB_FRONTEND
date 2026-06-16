@@ -1,6 +1,6 @@
 import fetchClient from './fetchClient';
 
-const API_URL = 'http://localhost:8080/api/database';
+const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/database';
 
 const handleError = async (response) => {
   let errorMsg = `Lỗi: ${response.status}`;

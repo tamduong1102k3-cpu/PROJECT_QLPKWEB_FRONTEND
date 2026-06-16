@@ -2,7 +2,7 @@ import { getAllApi, searchApi, getHoSoApi } from '../../../api/benhNhanApi';
 import React, { useState, useEffect, useCallback } from 'react';
 import ChiTietKhamModal from '../../../components/ChiTietKhamModal';
 
-const API = 'http://localhost:8080/api/benh-nhan';
+const API = 'https://qlpk-backend-spring-boot.onrender.com/api/benh-nhan';
 
 const fmt = (v) => v ?? '—';
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';

@@ -4,8 +4,8 @@ import ThuocTab from './ThuocTab';
 import KhoThuocTab from './KhoThuocTab';
 import PhieuNhapTab from './PhieuNhapTab';
 
-const API = 'http://localhost:8080/api/kho-thuoc';
-const NV_API = 'http://localhost:8080/api/nhan_vien';
+const API = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
+const NV_API = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
 
 // ── Hook: load lookup maps ────────────────────────────────────────────────────
 const useLookups = refreshTrigger => {

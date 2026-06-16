@@ -12,7 +12,7 @@ export { handleUnauthorized };
 export const apiClient = async (url, options = {}) => {
   const method = options.method ? options.method.toUpperCase() : 'GET';
   const body = options.body ? JSON.parse(options.body) : null;
-  const path = url.replace('http://localhost:8080/api', '');
+  const path = url.replace('https://qlpk-backend-spring-boot.onrender.com/api', '');
 
   try {
     // Thử dispatch qua các API chuyên biệt (các function này đã dùng fetchClient)

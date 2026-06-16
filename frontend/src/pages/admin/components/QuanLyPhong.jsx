@@ -1,7 +1,7 @@
 import { getAllPhongApi as _getAllPhongApi, getAllChucVuApi as _getAllChucVuApi, getAllChuyenKhoaApi as _getAllChuyenKhoaApi, deletePhongApi as _deletePhongApi } from '../../../api/danhMucApi';
 import { apiClient } from "../../../api/apiClient";
 import React, { useState, useEffect } from 'react';
-const BASE = 'http://localhost:8080/api/danhmuc';
+const BASE = 'https://qlpk-backend-spring-boot.onrender.com/api/danhmuc';
 const empty = {
   tenPhong: '',
   loaiPhong: '',

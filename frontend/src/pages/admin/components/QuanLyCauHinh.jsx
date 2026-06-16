@@ -19,7 +19,7 @@ const QuanLyCauHinh = () => {
     setLoading(true);
     showStatus('info', 'Đang kết nối cơ sở dữ liệu và chuẩn bị tệp sao lưu...');
     try {
-      const response = await fetchClient('http://localhost:8080/api/backup/export');
+      const response = await fetchClient('https://qlpk-backend-spring-boot.onrender.com/api/backup/export');
       if (!response.ok) {
         throw new Error('Lỗi từ hệ thống khi tạo tệp sao lưu.');
       }
@@ -81,7 +81,7 @@ const QuanLyCauHinh = () => {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await fetchClient('http://localhost:8080/api/backup/import', {
+      const response = await fetchClient('https://qlpk-backend-spring-boot.onrender.com/api/backup/import', {
         method: 'POST',
         body: formData,
       });
