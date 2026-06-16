@@ -31,10 +31,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedOrigins(List.of("http://localhost:5173"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(false);
+        config.setAllowCredentials(true);
         config.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
@@ -53,16 +53,23 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/api-docs/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/taikhoan/login", "/api/taikhoan/forgot-password/**", "/api/taikhoan/first-time-change-password").permitAll()
+                .requestMatchers("/ws/**", "/api/payment/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/appointments/**").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/appointments/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/appointments/**").authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/api/appointments/**").authenticated()
                 // Endpoint thay đổi mật khẩu cần xác thực
                 .requestMatchers(HttpMethod.PUT, "/api/taikhoan/*/change-password").authenticated()
                 // Admin endpoints
-                .requestMatchers("/api/taikhoan/**", "/api/nhan-vien/**").hasRole("QUAN_TRI")
+                .requestMatchers("/api/taikhoan/**", "/api/nhan-vien/**").hasRole("QUAN_TRI_VIEN")
+                // Cashier endpoints - thanh toán
+                .requestMatchers(HttpMethod.POST, "/api/hoa-don/*/thanh-toan").hasAnyRole("THU_NGAN", "QUAN_TRI_VIEN", "LE_TAN")
                 // Receptionist endpoints - full check-in
-                .requestMatchers(HttpMethod.POST, "/api/phieu-kham/full-check-in").hasAnyRole("LE_TAN", "BAC_SI", "TRO_LY")
+                .requestMatchers(HttpMethod.POST, "/api/phieu-kham/full-check-in").authenticated()
                 // Assistant endpoints - accept patient (dùng authority để hỗ trợ TRO_LY_RHM, TRO_LY_TMH...)
                 .requestMatchers(HttpMethod.POST, "/api/phieu-kham/accept-patient/**").authenticated()
                 // Doctor/Assistant endpoints
-                .requestMatchers(HttpMethod.POST, "/api/phieu-kham/**").hasAnyRole("BAC_SI", "TRO_LY")
+                .requestMatchers(HttpMethod.POST, "/api/phieu-kham/**").authenticated()
                 // Tất cả các API còn lại cần xác thực
                 .anyRequest().authenticated()
             )

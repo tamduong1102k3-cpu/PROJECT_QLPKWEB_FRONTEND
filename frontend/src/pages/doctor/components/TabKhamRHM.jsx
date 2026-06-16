@@ -1,66 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import { getByPhieuKhamApi as getChiSoKhamByMaPhieuKhamApi, saveAndUpdateApi as saveAndUpdatePhieuKhamApi } from '../../../api/chiSoKhamTongHopApi';
+import React, { useState } from 'react';
+import { saveAndUpdateApi as saveAndUpdatePhieuKhamApi } from '../../../api/chiSoKhamTongHopApi';
+import { useNotification } from '../../../components/NotificationContext';
 
 
 const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
+  const { showSuccess, showError } = useNotification();
   const [selectedTooth, setSelectedTooth] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // --- LOGIC LOAD DỮ LIỆU ---
-  useEffect(() => {
-    const loadRhmData = async () => {
-      // 1. Kiểm tra mã phiếu
-      if (!maPhieuKham) {
-        console.warn("TabKhamRHM: Không tìm thấy maPhieuKham");
-        return;
-      }
+  // NOTE: Data is loaded by the parent component (TroLyRHMForm / ManHinhKhamBenh).
+  // This component is a "controlled" form bound to parent's `examData` and `setExamData`.
 
-      try {
-        console.log("TabKhamRHM: Đang gọi API load dữ liệu cho phiếu #" + maPhieuKham);
-        const data = await getChiSoKhamByMaPhieuKhamApi(maPhieuKham);
-        
-        if (data) {
-          console.log("TabKhamRHM: Đã nhận dữ liệu từ DB:", data);
-          
-          // 2. Cập nhật state chung của Bác sĩ/Trợ lý
-          // Sử dụng hàm callback setExamData(prev => ...) để đảm bảo không mất các trường khám lâm sàng cũ
-          setExamData(prev => ({
-            ...prev,
-            // Map chính xác từng trường (Ưu tiên camelCase, fallback snake_case)
-            tinhTrangRang: data.tinhTrangRang || data.tinh_trang_rang || '',
-            sauRang: data.sauRang || data.sau_rang || '',
-            caoRang: data.caoRang || data.cao_rang || '',
-            viemNuou: data.viemNuou || data.viem_nuou || '',
-            khopCan: data.khopCan || data.khop_can || '',
-            doLungLay: data.doLungLay || data.do_lung_lay || '',
-            niemMacMieng: data.niemMacMieng || data.niem_mac_mieng || '',
-            phuHinhCu: data.phuHinhCu || data.phu_hinh_cu || '',
-            benhLyKhacRhm: data.benhLyKhacRhm || data.benh_ly_khac_rhm || '',
-            // Gán lại maPhieuKham vào state để tránh bị null khi lưu
-            maPhieuKham: maPhieuKham 
-          }));
-        } else {
-          console.log("TabKhamRHM: Phiếu này chưa có dữ liệu khám chuyên khoa RHM.");
-          // Reset các trường RHM về rỗng nếu là phiếu mới hoàn toàn
-          setExamData(prev => ({
-            ...prev,
-            sauRang: '', caoRang: '', viemNuou: '', khopCan: '', doLungLay: '',
-            tinhTrangRang: '', niemMacMieng: '', phuHinhCu: '', benhLyKhacRhm: '',
-            maPhieuKham: maPhieuKham
-          }));
-        }
-      } catch (error) {
-        console.error("TabKhamRHM: Lỗi khi load dữ liệu:", error);
-      }
-    };
+  // --- VALIDATE ---
+  const [errors, setErrors] = useState({});
 
-    loadRhmData();
-  }, [maPhieuKham]); // Chỉ chạy lại khi mã phiếu thay đổi
+  const validate = () => {
+    const newErrors = {};
+    const fields = ['tinhTrangRang', 'sauRang', 'caoRang', 'viemNuou', 'niemMacMieng', 'doLungLay', 'phuHinhCu', 'benhLyKhacRhm', 'khopCan'];
+    const hasAny = fields.some(f => examData[f] && examData[f].toString().trim());
+    if (!hasAny) {
+      newErrors.general = 'Vui lòng nhập ít nhất một thông tin khám RHM';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   // --- HÀM LƯU ---
   const handleSaveClinicalExam = async () => {
-    if (!maPhieuKham) return alert("Không tìm thấy mã phiếu!");
+    if (!maPhieuKham) return showError("Không tìm thấy mã phiếu!");
     
+    if (!validate()) {
+      showError('Vui lòng kiểm tra lại thông tin trước khi lưu!');
+      return;
+    }
+
     setLoading(true);
     const user = JSON.parse(localStorage.getItem('user'));
     
@@ -73,9 +46,9 @@ const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
 
     try {
       await saveAndUpdatePhieuKhamApi(payload);
-      alert(`✅ Đã lưu kết quả khám RHM thành công!`);
+      showSuccess(`✅ Đã lưu kết quả khám RHM thành công!`);
     } catch (error) {
-      alert("❌ Lỗi: " + error.message);
+      showError("❌ Lỗi: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -197,7 +170,7 @@ const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
           className={`px-10 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg flex items-center gap-2 ${loading ? 'opacity-50' : ''}`}
         >
           <span className="material-symbols-outlined">{loading ? 'sync' : 'how_to_reg'}</span>
-          {loading ? 'ĐANG LƯU...' : (isAssistant ? 'HOÀN TẤT VÀ CHUYỂN BÁC SĨ KIỂM TRA' : 'XÁC NHẬN KẾT QUẢ KHÁM RHM')}
+          {loading ? 'ĐANG LƯU...' : (isAssistant ? 'LƯU KẾT QUẢ KHÁM RHM SƠ BỘ' : 'XÁC NHẬN KẾT QUẢ KHÁM RHM')}
         </button>
       </div>
     </div>

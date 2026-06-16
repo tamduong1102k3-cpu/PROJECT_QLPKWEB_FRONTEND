@@ -1,54 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { getByPhieuKhamApi, saveAndUpdateApi } from '../../../api/chiSoKhamTongHopApi';
+import { useNotification } from '../../../components/NotificationContext';
 
 const TabKhamTMH = ({ examData, setExamData, maPhieuKham, isAssistant }) => {
+  const { showSuccess, showError } = useNotification();
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
 
-  // Load existing data for TMH fields
-  useEffect(() => {
-    const loadTmhData = async () => {
-      if (!maPhieuKham) {
-        console.warn("TabKhamTMH: Không tìm thấy maPhieuKham");
-        return;
-      }
+  // NOTE: Data is loaded by the parent component (TroLyTMHForm / ManHinhKhamBenh).
+  // This component is a "controlled" form bound to parent's `examData` and `setExamData`.
 
-      try {
-        console.log("TabKhamTMH: Đang tải dữ liệu cho phiếu #" + maPhieuKham);
-        const data = await getByPhieuKhamApi(maPhieuKham);
-        
-        if (data) {
-          console.log("TabKhamTMH: Đã nhận dữ liệu từ DB:", data);
-          setExamData(prev => ({
-            ...prev,
-            // Map TMH fields
-            tinhTrangMui: data.tinhTrangMui || '',
-            tinhTrangHong: data.tinhTrangHong || '',
-            soiTaiMuiHong: data.soiTaiMuiHong || '',
-            ongTai: data.ongTai || '',
-            mangNhiPhai: data.mangNhiPhai || '',
-            mangNhiTrai: data.mangNhiTrai || '',
-            vachNgan: data.vachNgan || '',
-            cuonMui: data.cuonMui || '',
-            kheMui: data.kheMui || '',
-            amidan: data.amidan || '',
-            thanhQuan: data.thanhQuan || '',
-            thinhLucTaiTrai: data.thinhLucTaiTrai || '',
-            thinhLucTaiPhai: data.thinhLucTaiPhai || '',
-            ghiChu: data.ghiChu || '',
-            maPhieuKham: maPhieuKham 
-          }));
-        }
-      } catch (error) {
-        console.error("TabKhamTMH: Lỗi khi load dữ liệu:", error);
-      }
-    };
-
-    loadTmhData();
-  }, [maPhieuKham, setExamData]);
+  const validate = () => {
+    const newErrors = {};
+    // At least one field should be filled for TMH exam
+    const fields = ['tinhTrangMui', 'tinhTrangHong', 'soiTaiMuiHong', 'ongTai', 'mangNhiPhai', 'mangNhiTrai', 'vachNgan', 'cuonMui', 'kheMui', 'amidan', 'thanhQuan', 'thinhLucTaiTrai', 'thinhLucTaiPhai'];
+    const hasAny = fields.some(f => examData[f] && examData[f].trim());
+    if (!hasAny) {
+      newErrors.general = 'Vui lòng nhập ít nhất một thông tin khám TMH';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSave = async () => {
-    if (!maPhieuKham) return alert("Không tìm thấy mã phiếu!");
+    if (!maPhieuKham) return showError("Không tìm thấy mã phiếu!");
     
+    if (!validate()) {
+      showError('Vui lòng kiểm tra lại thông tin trước khi lưu!');
+      return;
+    }
+
     setLoading(true);
     const user = JSON.parse(localStorage.getItem('user'));
     
@@ -74,9 +55,10 @@ const TabKhamTMH = ({ examData, setExamData, maPhieuKham, isAssistant }) => {
 
     try {
       await saveAndUpdateApi(payload);
-      alert(`✅ Đã lưu kết quả khám TMH thành công!`);
+      showSuccess(`✅ Đã lưu kết quả khám TMH thành công!`);
+      setErrors({});
     } catch (error) {
-      alert("❌ Lỗi: " + error.message);
+      showError("❌ Lỗi: " + error.message);
     } finally {
       setLoading(false);
     }

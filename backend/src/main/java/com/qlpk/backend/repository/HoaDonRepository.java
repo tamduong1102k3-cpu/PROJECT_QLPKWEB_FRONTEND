@@ -47,4 +47,62 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, Integer> {
         ORDER BY CAST(h.ngayThanhToan AS date) ASC
     """)
     List<Object[]> thongKeDoanhThu7Ngay(@Param("since") java.time.LocalDateTime since);
+
+    /** Lấy danh sách hóa đơn đã thanh toán kèm thông tin bệnh nhân chi tiết (cho dược sĩ) */
+    @Query(value = "SELECT h.ma_hoa_don as maHoaDon, h.ma_phieu_kham as maPhieuKham, h.tong_tien as tongTien, " +
+                   "h.ngay_thanh_toan as ngayThanhToan, h.trang_thai as trangThai, h.phuong_thuc_thanh_toan as phuongThucThanhToan, " +
+                   "b.ma_benh_nhan as maBenhNhan, b.ho_ten as hoTen, b.so_dien_thoai as soDienThoai, " +
+                   "CASE WHEN b.gioi_tinh = 1 THEN 'Nam' WHEN b.gioi_tinh = 0 THEN 'Nữ' ELSE b.gioi_tinh END as gioiTinh " +
+                   "FROM hoa_don h " +
+                   "JOIN phieu_kham p ON h.ma_phieu_kham = p.ma_phieu_kham " +
+                   "JOIN benh_nhan b ON p.ma_benh_nhan = b.ma_benh_nhan " +
+                   "WHERE LOWER(h.trang_thai) = 'da thanh toan' " +
+                   "ORDER BY h.ngay_thanh_toan DESC", nativeQuery = true)
+    List<java.util.Map<String, Object>> findPaidInvoicesDetailed();
+
+    /** Lấy danh sách hóa đơn đã thanh toán CÓ thuốc (chỉ những hóa đơn có ct_hoa_don loai_muc = 'THUOC') */
+    @Query(value = "SELECT DISTINCT h.ma_hoa_don as maHoaDon, h.ma_phieu_kham as maPhieuKham, h.tong_tien as tongTien, " +
+                   "h.ngay_thanh_toan as ngayThanhToan, h.trang_thai as trangThai, " +
+                   "b.ma_benh_nhan as maBenhNhan, b.ho_ten as hoTen, b.so_dien_thoai as soDienThoai, " +
+                   "CASE WHEN b.gioi_tinh = 1 THEN 'Nam' WHEN b.gioi_tinh = 0 THEN 'Nữ' ELSE b.gioi_tinh END as gioiTinh " +
+                   "FROM hoa_don h " +
+                   "JOIN phieu_kham p ON h.ma_phieu_kham = p.ma_phieu_kham " +
+                   "JOIN benh_nhan b ON p.ma_benh_nhan = b.ma_benh_nhan " +
+                   "JOIN ct_hoa_don ct ON ct.ma_hoa_don = h.ma_hoa_don " +
+                   "WHERE LOWER(h.trang_thai) = 'da thanh toan' " +
+                   "  AND ct.loai_muc = 'THUOC' " +
+                   "ORDER BY h.ngay_thanh_toan DESC", nativeQuery = true)
+    List<java.util.Map<String, Object>> findPaidInvoicesWithThuoc();
+
+    /** Lấy danh sách hóa đơn đã thanh toán CÓ thuốc kèm trạng thái toa thuốc (cho dược sĩ 2 tab) */
+    @Query(value = "SELECT DISTINCT h.ma_hoa_don as maHoaDon, h.ma_phieu_kham as maPhieuKham, h.tong_tien as tongTien, " +
+                   "h.ngay_thanh_toan as ngayThanhToan, h.trang_thai as trangThai, " +
+                   "b.ma_benh_nhan as maBenhNhan, b.ho_ten as hoTen, b.so_dien_thoai as soDienThoai, " +
+                   "CASE WHEN b.gioi_tinh = 1 THEN 'Nam' WHEN b.gioi_tinh = 0 THEN 'Nữ' ELSE b.gioi_tinh END as gioiTinh, " +
+                   "CASE WHEN EXISTS (SELECT 1 FROM toa_thuoc tt WHERE tt.ma_phieu_kham = h.ma_phieu_kham AND tt.trang_thai = 'CHO_CAP_THUOC') " +
+                   "     THEN 'CHO_CAP' ELSE 'DA_CAP' END as tinhTrangCapThuoc " +
+                   "FROM hoa_don h " +
+                   "JOIN phieu_kham p ON h.ma_phieu_kham = p.ma_phieu_kham " +
+                   "JOIN benh_nhan b ON p.ma_benh_nhan = b.ma_benh_nhan " +
+                   "JOIN ct_hoa_don ct ON ct.ma_hoa_don = h.ma_hoa_don " +
+                   "WHERE LOWER(h.trang_thai) = 'da thanh toan' " +
+                   "  AND ct.loai_muc = 'THUOC' " +
+                   "ORDER BY CASE WHEN EXISTS (SELECT 1 FROM toa_thuoc tt2 WHERE tt2.ma_phieu_kham = h.ma_phieu_kham AND tt2.trang_thai = 'CHO_CAP_THUOC') THEN 0 ELSE 1 END, " +
+                   "h.ngay_thanh_toan DESC", nativeQuery = true)
+    List<java.util.Map<String, Object>> findPaidInvoicesWithThuocAndStatus();
+
+    /** Lấy danh sách hóa đơn đã thanh toán CÓ thuốc đã cấp (DA_CAP_THUOC) - cho lịch sử dược sĩ, tất cả các ngày */
+    @Query(value = "SELECT DISTINCT h.ma_hoa_don as maHoaDon, h.ma_phieu_kham as maPhieuKham, h.tong_tien as tongTien, " +
+                   "h.ngay_thanh_toan as ngayThanhToan, h.trang_thai as trangThai, " +
+                   "b.ma_benh_nhan as maBenhNhan, b.ho_ten as hoTen, b.so_dien_thoai as soDienThoai, " +
+                   "CASE WHEN b.gioi_tinh = 1 THEN 'Nam' WHEN b.gioi_tinh = 0 THEN 'Nữ' ELSE b.gioi_tinh END as gioiTinh, " +
+                   "tt.ngay_tao as ngayCapThuoc " +
+                   "FROM hoa_don h " +
+                   "JOIN phieu_kham p ON h.ma_phieu_kham = p.ma_phieu_kham " +
+                   "JOIN benh_nhan b ON p.ma_benh_nhan = b.ma_benh_nhan " +
+                   "JOIN toa_thuoc tt ON tt.ma_phieu_kham = h.ma_phieu_kham " +
+                   "WHERE LOWER(h.trang_thai) = 'da thanh toan' " +
+                   "  AND tt.trang_thai = 'DA_CAP_THUOC' " +
+                   "ORDER BY tt.ngay_tao DESC", nativeQuery = true)
+    List<java.util.Map<String, Object>> findPaidInvoicesDaCapThuoc();
 }

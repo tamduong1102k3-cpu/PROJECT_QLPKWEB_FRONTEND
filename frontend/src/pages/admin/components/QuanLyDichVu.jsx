@@ -1,5 +1,5 @@
-import { apiClient } from "../../api/apiClient";
-import { createApi, updateApi, deleteApi } from '../../api/dichVuApi';
+import { apiClient } from "../../../api/apiClient";
+import { createApi, updateApi, deleteApi } from '../../../api/dichVuApi';
 import React, { useState, useEffect } from 'react';
 const BASE_DV = 'http://localhost:8080/api/dich-vu';
 const BASE_DM = 'http://localhost:8080/api/danhmuc';

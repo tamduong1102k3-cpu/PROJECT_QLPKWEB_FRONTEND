@@ -9,5 +9,6 @@ public class CheckInRequest {
     private Integer maNhanVienBacSi;
     private Integer maChuyenKhoa;
     private Integer maDichVu;
+    private Integer appointmentId;
     private String ghiChu;
 }

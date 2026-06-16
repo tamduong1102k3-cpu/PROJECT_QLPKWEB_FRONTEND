@@ -137,23 +137,13 @@ public class TaiKhoanServiceImpl implements TaiKhoanService {
         if (maNhanVien != null) {
             var nhanVienOpt = nhanVienRepository.findById(maNhanVien);
             if (nhanVienOpt.isPresent()) {
-                String tenCK = nhanVienOpt.get().getChuyenKhoa();
-                if (tenCK != null) {
-                    result.put("tenChuyenKhoa", tenCK);
+                Integer maCK = nhanVienOpt.get().getChuyenKhoa();
+                if (maCK != null) {
+                    result.put("maChuyenKhoa", maCK);
                     
-                    var ckOpt = chuyenKhoaRepository.findByTenChuyenKhoa(tenCK);
+                    var ckOpt = chuyenKhoaRepository.findById(maCK);
                     if (ckOpt.isPresent()) {
-                        result.put("maChuyenKhoa", ckOpt.get().getMaChuyenKhoa());
-                    } else {
-                        String searchName = tenCK.trim().toLowerCase();
-                        var allCK = chuyenKhoaRepository.findAll();
-                        for (var ck : allCK) {
-                            String ckName = ck.getTenChuyenKhoa() != null ? ck.getTenChuyenKhoa().trim().toLowerCase() : "";
-                            if (ckName.equals(searchName) || ckName.contains(searchName) || searchName.contains(ckName)) {
-                                result.put("maChuyenKhoa", ck.getMaChuyenKhoa());
-                                break;
-                            }
-                        }
+                        result.put("tenChuyenKhoa", ckOpt.get().getTenChuyenKhoa());
                     }
                 }
             }

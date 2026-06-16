@@ -1,5 +1,5 @@
-import { apiClient } from "../../api/apiClient";
-import { getAllApi, getChiTietApi } from '../../api/hoaDonApi';
+import { apiClient } from "../../../api/apiClient";
+import { getAllApi, getChiTietApi } from '../../../api/hoaDonApi';
 import React, { useState, useEffect } from 'react';
 const API = 'http://localhost:8080/api/hoa-don';
 const NV_API = 'http://localhost:8080/api/nhan_vien';

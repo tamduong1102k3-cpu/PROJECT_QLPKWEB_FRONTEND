@@ -1,4 +1,4 @@
-import { getAllApi, updateApi, deleteApi } from '../../api/accountApi'; 
+import { getAllApi, updateApi, deleteApi } from '../../../api/accountApi'; 
 import React, { useState, useEffect } from 'react';
 
 const VAI_TRO_OPTIONS = ['QUAN_TRI_VIEN', 'BAC_SI_CHUYEN_KHOA', 'Y_TA', 'LE_TAN'];

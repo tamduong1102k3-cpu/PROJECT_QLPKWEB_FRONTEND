@@ -130,11 +130,83 @@ export const getAllKhoApi = async () => {
 };
 
 /**
+ * GET /canh-bao - Lấy tất cả tồn kho kèm trạng thái cảnh báo
+ */
+export const getKhoCanhBaoApi = async () => {
+  try {
+    const response = await fetchClient(`${API_URL}/canh-bao`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in getKhoCanhBaoApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * GET /canh-bao/thuoc - Danh sách thuốc đang có cảnh báo
+ */
+export const getThuocCanhBaoApi = async () => {
+  try {
+    const response = await fetchClient(`${API_URL}/canh-bao/thuoc`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in getThuocCanhBaoApi:", error);
+    throw error;
+  }
+};
+
+/**
  * GET /sap-het
+ */
+export const getThuocSapHetApi = async (threshold = 20) => {
+  try {
+    const response = await fetchClient(`${API_URL}/sap-het?threshold=${threshold}`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in getThuocSapHetApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * GET /phieu-nhap
  */
 export const getAllPhieuNhapApi = async () => {
   try {
-    const response = await fetchClient(`${API_URL}/sap-het`, {
+    const response = await fetchClient(`${API_URL}/phieu-nhap`, {
       method: 'GET'
     });
     if (!response.ok) {

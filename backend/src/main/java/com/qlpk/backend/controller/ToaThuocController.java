@@ -3,6 +3,7 @@ package com.qlpk.backend.controller;
 import com.qlpk.backend.dto.PrescriptionRequest;
 import com.qlpk.backend.entity.ChiTietToaThuoc;
 import com.qlpk.backend.entity.ToaThuoc;
+import com.qlpk.backend.payment.WebSocketPublisher;
 import com.qlpk.backend.service.ChiTietToaThuocService;
 import com.qlpk.backend.service.ToaThuocService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,10 +24,17 @@ public class ToaThuocController {
     @Autowired
     private ChiTietToaThuocService chiTietService;
 
+    @Autowired
+    private WebSocketPublisher webSocketPublisher;
+
     @PostMapping
     public ResponseEntity<?> create(@RequestBody PrescriptionRequest request) {
         try {
             ToaThuoc savedToa = toaThuocService.createPrescription(request);
+            if (savedToa != null) {
+                // Publish WebSocket event khi tạo toa thuốc mới -> dược sĩ cập nhật realtime
+                webSocketPublisher.publishToaThuocChange("CREATED", savedToa.getMaPhieuKham());
+            }
             return ResponseEntity.ok(savedToa);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("message", "Lỗi: " + e.getMessage()));

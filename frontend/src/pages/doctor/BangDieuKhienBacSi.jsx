@@ -1,26 +1,25 @@
 import React, { useState } from 'react';
-import QuanLyBenhNhan from '../admin/QuanLyBenhNhan';
-import LichSuKham from './components/LichSuKham';
+import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
+import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
 import DuyetKetQuaXetNghiem from './components/DuyetKetQuaXetNghiem';
 import DuyetKetQuaCDHA from './components/DuyetKetQuaCDHA';
 import HangDoiKham from './components/HangDoiKham';
 import ManHinhKhamBenh from './components/ManHinhKhamBenh';
+import TabHenTaiKham from './components/TabHenTaiKham';
 import UserMenu from '../../components/UserMenu';
+import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 
 const BangDieuKhienBacSi = ({ onLogout, user }) => {
-  const isXetNghiemDoc = user?.maChuyenKhoa === 7 || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('xét nghiệm') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('xact nghiem') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('xact nghi?m');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  // Dựa vào mã chuyên khoa và tên chuyên khoa:
+  // 1: Nội tổng quát, 3: Nhi khoa, 4: TMH, 5: RHM, 7: Xét nghiệm, 11: Tim mạch, 12: CĐHA
+  const maCK = Number(user?.maChuyenKhoa);
+  const tenCK = (user?.tenChuyenKhoa || '').toLowerCase();
+  const vaiTro = (user?.vaiTro || '').toUpperCase();
 
-  const isCdhaDoc = user?.maChuyenKhoa === 8 || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('chẩn đoán hình ảnh') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('chan doan hinh anh') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('cdha') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('siêu âm') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('sieu am') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('x-quang') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('xquang');
+  // Kiểm tra nhiều nguồn để đảm bảo phát hiện chính xác
+  const isXetNghiemDoc = maCK === 7 || vaiTro.includes('XET_NGHIEM') || tenCK.includes('xét nghiệm');
+  const isCdhaDoc = maCK === 12 || vaiTro.includes('CDHA') || vaiTro.includes('CHAN_DOAN_HINH_ANH') || tenCK.includes('chẩn đoán') || tenCK.includes('hình ảnh');
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -51,6 +50,11 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
       id: 'patients',
       label: 'Hồ Sơ Bệnh Nhân',
       icon: 'person_search'
+    }, 
+    {
+      id: 'appointments',
+      label: 'Lịch Hẹn',
+      icon: 'calendar_month'
     }
   ];
 
@@ -61,6 +65,7 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
           <HangDoiKham 
             user={user} 
             handleSelectPatient={handleSelectPatient} 
+            refreshTrigger={refreshTrigger}
           />
         );
       case 'examination':
@@ -133,9 +138,11 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
           </div>
         );
       case 'history':
-        return <LichSuKham user={user} onSelectPatient={handleSelectPatient} />;
+        return <LichSuChuyenKhoa user={user} onReview={handleSelectPatient} />;
       case 'patients':
         return <QuanLyBenhNhan />;
+      case 'appointments':
+        return <TabHenTaiKham user={user} />;
       default:
         return null;
     }
@@ -143,6 +150,12 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
 
   return (
     <div className="flex h-screen bg-[#f8f9fa] font-body-md text-on-background overflow-hidden">
+      <WebSocketAutoRefresh
+        topics={['/topic/phieu-kham', '/topic/dang-ky-kham', '/topic/cls']}
+        onMessage={(topic, data) => {
+          setRefreshTrigger(prev => prev + 1);
+        }}
+      />
       <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20`}>
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
           <div className="flex items-center gap-2">
@@ -167,12 +180,6 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
             ))}
           </ul>
         </nav>
-        <div className="p-4 border-t border-gray-200">
-          <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors font-medium">
-            <span className="material-symbols-outlined">logout</span>
-            {isSidebarOpen && <span>Đăng xuất</span>}
-          </button>
-        </div>
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">

@@ -4,61 +4,22 @@ import {
   approveCdhaResultApi, 
   rejectCdhaResultApi 
 } from "../../../api/phieuChiDinhApi";
+import { useNotification } from '../../../components/NotificationContext';
+import PrintButton from '../../../components/PrintButton';
 
 const DuyetKetQuaCDHA = ({
   patient,
   user,
   onBack
 }) => {
+  const { showSuccess, showError, showWarning } = useNotification();
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState([]);
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const [activeImageKey, setActiveImageKey] = useState('duongDanAnh1');
-  const [zoom, setZoom] = useState(1);
-  const [brightness, setBrightness] = useState(100);
-  const [contrast, setContrast] = useState(100);
-  const [invert, setInvert] = useState(false);
-  const [rotate, setRotate] = useState(0);
-  const [showGrid, setShowGrid] = useState(false);
-  const [pan, setPan] = useState({
-    x: 0,
-    y: 0
-  });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({
-    x: 0,
-    y: 0
-  });
-  const handleMouseDown = e => {
-    e.preventDefault();
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - pan.x,
-      y: e.clientY - pan.y
-    });
-  };
-  const handleMouseMove = e => {
-    if (!isDragging) return;
-    setPan({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    });
-  };
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-  const handleResetFilters = () => {
-    setZoom(1);
-    setBrightness(100);
-    setContrast(100);
-    setInvert(false);
-    setRotate(0);
-    setPan({
-      x: 0,
-      y: 0
-    });
-  };
+
   const fetchCdhaResults = useCallback(async () => {
     try {
       setLoading(true);
@@ -79,20 +40,23 @@ const DuyetKetQuaCDHA = ({
       setLoading(false);
     }
   }, [patient.maPhieuKham]);
+
   useEffect(() => {
     fetchCdhaResults();
   }, [fetchCdhaResults]);
+
   const handleTextChange = (field, value) => {
     if (results.length === 0) return;
     const updated = [...results];
     updated[selectedResultIndex][field] = value;
     setResults(updated);
   };
+
   const handleApprove = async () => {
     const currentResult = results[selectedResultIndex];
     if (!currentResult) return;
     if (!currentResult.ketLuan.trim()) {
-      alert("Vui lòng điền kết luận chẩn đoán trước khi ký duyệt!");
+      showWarning("Vui lòng điền kết luận chẩn đoán trước khi ký duyệt!");
       return;
     }
     setSubmitting(true);
@@ -107,22 +71,23 @@ const DuyetKetQuaCDHA = ({
       };
       const detailId = currentResult.maChiTietChiDinh || currentResult.idChiTietChiDinh;
       await approveCdhaResultApi(detailId, payload);
-      alert("Đã ký duyệt kết quả chẩn đoán hình ảnh thành công!");
+      showSuccess("Đã ký duyệt kết quả chẩn đoán hình ảnh thành công!");
       onBack();
     } catch (e) {
       console.error(e);
-      alert("Lỗi khi ký duyệt kết quả: " + e.message);
+      showError("Lỗi khi ký duyệt kết quả: " + e.message);
     } finally {
       setSubmitting(false);
     }
   };
+
   const handleReject = async () => {
     const currentResult = results[selectedResultIndex];
     if (!currentResult) return;
     const reason = prompt("Nhập lý do không duyệt / yêu cầu kỹ thuật viên chụp lại:");
     if (reason === null) return;
     if (!reason.trim()) {
-      alert("Lý do từ chối không được để trống!");
+      showWarning("Lý do từ chối không được để trống!");
       return;
     }
     setSubmitting(true);
@@ -131,263 +96,377 @@ const DuyetKetQuaCDHA = ({
       await rejectCdhaResultApi(detailId, {
         reason: reason.trim()
       });
-      alert("Đã từ chối kết quả và gửi yêu cầu thực hiện lại cho kỹ thuật viên!");
+      showSuccess("Đã từ chối kết quả và gửi yêu cầu thực hiện lại cho kỹ thuật viên!");
       onBack();
     } catch (e) {
       console.error(e);
-      alert("Lỗi khi gửi yêu cầu từ chối: " + e.message);
+      showError("Lỗi khi gửi yêu cầu từ chối: " + e.message);
     } finally {
       setSubmitting(false);
     }
   };
+
   const applyTemplate = type => {
     let findings = "";
     let conclusion = "";
     let recommendation = "Theo dõi lâm sàng và kết hợp lâm sàng.";
     if (type === 'ultrasound') {
-      findings = "SIÊU ÂM BỤNG TỔNG QUÁT:\nGAN: Kích thước bình thường, nhu mô đều, không thấy tổn thương khu trú.\nMẬT: Túi mật căng thành mỏng, không sỏi. Đường mật trong và ngoài gan không giãn.\nTỤY, LÁCH: Kích thước bình thường, nhu mô đồng nhất.\nTHẬN: Vị trí bình thường, kích thước đều hai bên, nhu mô phân biệt tủy về rõ, không sỏi, không ứ nước.\nBÀNG QUANG: Thành mỏng, không sỏi.";
-      conclusion = "Hiện chưa thấy hình ảnh bất thường trên siêu âm bụng tổng quát.";
+      findings = "SIÊU ÂM BỤNG TỔNG QUÁT:\nGAN: Kích thước bình thường, nhu mô đều.\nMẬT: Túi mật căng thành mỏng, không sỏi.\nTỤY, LÁCH: Kích thước bình thường.\nTHẬN: Kích thước đều hai bên, không sỏi, không ứ nước.\nBÀNG QUANG: Thành mỏng, không sỏi.";
+      conclusion = "Chưa thấy hình ảnh bất thường trên siêu âm bụng tổng quát.";
     } else if (type === 'xray') {
-      findings = "X-QUANG NGỰC THẲNG:\nPHẾ TRƯỜNG: Hai phế trường sáng đều, nhu mô phổi bình thường, không thấy tổn thương thâm nhiễm hay xơ xẹp.\nBÓNG TIM: Chỉ số tim ngực trong giới hạn bình thường.\nCƠ HOÀNH: Vòm hoành hai bên đều, góc sườn hoành hai bên nhọn.";
+      findings = "X-QUANG NGỰC THẲNG:\nPHẾ TRƯỜNG: Hai phế trường sáng đều, nhu mô phổi bình thường.\nBÓNG TIM: Chỉ số tim ngực trong giới hạn bình thường.\nCƠ HOÀNH: Vòm hoành hai bên đều, góc sườn hoành nhọn.";
       conclusion = "Hình ảnh tim phổi thẳng bình thường.";
     } else if (type === 'ct') {
-      findings = "CT-SCANNER SỌ NÃO KHÔNG CẢN QUANG:\nNHU MÔ NÃO: Nhu mô não đều, không thấy ổ giảm đậm độ hay xuất huyết cấp tính.\nHỆ THỐNG NÃO THẤT: Cân đối, không giãn, đường giữa không lệch.\nXƯƠNG SỌ: Không thấy đường nứt xương sọ.";
-      conclusion = "Hiện chưa phát hiện tổn thương sọ não cấp tính trên phim CT.";
+      findings = "CT-SCANNER SỌ NÃO KHÔNG CẢN QUANG:\nNHU MÔ NÃO: Nhu mô não đều, không thấy ổ giảm đậm độ hay xuất huyết cấp tính.\nHỆ THỐNG NÃO THẤT: Cân đối, không giãn.\nXƯƠNG SỌ: Không thấy đường nứt xương sọ.";
+      conclusion = "Chưa phát hiện tổn thương sọ não cấp tính trên phim CT.";
     } else if (type === 'mri') {
-      findings = "MRI CỘT SỐNG THẮT LƯNG:\nCỘT SỐNG: Trục cột sống thắt lưng bình thường. Chiều cao đốt sống bình thường.\nĐĨA ĐỆM: Đĩa đệm L4-L5, L5-S1 giảm tín hiệu nhẹ trên T2W, không thấy phồng hay thoát vị đĩa đệm chèn ép rễ thần kinh.\nTỦY SỐNG: Tín hiệu đoạn tủy thắt lưng bình thường.";
+      findings = "MRI CỘT SỐNG THẮT LƯNG:\nTrục cột sống thắt lưng bình thường.\nĐĨA ĐỆM: Không thấy phồng hay thoát vị đĩa đệm chèn ép rễ thần kinh.\nTỦY SỐNG: Tín hiệu đoạn tủy thắt lưng bình thường.";
       conclusion = "Chưa phát hiện thoát vị đĩa đệm gây hẹp ống sống hay chèn ép rễ thần kinh.";
     }
     handleTextChange('moTaHinhAnh', findings);
     handleTextChange('ketLuan', conclusion);
     handleTextChange('deNghi', recommendation);
   };
+
   const currentResult = results[selectedResultIndex];
-  const currentImgUrl = currentResult ? currentResult[activeImageKey] : null;
-  const imageStyle = {
-    transform: `scale(${zoom}) rotate(${rotate}deg) translate(${pan.x}px, ${pan.y}px)`,
-    filter: `brightness(${brightness}%) contrast(${contrast}%) ${invert ? 'invert(1)' : 'invert(0)'}`,
-    transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-    cursor: isDragging ? 'grabbing' : 'grab',
-    maxWidth: '100%',
-    maxHeight: '100%',
-    objectFit: 'contain'
-  };
-  return <div className="space-y-6 animate-scale-up">
-      {/* Header Panel */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between bg-gradient-to-r from-white to-indigo-50/30">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg shadow-indigo-200">
+  const isApproved = currentResult?.trangThai === 'DA_DUYET';
+  const hasImages = currentResult?.duongDanAnh1 || currentResult?.duongDanAnh2;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-20 text-indigo-600 font-bold italic">
+        <span className="material-symbols-outlined animate-spin mr-2">sync</span>
+        Đang tải kết quả chẩn đoán hình ảnh...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 animate-scale-up">
+      {/* Header */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-xl font-black shadow-lg shadow-indigo-200">
             {patient.hoTen?.[0] || 'BN'}
           </div>
           <div>
-            <h2 className="text-2xl font-black text-gray-800">{patient.hoTen}</h2>
-            <div className="flex items-center gap-4 mt-1 text-sm font-medium text-gray-500">
-              <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md">#{patient.maBenhNhan}</span>
-              <span>•</span>
-              <span>{patient.gioiTinh ? 'Nam' : 'Nữ'}</span>
-              <span>•</span>
-              <span>{new Date(patient.ngaySinh).getFullYear()}</span>
-            </div>
+            <h2 className="text-xl font-black text-gray-800">{patient.hoTen}</h2>
+            <p className="text-sm text-gray-500">
+              #{patient.maBenhNhan} • {patient.gioiTinh ? 'Nam' : 'Nữ'} • {patient.ngaySinh ? new Date(patient.ngaySinh).getFullYear() : ''}
+            </p>
           </div>
         </div>
-        <button onClick={onBack} className="px-5 py-2.5 bg-gray-100 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-200 transition-all flex items-center gap-2 border border-gray-200">
-          <span className="material-symbols-outlined text-sm">arrow_back</span>
-          QUAY LẠI HÀNG ĐỢI
+        <button onClick={onBack} className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-200 transition-all border border-gray-200">
+          ← QUAY LẠI
         </button>
       </div>
 
-      {results.length === 0 ? <div className="bg-white p-12 text-center rounded-2xl shadow-sm border border-gray-100 text-gray-400 italic">
+      {results.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-2xl shadow-sm border border-gray-100 text-gray-400 italic">
           Bệnh nhân này chưa có kết quả chỉ định chẩn đoán hình ảnh nào được tải lên.
-        </div> : <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* LEFT COLUMN: DICOM/Imaging Viewer (7 cols) */}
-          <div className="lg:col-span-7 bg-[#0b0f19] rounded-2xl shadow-xl overflow-hidden border border-slate-800 p-5 flex flex-col space-y-4">
-            <div className="flex justify-between items-center text-slate-300 border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-400">videocam</span>
-                <span className="font-bold text-sm tracking-wider uppercase text-slate-200">
-                  {currentResult?.tenDichVu || 'Đầu phim chẩn đoán'}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          {/* LEFT: Main Content (4/5) */}
+          <div className="lg:col-span-4 space-y-5">
+            {/* Patient Info + Service Selector */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-bold text-gray-700">PHIẾU KẾT QUẢ CHẨN ĐOÁN HÌNH ẢNH</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Mã BN: #{patient.maBenhNhan} | Mã PK: #{patient.maPhieuKham} | 
+                    Giới: {patient.gioiTinh ? 'Nam' : 'Nữ'} | 
+                    Năm sinh: {patient.ngaySinh ? new Date(patient.ngaySinh).getFullYear() : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {results.length > 1 && (
+                    <div className="flex gap-2">
+                      {results.map((res, index) => (
+                        <button
+                          key={res.id}
+                          onClick={() => {
+                            setSelectedResultIndex(index);
+                            setActiveImageKey('duongDanAnh1');
+                          }}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            selectedResultIndex === index
+                              ? 'bg-indigo-600 text-white shadow-md'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          {res.tenDichVu}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Nút xem ảnh riêng biệt */}
+                  {hasImages && (
+                    <button
+                      onClick={() => setShowImageModal(true)}
+                      className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 flex items-center gap-2 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-sm">visibility</span>
+                      XEM HÌNH ẢNH
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Mô tả hình ảnh - LỚN */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold text-gray-700 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-indigo-600">description</span>
+                  Mô tả hình ảnh (Findings)
+                </h3>
+                {!isApproved && (
+                  <div className="flex gap-1.5">
+                    {[
+                      { key: 'ultrasound', label: 'Siêu âm' },
+                      { key: 'xray', label: 'X-Quang' },
+                      { key: 'ct', label: 'CT' },
+                      { key: 'mri', label: 'MRI' }
+                    ].map(tpl => (
+                      <button
+                        key={tpl.key}
+                        onClick={() => applyTemplate(tpl.key)}
+                        className="px-3 py-1 bg-gray-50 border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 text-gray-600 text-xs font-bold rounded-lg transition-all"
+                      >
+                        {tpl.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <textarea
+                rows={9}
+                value={currentResult?.moTaHinhAnh || ''}
+                onChange={e => handleTextChange('moTaHinhAnh', e.target.value)}
+                disabled={isApproved}
+                placeholder="Nhập mô tả chi tiết hình ảnh chẩn đoán..."
+                className="w-full px-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-base leading-relaxed"
+              />
+            </div>
+
+            {/* Kết luận chẩn đoán - LỚN */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-base font-bold text-gray-700 flex items-center gap-2 mb-3">
+                <span className="material-symbols-outlined text-indigo-600">assignment_turned_in</span>
+                Kết luận chẩn đoán (Impression) <span className="text-rose-500 text-sm">*</span>
+              </h3>
+              <textarea
+                rows={5}
+                value={currentResult?.ketLuan || ''}
+                onChange={e => handleTextChange('ketLuan', e.target.value)}
+                disabled={isApproved}
+                placeholder="VD: Viêm phổi thùy phải / Không có bất thường rõ..."
+                className="w-full px-5 py-4 border-2 border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-base font-bold text-indigo-900 leading-relaxed"
+              />
+            </div>
+
+            {/* Đề nghị */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-base font-bold text-gray-700 flex items-center gap-2 mb-3">
+                <span className="material-symbols-outlined text-amber-600">lightbulb</span>
+                Đề nghị / Lời dặn
+              </h3>
+              <input
+                type="text"
+                value={currentResult?.deNghi || ''}
+                onChange={e => handleTextChange('deNghi', e.target.value)}
+                disabled={isApproved}
+                placeholder="VD: Kết hợp lâm sàng hoặc đề nghị làm thêm xét nghiệm..."
+                className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-base"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-4 text-sm text-gray-500">
+                <span>👨‍🔬 KTV: ID #{currentResult?.maNhanVienThucHien || 'Chưa rõ'}</span>
+                <span>🩺 BS duyệt: {user?.hoTen || user?.username}</span>
+              </div>
+              <div className="flex gap-4">
+                {!isApproved ? (
+                  <>
+                    <button
+                      onClick={handleReject}
+                      disabled={submitting}
+                      className="px-6 py-3.5 bg-white hover:bg-rose-50 text-gray-700 hover:text-rose-600 text-base font-bold rounded-xl border-2 border-gray-200 hover:border-rose-300 flex items-center gap-2 flex-1 justify-center transition-all"
+                    >
+                      <span className="material-symbols-outlined">cancel</span>
+                      TỪ CHỐI DUYỆT
+                    </button>
+                    <button
+                      onClick={handleApprove}
+                      disabled={submitting}
+                      className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-base font-bold rounded-xl shadow-lg shadow-indigo-200 flex items-center gap-2 flex-[2] justify-center transition-all"
+                    >
+                      <span className="material-symbols-outlined">draw</span>
+                      KÝ DUYỆT KẾT QUẢ
+                    </button>
+                  </>
+                ) : (
+                  <PrintButton
+                    targetId={`cdha-print-area-${currentResult.id || currentResult.maChiTietChiDinh}`}
+                    variant="success"
+                    title="IN KẾT QUẢ CĐHA"
+                    className="w-full justify-center py-3.5 text-base"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: Mini Sidebar (1/5) */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* Service Info */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Dịch vụ</h4>
+              <p className="text-sm font-bold text-gray-800">{currentResult?.tenDichVu || 'CĐHA'}</p>
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${
+                  isApproved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {isApproved ? '✓ ĐÃ DUYỆT' : '⏳ CHỜ DUYỆT'}
                 </span>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => setActiveImageKey('duongDanAnh1')} className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${activeImageKey === 'duongDanAnh1' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+            </div>
+
+            {/* Quick Image Button */}
+            {hasImages && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Hình ảnh</h4>
+                <button
+                  onClick={() => setShowImageModal(true)}
+                  className="w-full py-8 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-xl text-blue-700 hover:bg-blue-100 transition-all flex flex-col items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-4xl">image</span>
+                  <span className="text-sm font-bold">XEM ẢNH</span>
+                  <span className="text-[10px] text-blue-500">
+                    {currentResult?.duongDanAnh2 ? '2 ảnh' : '1 ảnh'}
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* KTV Info */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">KTV thực hiện</h4>
+              <p className="text-sm font-semibold text-gray-800">ID: #{currentResult?.maNhanVienThucHien || '---'}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Modal */}
+      {showImageModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={() => setShowImageModal(false)}
+        >
+          <div className="relative max-w-[95vw] max-h-[95vh]" onClick={e => e.stopPropagation()}>
+            <div className="absolute -top-14 right-0 flex items-center gap-3">
+              {currentResult?.duongDanAnh1 && (
+                <button
+                  onClick={() => setActiveImageKey('duongDanAnh1')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg ${
+                    activeImageKey === 'duongDanAnh1'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
                   Ảnh 1
                 </button>
-                <button onClick={() => setActiveImageKey('duongDanAnh2')} className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${activeImageKey === 'duongDanAnh2' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+              )}
+              {currentResult?.duongDanAnh2 && (
+                <button
+                  onClick={() => setActiveImageKey('duongDanAnh2')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg ${
+                    activeImageKey === 'duongDanAnh2'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
                   Ảnh 2
                 </button>
-              </div>
+              )}
+              <button
+                onClick={() => setShowImageModal(false)}
+                className="text-white/70 hover:text-white flex items-center gap-1 text-sm ml-4"
+              >
+                <span className="material-symbols-outlined">close</span>
+                ĐÓNG
+              </button>
             </div>
-
-            {/* Interactive Image Panel */}
-            <div className="relative flex-1 bg-[#050811] flex items-center justify-center overflow-hidden border border-slate-900 rounded-xl h-[480px]" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-              {currentImgUrl ? <img src={currentImgUrl} alt="Medical scan" style={imageStyle} draggable={false} /> : <div className="flex flex-col items-center justify-center p-8 text-slate-500 w-full h-full select-none">
-                  <svg viewBox="0 0 400 400" className="w-64 h-64 opacity-50">
-                    <rect width="400" height="400" fill="#050811" rx="20" />
-                    <path d="M100 120 C100 80, 180 80, 180 180 C180 280, 100 320, 100 320 C100 320, 80 280, 80 180 C80 80, 100 120, 100 120 Z" fill="#1e293b" stroke="#475569" strokeWidth="2" opacity="0.3" />
-                    <path d="M300 120 C300 80, 220 80, 220 180 C220 280, 300 320, 300 320 C300 320, 320 280, 320 180 C320 80, 300 120, 300 120 Z" fill="#1e293b" stroke="#475569" strokeWidth="2" opacity="0.3" />
-                    <line x1="200" y1="50" x2="200" y2="350" stroke="#64748b" strokeWidth="10" strokeDasharray="15,5" opacity="0.4" />
-                    <path d="M200 100 C150 90, 80 120, 80 120" stroke="#64748b" strokeWidth="4" fill="none" opacity="0.4" />
-                    <path d="M200 100 C250 90, 320 120, 320 120" stroke="#64748b" strokeWidth="4" fill="none" opacity="0.4" />
-                    <path d="M200 150 C160 140, 110 160, 90 190" stroke="#64748b" strokeWidth="3" fill="none" opacity="0.3" />
-                    <path d="M200 150 C240 140, 290 160, 310 190" stroke="#64748b" strokeWidth="3" fill="none" opacity="0.3" />
-                    <path d="M200 190 C150 180, 100 210, 92 240" stroke="#64748b" strokeWidth="3" fill="none" opacity="0.3" />
-                    <path d="M200 190 C250 180, 300 210, 308 240" stroke="#64748b" strokeWidth="3" fill="none" opacity="0.3" />
-                    <path d="M170 190 Q200 220 220 250 T170 280 Q140 250 170 190 Z" fill="#334155" opacity="0.4" />
-                  </svg>
-                  <p className="text-xs mt-4 text-slate-400 text-center font-medium">Bệnh nhân chưa có ảnh chẩn đoán từ kỹ thuật viên.<br />Hiển thị ảnh phác họa giải phẫu ngực.</p>
-                </div>}
-              
-              {showGrid && <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="absolute w-full h-[1px] bg-emerald-500/20"></div>
-                  <div className="absolute h-full w-[1px] bg-emerald-500/20"></div>
-                  <div className="absolute w-24 h-24 rounded-full border border-emerald-500/10"></div>
-                  <div className="absolute w-48 h-48 rounded-full border border-emerald-500/5"></div>
-                  <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 border border-emerald-500/5">
-                    {[...Array(16)].map((_, i) => <div key={i} className="border border-emerald-500/5"></div>)}
-                  </div>
-                </div>}
-
-              {/* HUD Telemetry Overlay */}
-              <div className="absolute bottom-4 left-4 bg-slate-950/80 backdrop-blur-md px-3 py-2 rounded-lg border border-slate-800 text-[10px] font-mono text-emerald-400 space-y-0.5 shadow-lg select-none">
-                <div>ZOOM: {Math.round(zoom * 100)}%</div>
-                <div>BRIGHTNESS: {brightness}%</div>
-                <div>CONTRAST: {contrast}%</div>
-                <div>NEGATIVE: {invert ? 'ON' : 'OFF'}</div>
-                <div>ANGLE: {rotate}°</div>
-              </div>
-            </div>
-
-            {/* Slider and Buttons Control Panel */}
-            <div className="bg-slate-900 rounded-xl p-4 border border-slate-800 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Sliders */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">wb_sunny</span>Độ sáng</span>
-                    <span className="font-mono font-bold text-slate-200">{brightness}%</span>
-                  </div>
-                  <input type="range" min="50" max="200" value={brightness} onChange={e => setBrightness(parseInt(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
-
-                  <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">contrast</span>Độ tương phản</span>
-                    <span className="font-mono font-bold text-slate-200">{contrast}%</span>
-                  </div>
-                  <input type="range" min="50" max="200" value={contrast} onChange={e => setContrast(parseInt(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
-                </div>
-
-                {/* Adjust Tools */}
-                <div className="flex flex-col justify-between space-y-3">
-                  <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">zoom_in</span>Thu phóng</span>
-                    <span className="font-mono font-bold text-slate-200">{Math.round(zoom * 100)}%</span>
-                  </div>
-                  <input type="range" min="0.5" max="3" step="0.1" value={zoom} onChange={e => setZoom(parseFloat(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
-
-                  <div className="flex items-center gap-2 pt-1.5">
-                    <button onClick={() => setInvert(!invert)} className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 ${invert ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`} title="Chuyển chế độ âm bản X-quang">
-                      <span className="material-symbols-outlined text-sm">invert_colors</span>
-                      Âm bản
-                    </button>
-                    <button onClick={() => setRotate(prev => (prev + 90) % 360)} className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1">
-                      <span className="material-symbols-outlined text-sm">rotate_right</span>
-                      Xoay 90°
-                    </button>
-                    <button onClick={() => setShowGrid(!showGrid)} className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 ${showGrid ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}>
-                      <span className="material-symbols-outlined text-sm">grid_on</span>
-                      Lưới định vị
-                    </button>
-                    <button onClick={handleResetFilters} className="p-1.5 bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-900 rounded-lg text-xs transition-all flex items-center justify-center" title="Khôi phục trạng thái ảnh ban đầu">
-                      <span className="material-symbols-outlined text-sm">restart_alt</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <img
+              src={currentResult?.[activeImageKey]}
+              alt="Medical scan"
+              className="max-w-full max-h-[85vh] object-contain rounded-lg"
+            />
           </div>
+        </div>
+      )}
 
-          {/* RIGHT COLUMN: Diagnostic Form (5 cols) */}
-          <div className="lg:col-span-5 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col p-6 space-y-6">
-            <h3 className="text-lg font-black text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="material-symbols-outlined text-indigo-600">assignment_turned_in</span>
-              Kết quả chẩn đoán chuyên môn
-            </h3>
-
-            {/* Multiple service tabs */}
-            {results.length > 1 && <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Chọn dịch vụ cần chẩn đoán</label>
-                <div className="flex gap-2 p-1 bg-gray-50 border border-gray-100 rounded-xl">
-                  {results.map((res, index) => <button key={res.id} onClick={() => {
-              setSelectedResultIndex(index);
-              setActiveImageKey('duongDanAnh1');
-              handleResetFilters();
-            }} className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${selectedResultIndex === index ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-gray-600 hover:bg-white hover:text-indigo-600'}`}>
-                      {res.tenDichVu}
-                    </button>)}
-                </div>
-              </div>}
-
-            {/* Medical templates */}
+      {/* Print Template */}
+      {currentResult && isApproved && (
+        <div id={`cdha-print-area-${currentResult.id || currentResult.maChiTietChiDinh}`} className="hidden print:block p-8 bg-white text-black font-sans text-sm">
+          <div className="flex justify-between items-start border-b-2 border-indigo-900 pb-4 mb-6">
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Mẫu kết luận mẫu</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => applyTemplate('ultrasound')} className="px-3 py-2 bg-slate-50 border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30 text-gray-700 text-xs font-bold rounded-xl text-left transition-all flex items-center justify-between">
-                  Siêu âm ổ bụng
-                  <span className="material-symbols-outlined text-xs text-gray-400">arrow_right_alt</span>
-                </button>
-                <button onClick={() => applyTemplate('xray')} className="px-3 py-2 bg-slate-50 border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30 text-gray-700 text-xs font-bold rounded-xl text-left transition-all flex items-center justify-between">
-                  X-Quang tim phổi
-                  <span className="material-symbols-outlined text-xs text-gray-400">arrow_right_alt</span>
-                </button>
-                <button onClick={() => applyTemplate('ct')} className="px-3 py-2 bg-slate-50 border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30 text-gray-700 text-xs font-bold rounded-xl text-left transition-all flex items-center justify-between">
-                  CT SĐ não
-                  <span className="material-symbols-outlined text-xs text-gray-400">arrow_right_alt</span>
-                </button>
-                <button onClick={() => applyTemplate('mri')} className="px-3 py-2 bg-slate-50 border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30 text-gray-700 text-xs font-bold rounded-xl text-left transition-all flex items-center justify-between">
-                  MRI Cột sống
-                  <span className="material-symbols-outlined text-xs text-gray-400">arrow_right_alt</span>
-                </button>
-              </div>
+              <h2 className="text-md font-bold uppercase text-indigo-900">HỆ THỐNG PHÒNG KHÁM QUỐC TẾ MEDCORE</h2>
+              <p className="text-xs text-gray-600">123 Đường Ba Tháng Hai, Quận 10, TP. Hồ Chí Minh</p>
+              <p className="text-xs text-gray-600">Điện thoại: 1900 6000 • www.medcore.vn</p>
             </div>
-
-            {/* Findings Form */}
-            <div className="space-y-4 flex-1">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Mô tả hình ảnh (Findings)</label>
-                <textarea rows="5" value={currentResult?.moTaHinhAnh} onChange={e => handleTextChange('moTaHinhAnh', e.target.value)} placeholder="Ghi nhận mô tả chi tiết giải phẫu học..." className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm" />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                  Kết luận chẩn đoán (Impression) <span className="text-rose-500">*</span>
-                </label>
-                <textarea rows="3" value={currentResult?.ketLuan} onChange={e => handleTextChange('ketLuan', e.target.value)} placeholder="VD: Viêm phổi thùy phải / Không có bất thường rõ..." className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all text-sm font-bold text-indigo-950" />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Đề nghị / Lời dặn thêm</label>
-                <input type="text" value={currentResult?.deNghi} onChange={e => handleTextChange('deNghi', e.target.value)} placeholder="VD: Kết hợp lâm sàng hoặc đĐ nghị làm thêm xét nghiệm..." className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm" />
-              </div>
-            </div>
-
-            {/* Actions Panel */}
-            <div className="border-t border-gray-100 pt-4 bg-gray-50/50 p-4 rounded-xl space-y-3">
-              <div className="flex items-center justify-between text-xs text-gray-400 font-bold">
-                <span>KTV thực hiện: ID #{currentResult?.maNhanVienThucHien || 'Chưa rõ'}</span>
-                <span>Bác sĩ ký duyệt: {user?.hoTen}</span>
-              </div>
-              <div className="flex gap-2">
-                <button type="button" disabled={submitting} onClick={handleReject} className="px-4 py-2.5 bg-white hover:bg-rose-50 text-gray-700 hover:text-rose-600 text-xs font-bold rounded-xl transition-all border border-gray-200 flex items-center justify-center gap-1.5 flex-1">
-                  <span className="material-symbols-outlined text-sm">cancel</span>
-                  TỪ CHỐI DUYỆT
-                </button>
-                <button type="button" disabled={submitting} onClick={handleApprove} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2 flex-1.5">
-                  <span className="material-symbols-outlined text-sm">draw</span>
-                  KĐ & DUYỆT KẾT QUẢ
-                </button>
-              </div>
+            <div className="text-right">
+              <h3 className="text-lg font-black text-indigo-900 tracking-wide uppercase">KẾT QUẢ CHẨN ĐOÁN HÌNH ẢNH</h3>
+              <p className="text-xs text-gray-500 font-bold">Mã kết quả: #{currentResult.maChiTietChiDinh || currentResult.id || 'N/A'}</p>
             </div>
           </div>
-        </div>}
-    </div>;
+          <div className="grid grid-cols-2 gap-4 mb-6 border bg-gray-50/50 p-4 rounded-xl text-xs">
+            <div>
+              <p><strong>Họ tên BN:</strong> {patient.hoTen}</p>
+              <p><strong>Năm sinh:</strong> {new Date(patient.ngaySinh).getFullYear()} • <strong>Giới tính:</strong> {patient.gioiTinh ? 'Nam' : 'Nữ'}</p>
+              <p><strong>Mã BN:</strong> #{patient.maBenhNhan}</p>
+            </div>
+            <div>
+              <p><strong>Dịch vụ:</strong> {currentResult.tenDichVu}</p>
+              <p><strong>Thời gian duyệt:</strong> {new Date().toLocaleString('vi-VN')}</p>
+              <p><strong>Mã PK:</strong> #{patient.maPhieuKham}</p>
+            </div>
+          </div>
+          <div className="mb-6">
+            <h3 className="font-bold border-b border-gray-300 pb-1 mb-2 uppercase text-[11px]">Mô tả hình ảnh</h3>
+            <p className="text-xs whitespace-pre-wrap">{currentResult.moTaHinhAnh || 'Chưa có mô tả.'}</p>
+          </div>
+          <div className="mb-6 p-4 border-2 border-indigo-900/10 rounded-xl bg-indigo-50/10">
+            <strong className="text-[11px] text-indigo-900 uppercase block mb-1">Kết luận chẩn đoán</strong>
+            <p className="font-bold text-sm">{currentResult.ketLuan}</p>
+          </div>
+          {currentResult.deNghi && (
+            <div className="mb-6 p-4 border border-amber-200 rounded-xl bg-amber-50/10">
+              <strong className="text-[11px] text-amber-800 uppercase block mb-1">Đề nghị</strong>
+              <p className="italic">{currentResult.deNghi}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-gray-100">
+            <div className="text-center">
+              <p className="text-[10px] text-gray-400 uppercase mb-12">KTV thực hiện</p>
+              <span className="font-semibold text-xs">Mã NV: #{currentResult.maNhanVienThucHien || 'Chưa rõ'}</span>
+            </div>
+            <div className="text-center">
+              <p className="text-xs italic mb-1">Ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+              <p className="font-bold text-xs uppercase mb-12">Bác sĩ ký duyệt</p>
+              <p className="font-serif italic text-lg text-indigo-800">{user?.hoTen || user?.username || 'Bác sĩ CĐHA'}</p>
+              <p className="text-[10px] text-gray-400 mt-1">Đã ký điện tử</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
+
 export default DuyetKetQuaCDHA;

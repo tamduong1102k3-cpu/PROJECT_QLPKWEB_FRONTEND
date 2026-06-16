@@ -63,6 +63,18 @@ public class KhoThuocController {
         return ResponseEntity.ok(khoThuocService.getSapHet(threshold));
     }
 
+    // ── Tất cả tồn kho kèm trạng thái cảnh báo ──────────────────────────
+    @GetMapping("/canh-bao")
+    public ResponseEntity<List<Map<String, Object>>> getAllWithAlertStatus() {
+        return ResponseEntity.ok(khoThuocService.getAllWithAlertStatus());
+    }
+
+    // ── Danh sách thuốc đang có cảnh báo (soLuongTon < 50) ────────────
+    @GetMapping("/canh-bao/thuoc")
+    public ResponseEntity<List<Map<String, Object>>> getAlertList() {
+        return ResponseEntity.ok(khoThuocService.getAlertList());
+    }
+
     // ── Phiếu nhập thuốc ───────────────────────────────────────────────
     @GetMapping("/phieu-nhap")
     public List<PhieuNhapThuoc> getAllPhieuNhap() {

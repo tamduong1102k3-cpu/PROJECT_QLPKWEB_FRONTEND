@@ -48,7 +48,7 @@ const DanhSachCho = () => {
             </div>
             <div>
               <p className="font-bold text-sm text-gray-800">{p.hoTen}</p>
-              <p className="text-xs text-gray-500">ChĐ khám • {new Date(p.thoiGian).toLocaleTimeString('vi-VN', {
+              <p className="text-xs text-gray-500">Chờ khám • {new Date(p.thoiGian).toLocaleTimeString('vi-VN', {
               hour: '2-digit',
               minute: '2-digit'
             })}</p>

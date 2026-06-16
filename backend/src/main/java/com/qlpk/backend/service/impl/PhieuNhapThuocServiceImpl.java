@@ -3,9 +3,12 @@ package com.qlpk.backend.service.impl;
 import com.qlpk.backend.entity.ChiTietPhieuNhapThuoc;
 import com.qlpk.backend.entity.KhoThuoc;
 import com.qlpk.backend.entity.PhieuNhapThuoc;
+import com.qlpk.backend.entity.Thuoc;
+import com.qlpk.backend.payment.WebSocketPublisher;
 import com.qlpk.backend.repository.ChiTietPhieuNhapThuocRepository;
 import com.qlpk.backend.repository.KhoThuocRepository;
 import com.qlpk.backend.repository.PhieuNhapThuocRepository;
+import com.qlpk.backend.repository.ThuocRepository;
 import com.qlpk.backend.service.PhieuNhapThuocService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,12 @@ public class PhieuNhapThuocServiceImpl implements PhieuNhapThuocService {
 
     @Autowired
     private KhoThuocRepository khoThuocRepository;
+
+    @Autowired
+    private ThuocRepository thuocRepository;
+
+    @Autowired
+    private WebSocketPublisher webSocketPublisher;
 
     @Override
     public List<PhieuNhapThuoc> getAll() {
@@ -79,6 +88,9 @@ public class PhieuNhapThuocServiceImpl implements PhieuNhapThuocService {
             ct.setSoLuongNhap(sl);
             ct.setDonGiaNhap(gia);
             ct.setThanhTien(gia.multiply(new java.math.BigDecimal(sl)));
+            if (item.get("maNcc") != null) {
+                ct.setMaNcc((Integer) item.get("maNcc"));
+            }
             chiTietRepository.save(ct);
 
             KhoThuoc kho = khoThuocRepository.findByMaThuoc(maThuoc)
@@ -90,8 +102,38 @@ public class PhieuNhapThuocServiceImpl implements PhieuNhapThuocService {
             kho.setSoLuongTon(kho.getSoLuongTon() + sl);
             kho.setNgayCapNhatCuoi(java.time.LocalDateTime.now());
             khoThuocRepository.save(kho);
+
+            // Publish alert if stock is low after update
+            checkAndPublishAlert(maThuoc, kho.getSoLuongTon());
         }
 
+        // Publish kho update event
+        webSocketPublisher.publishKhoUpdate();
+
         return savedPhieu;
+    }
+
+    /**
+     * Kiểm tra tồn kho và publish cảnh báo qua WebSocket nếu cần
+     */
+    private void checkAndPublishAlert(Integer maThuoc, Integer soLuongTon) {
+        String trangThai;
+        if (soLuongTon == null || soLuongTon <= 0) {
+            trangThai = "HẾT_HÀNG";
+        } else if (soLuongTon < 20) {
+            trangThai = "CẢNH_BÁO";
+        } else if (soLuongTon <= 50) {
+            trangThai = "SẮP_HẾT";
+        } else {
+            return; // Bình thường, không cần cảnh báo
+        }
+
+        String tenThuoc = "N/A";
+        Thuoc thuoc = thuocRepository.findById(maThuoc).orElse(null);
+        if (thuoc != null) {
+            tenThuoc = thuoc.getTenThuoc();
+        }
+
+        webSocketPublisher.publishKhoAlert("ALERT", maThuoc, tenThuoc, soLuongTon, trangThai);
     }
 }

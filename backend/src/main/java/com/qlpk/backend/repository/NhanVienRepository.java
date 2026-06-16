@@ -23,7 +23,7 @@ public interface NhanVienRepository extends JpaRepository<NhanVien, Integer> {
         @Param("p_Email") String p_Email,
         @Param("p_BangCap") String p_BangCap,
         @Param("p_ChucVu") String p_ChucVu,
-        @Param("p_ChuyenKhoa") String p_ChuyenKhoa,
+        @Param("p_ChuyenKhoa") Integer p_ChuyenKhoa,
         @Param("p_NgayVaoLam") Date p_NgayVaoLam,
         @Param("p_Username") String p_Username,
         @Param("p_Password") String p_Password,

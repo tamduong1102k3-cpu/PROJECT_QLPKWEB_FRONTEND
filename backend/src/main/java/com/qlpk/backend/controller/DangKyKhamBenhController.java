@@ -18,7 +18,11 @@ public class DangKyKhamBenhController {
     private DangKyKhamBenhService service;
 
     @GetMapping("/today")
-    public ResponseEntity<List<Map<String, Object>>> getToday() {
+    public ResponseEntity<List<Map<String, Object>>> getToday(
+            @RequestParam(value = "keyword", required = false, defaultValue = "") String keyword) {
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(service.getTodayRegistrationsDetailedWithSearch(keyword.trim()));
+        }
         return ResponseEntity.ok(service.getTodayRegistrationsDetailed());
     }
 

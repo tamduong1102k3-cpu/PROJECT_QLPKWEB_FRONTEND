@@ -1,5 +1,6 @@
-import { getAllApi, searchApi, getHoSoApi } from '../../api/benhNhanApi';
+import { getAllApi, searchApi, getHoSoApi } from '../../../api/benhNhanApi';
 import React, { useState, useEffect, useCallback } from 'react';
+import ChiTietKhamModal from '../../../components/ChiTietKhamModal';
 
 const API = 'http://localhost:8080/api/benh-nhan';
 
@@ -31,8 +32,9 @@ const statusPK = (s) => {
   return <Badge text={label} bg={bg} color={color} />;
 };
 
+
 // ── MAIN ─────────────────────────────────────────────────────────────────────
-const QuanLyBenhNhan = () => {
+const QuanLyBenhNhan = ({ allowViewDetail = true }) => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -40,7 +42,6 @@ const QuanLyBenhNhan = () => {
   const [hoSo, setHoSo] = useState([]);
   const [hoSoLoading, setHoSoLoading] = useState(false);
   const [activeHoSoTab, setActiveHoSoTab] = useState('lich-su');
-  const [expandedPK, setExpandedPK] = useState(null);
 
   const loadPatients = useCallback(async (kw = '') => {
     setLoading(true);
@@ -246,86 +247,27 @@ const QuanLyBenhNhan = () => {
                         <th style={{ ...S.th, fontSize:'11px' }}>Chuyên Khoa</th>
                         <th style={{ ...S.th, fontSize:'11px' }}>Bác Sĩ</th>
                         <th style={{ ...S.th, fontSize:'11px' }}>Trạng Thái</th>
+                        <th style={{ ...S.th, fontSize:'11px', textAlign:'center' }}>Thao Tác</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {hoSo.map(h => {
-                        const isExp = expandedPK === h.maPhieuKham;
-                        return (
-                          <React.Fragment key={h.maPhieuKham}>
-                            <tr onClick={() => setExpandedPK(isExp ? null : h.maPhieuKham)}
-                              onMouseEnter={e => e.currentTarget.style.background='#f9fafb'} onMouseLeave={e => e.currentTarget.style.background='transparent'}
-                              style={{ cursor:'pointer', borderBottom: isExp ? 'none' : '1px solid #f3f4f6' }}>
-                              <td style={{ ...S.td, fontSize:'13px', fontWeight:600, color:'#2563eb' }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
-                                  <span className="material-symbols-outlined" style={{ fontSize:'16px' }}>{isExp ? 'expand_more' : 'chevron_right'}</span>
-                                  PK{String(h.maPhieuKham).padStart(4,'0')}
-                                </div>
-                              </td>
-                              <td style={{ ...S.td, fontSize:'12px' }}>{fmtDateTime(h.ngayKham)}</td>
-                              <td style={{ ...S.td, fontSize:'12px' }}>{h.tenChuyenKhoa}</td>
-                              <td style={{ ...S.td, fontSize:'12px' }}>{h.tenNhanVien}</td>
-                              <td style={S.td}>{statusPK(h.trangThaiKham)}</td>
-                            </tr>
-                            {isExp && (
-                              <tr style={{ background:'#f8fafc' }}>
-                                <td colSpan="5" style={{ padding:'0 14px 14px' }}>
-                                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', padding:'16px', background:'#fff', borderRadius:'8px', border:'1px solid #e2e8f0', boxShadow:'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
-                                    
-                                    <div>
-                                      <p style={{ margin:0, fontSize:'11px', color:'#6b7280', fontWeight:700, textTransform:'uppercase' }}>Lý do khám</p>
-                                      <p style={{ margin:'2px 0 0', fontSize:'13px', color:'#111827', fontWeight:500 }}>{fmt(h.lyDoKham)}</p>
-                                    </div>
-                                    
-                                    <div>
-                                      <p style={{ margin:0, fontSize:'11px', color:'#6b7280', fontWeight:700, textTransform:'uppercase' }}>Tiền sử bản thân</p>
-                                      <p style={{ margin:'2px 0 0', fontSize:'13px', color:'#111827' }}>{fmt(h.tienSuBanThan)}</p>
-                                    </div>
-
-                                    <div>
-                                      <p style={{ margin:0, fontSize:'11px', color:'#6b7280', fontWeight:700, textTransform:'uppercase' }}>Bệnh sử</p>
-                                      <p style={{ margin:'2px 0 0', fontSize:'13px', color:'#111827' }}>{fmt(h.benhSu)}</p>
-                                    </div>
-
-                                    <div>
-                                      <p style={{ margin:0, fontSize:'11px', color:'#6b7280', fontWeight:700, textTransform:'uppercase' }}>Khám lâm sàng</p>
-                                      <p style={{ margin:'2px 0 0', fontSize:'13px', color:'#111827' }}>{fmt(h.khamLamSang)}</p>
-                                    </div>
-
-                                    <div style={{ gridColumn:'span 2' }}>
-                                      <div style={{ height:'1px', background:'#f1f5f9', margin:'8px 0' }}></div>
-                                    </div>
-
-                                    <div>
-                                      <p style={{ margin:0, fontSize:'11px', color:'#2563eb', fontWeight:700, textTransform:'uppercase' }}>Chẩn đoán sơ bộ</p>
-                                      <p style={{ margin:'2px 0 0', fontSize:'14px', fontWeight:700, color:'#1e40af' }}>{fmt(h.chanDoanSoBo)}</p>
-                                    </div>
-
-                                    <div>
-                                      <p style={{ margin:0, fontSize:'11px', color:'#2563eb', fontWeight:700, textTransform:'uppercase' }}>Kết quả cận lâm sàng</p>
-                                      <p style={{ margin:'2px 0 0', fontSize:'13px', color:'#1e40af' }}>{fmt(h.ketQuaCLS)}</p>
-                                    </div>
-
-                                    <div style={{ gridColumn:'span 2' }}>
-                                      <div style={{ padding:'12px', background:'#f0fdf4', borderRadius:'6px', border:'1px solid #bbf7d0' }}>
-                                        <p style={{ margin:0, fontSize:'11px', color:'#15803d', fontWeight:700, textTransform:'uppercase' }}>Lời dặn bác sĩ</p>
-                                        <p style={{ margin:'4px 0 0', fontSize:'13px', fontWeight:600, color:'#166534', lineHeight:'1.5' }}>{fmt(h.loiDanBacSi)}</p>
-                                      </div>
-                                    </div>
-
-                                    {h.ghiChuKham && (
-                                      <div style={{ gridColumn:'span 2' }}>
-                                        <p style={{ margin:0, fontSize:'11px', color:'#9ca3af', fontWeight:700, textTransform:'uppercase' }}>Ghi chú chung</p>
-                                        <p style={{ margin:'2px 0 0', fontSize:'12px', color:'#6b7280', italic:true }}>{h.ghiChuKham}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
+                      {hoSo.map(h => (
+                        <tr key={h.maPhieuKham}
+                          onMouseEnter={e => e.currentTarget.style.background='#f9fafb'}
+                          onMouseLeave={e => e.currentTarget.style.background='transparent'}
+                          style={{ borderBottom:'1px solid #f3f4f6' }}>
+                          <td style={{ ...S.td, fontSize:'13px', fontWeight:600, color:'#2563eb' }}>
+                            PK{String(h.maPhieuKham).padStart(4,'0')}
+                          </td>
+                          <td style={{ ...S.td, fontSize:'12px' }}>{fmtDateTime(h.ngayKham)}</td>
+                          <td style={{ ...S.td, fontSize:'12px' }}>{h.tenChuyenKhoa}</td>
+                          <td style={{ ...S.td, fontSize:'12px' }}>{h.tenNhanVien}</td>
+                          <td style={S.td}>{statusPK(h.trangThaiKham)}</td>
+                          <td style={{ ...S.td, textAlign:'center' }}>
+                            <ChiTietKhamModal data={h} allowViewDetail={allowViewDetail} />
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 )
@@ -371,9 +313,9 @@ const QuanLyBenhNhan = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };
 
 export default QuanLyBenhNhan;
-

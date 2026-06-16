@@ -4,12 +4,12 @@ import {
   addNhanVienApi as createEmployeeApi, 
   updateNhanVienApi as updateEmployeeApi, 
   deleteNhanVienApi as deleteEmployeeApi 
-} from '../../api/employeeApi';
+} from '../../../api/employeeApi';
 import { 
   getAllChucVuApi as getChucVuApi, 
   getAllChuyenKhoaApi as getChuyenKhoaApi, 
   getAllVaiTroApi as getVaiTroApi 
-} from '../../api/danhMucApi';
+} from '../../../api/danhMucApi';
 
 
 const QuanLyNhanVien = () => {

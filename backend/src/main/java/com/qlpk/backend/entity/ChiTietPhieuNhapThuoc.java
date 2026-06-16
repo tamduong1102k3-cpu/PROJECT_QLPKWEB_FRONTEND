@@ -32,4 +32,7 @@ public class ChiTietPhieuNhapThuoc {
 
     @Column(name = "thanh_tien", precision = 15, scale = 7)
     private BigDecimal thanhTien;
+
+    @Column(name = "ma_ncc")
+    private Integer maNcc;
 }

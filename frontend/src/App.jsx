@@ -13,6 +13,10 @@ import BangDieuKhienLeTan from './pages/receptionist/BangDieuKhienLeTan';
 import BangDieuKhienTroLy from './pages/assistant/BangDieuKhienTroLy';
 import BangDieuKhienBacSi from './pages/doctor/BangDieuKhienBacSi';
 import BangDieuKhienKyThuatVien from './pages/technician/BangDieuKhienKyThuatVien';
+import BangDieuKhienThuNgan from './pages/cashier/BangDieuKhienThuNgan';
+import BangDieuKhienDuocSi from './pages/pharmacist/BangDieuKhienDuocSi';
+import BangDieuKhienKho from './pages/warehouse/BangDieuKhienKho';
+import PaymentResult from './pages/cashier/components/PaymentResult';
 import './App.css';
 
 function App() {
@@ -35,6 +39,12 @@ function App() {
       setCurrentView('assistant');
     } else if (vaiTro.startsWith('BAC_SI_') || vaiTro === 'BAC_SI') {
       setCurrentView('doctor');
+    } else if (vaiTro === 'THU_NGAN') {
+      setCurrentView('cashier');
+    } else if (vaiTro === 'DUOC_SI' || vaiTro.startsWith('DUOC_') || vaiTro === 'NHAN_VIEN_NHA_THUOC') {
+      setCurrentView('pharmacist');
+    } else if (vaiTro === 'NHAN_VIEN_KHO' || vaiTro === 'NHAN_VIEN_NHAP_KHO') {
+      setCurrentView('warehouse');
     } else if (vaiTro.startsWith('KY_THUAT_VIEN_') || vaiTro.startsWith('KTV_') || vaiTro === 'KY_THUAT_VIEN_XET_NGHIEM') {
       setCurrentView('technician');
     } else {
@@ -42,13 +52,18 @@ function App() {
     }
   };
 
-  // 2. Tạo một hàm để chứa logic render content
   const renderMainContent = () => {
+    if (window.location.pathname === '/payment/result') {
+      return <PaymentResult />;
+    }
     if (currentView === 'admin') return <BangDieuKhienAdmin onLogout={() => setCurrentView('DangNhap')} />;
     if (currentView === 'receptionist') return <BangDieuKhienLeTan user={currentUser} onLogout={() => setCurrentView('DangNhap')} />;
     if (currentView === 'assistant') return <BangDieuKhienTroLy user={currentUser} onLogout={() => setCurrentView('DangNhap')} />;
     if (currentView === 'doctor') return <BangDieuKhienBacSi user={currentUser} onLogout={() => setCurrentView('DangNhap')} />;
     if (currentView === 'technician') return <BangDieuKhienKyThuatVien user={currentUser} onLogout={() => setCurrentView('DangNhap')} />;
+    if (currentView === 'cashier') return <BangDieuKhienThuNgan user={currentUser} onLogout={() => setCurrentView('DangNhap')} />;
+    if (currentView === 'pharmacist') return <BangDieuKhienDuocSi user={currentUser} onLogout={() => setCurrentView('DangNhap')} />;
+    if (currentView === 'warehouse') return <BangDieuKhienKho user={currentUser} onLogout={() => setCurrentView('DangNhap')} />;
     
     if (currentView === 'under-development') {
       return (

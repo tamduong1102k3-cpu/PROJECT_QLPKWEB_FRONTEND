@@ -4,18 +4,26 @@ import {
   approveTestResultApi, 
   rejectTestResultApi 
 } from "../../../api/phieuChiDinhApi";
+import { useNotification } from '../../../components/NotificationContext';
+import ConfirmDialog from '../../../components/ConfirmDialog';
+import PrintButton from '../../../components/PrintButton';
 
 const DuyetKetQuaXetNghiem = ({
   patient,
   user,
   onBack
 }) => {
+  const { showSuccess, showError, showWarning } = useNotification();
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
+  const [promptState, setPromptState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, value: '' });
+
   useEffect(() => {
     fetchResults();
   }, [patient.maPhieuKham]);
+
   const fetchResults = async () => {
     try {
       setLoading(true);
@@ -36,19 +44,22 @@ const DuyetKetQuaXetNghiem = ({
       setLoading(false);
     }
   };
+
   const handleValueChange = (resultIndex, chiSoIndex, field, value) => {
     const updated = [...results];
     updated[resultIndex].chiSoList[chiSoIndex][field] = value;
     setResults(updated);
   };
+
   const handleMetaChange = (resultIndex, field, value) => {
     const updated = [...results];
     updated[resultIndex][field] = value;
     setResults(updated);
   };
+
   const handleApprove = async (result, index) => {
     if (!result.ketLuan.trim()) {
-      alert("Vui lòng điền kết luận trước khi duyệt kết quả!");
+      showWarning("Vui lòng điền kết luận trước khi duyệt kết quả!");
       return;
     }
     setSubmitting(true);
@@ -66,20 +77,21 @@ const DuyetKetQuaXetNghiem = ({
         }))
       };
       await approveTestResultApi(result.id, payload);
-      alert("Đã ký duyệt kết quả xét nghiệm thành công!");
+      showSuccess("Đã ký duyệt kết quả xét nghiệm thành công!");
       fetchResults();
     } catch (e) {
       console.error(e);
-      alert("Lỗi khi duyệt kết quả: " + e.message);
+      showError("Lỗi khi duyệt kết quả: " + e.message);
     } finally {
       setSubmitting(false);
     }
   };
+
   const handleReject = async (result, index) => {
     const reason = prompt("Vui lòng nhập lý do không duyệt / yêu cầu làm lại xét nghiệm:");
-    if (reason === null) return; // Nhấn Cancel
+    if (reason === null) return;
     if (!reason.trim()) {
-      alert("Lý do không duyệt không được để trống!");
+      showWarning("Lý do không duyệt không được để trống!");
       return;
     }
     setSubmitting(true);
@@ -87,21 +99,23 @@ const DuyetKetQuaXetNghiem = ({
       await rejectTestResultApi(result.id, {
         reason: reason.trim()
       });
-      alert("Đã từ chối kết quả xét nghiệm và yêu cầu kỹ thuật viên làm lại!");
-      onBack(); // Quay lại hàng đợi
+      showSuccess("Đã từ chối kết quả xét nghiệm và yêu cầu kỹ thuật viên làm lại!");
+      onBack();
     } catch (e) {
       console.error(e);
-      alert("Lỗi khi từ chối kết quả: " + e.message);
+      showError("Lỗi khi từ chối kết quả: " + e.message);
     } finally {
       setSubmitting(false);
     }
   };
+
   if (loading) {
     return <div className="flex items-center justify-center p-20 text-indigo-600 font-bold italic">
         <span className="material-symbols-outlined animate-spin mr-2">sync</span>
         Đang tải kết quả cận lâm sàng của bệnh nhân...
       </div>;
   }
+
   return <div className="space-y-6 animate-scale-up">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between bg-gradient-to-r from-white to-indigo-50/30">
         <div className="flex items-center gap-6">
@@ -202,7 +216,8 @@ const DuyetKetQuaXetNghiem = ({
 
                       <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 bg-gray-50/50 p-4 rounded-xl">
                         <span className="text-xs text-gray-400 font-bold">KTV Thực hiện: ID #{result.nguoiThucHien}</span>
-                        {!isApproved && <div className="flex gap-2">
+                        {!isApproved ? (
+                          <div className="flex gap-2">
                             <button type="button" disabled={submitting} onClick={() => handleReject(result, rIdx)} className="px-5 py-2.5 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 text-xs font-bold rounded-xl transition-all border border-gray-200 flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-sm">cancel</span>
                               KHÔNG DUYỆT
@@ -211,10 +226,115 @@ const DuyetKetQuaXetNghiem = ({
                               <span className="material-symbols-outlined text-sm">draw</span>
                               DUYỆT & KĐ KẾT QUẢ
                             </button>
-                          </div>}
+                          </div>
+                        ) : (
+                          <PrintButton 
+                            targetId={`test-print-area-${result.id}`} 
+                            variant="success" 
+                            title="IN KẾT QUẢ XÉT NGHIỆM" 
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
+
+                  {/* --- PHẦN TỬ IN PHIẾU XÉT NGHIỆM (ẨN TRÊN MÀN HÌNH, CHỈ HIỂN THỊ KHI IN) --- */}
+                  {isApproved && (
+                    <div id={`test-print-area-${result.id}`} className="hidden print:block p-8 bg-white text-black font-sans leading-relaxed text-sm">
+                      <div className="flex justify-between items-start border-b-2 border-indigo-900 pb-4 mb-6">
+                        <div>
+                          <h2 className="text-md font-bold uppercase text-indigo-900">HỆ THỐNG PHÒNG KHÁM QUỐC TẾ MEDCORE</h2>
+                          <p className="text-xs text-gray-600">Địa chỉ: 123 Đường Ba Tháng Hai, Quận 10, TP. Hồ Chí Minh</p>
+                          <p className="text-xs text-gray-600">Điện thoại: 1900 6000 • Website: www.medcore.vn</p>
+                        </div>
+                        <div className="text-right">
+                          <h3 className="text-lg font-black text-indigo-900 tracking-wide uppercase">PHIẾU KẾT QUẢ XÉT NGHIỆM</h3>
+                          <p className="text-xs text-gray-500 font-bold">Mã kết quả: #{result.id}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-6 border bg-gray-50/50 p-4 rounded-xl text-xs">
+                        <div>
+                          <p><strong>Họ tên bệnh nhân:</strong> <span className="font-bold text-sm">{patient.hoTen}</span></p>
+                          <p><strong>Năm sinh:</strong> {new Date(patient.ngaySinh).getFullYear()} • <strong>Giới tính:</strong> {patient.gioiTinh ? 'Nam' : 'Nữ'}</p>
+                          <p><strong>Mã bệnh nhân:</strong> #{patient.maBenhNhan}</p>
+                        </div>
+                        <div>
+                          <p><strong>Dịch vụ thực hiện:</strong> <span className="font-bold">{result.tenDichVu}</span></p>
+                          <p><strong>Thời gian thực hiện:</strong> {new Date(result.ngayThucHien).toLocaleString('vi-VN')}</p>
+                          <p><strong>Mã phiếu khám:</strong> #{patient.maPhieuKham}</p>
+                        </div>
+                      </div>
+
+                      {result.chiSoList.length > 0 && (
+                        <div className="mb-6">
+                          <h3 className="font-bold border-b border-gray-300 pb-1 mb-3 uppercase text-[11px] tracking-wider">Chỉ số xét nghiệm chi tiết</h3>
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="border-b border-gray-300 font-bold">
+                                <th className="py-2">Tên chỉ số</th>
+                                <th className="py-2 text-center w-28">Kết quả</th>
+                                <th className="py-2 text-center w-20">Bất thường</th>
+                                <th className="py-2">Đơn vị</th>
+                                <th className="py-2">Khoảng tham chiếu</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {result.chiSoList.map((cs, idx) => (
+                                <tr key={cs.id || idx} className="border-b border-gray-100">
+                                  <td className="py-2.5 font-semibold text-gray-700">{cs.tenChiSo}</td>
+                                  <td className={`py-2.5 text-center font-bold ${cs.batThuong ? 'text-red-600' : 'text-gray-800'}`}>{cs.giaTri || '---'}</td>
+                                  <td className="py-2.5 text-center">{cs.batThuong ? <span className="font-bold text-red-600">H</span> : 'Bình thường'}</td>
+                                  <td className="py-2.5 text-gray-600">{cs.donVi || '---'}</td>
+                                  <td className="py-2.5 text-gray-600">{cs.chiSoThamChieu || '---'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-6 mb-6">
+                        {result.nhomMau && (
+                          <div className="p-3 border rounded-lg bg-gray-50/20">
+                            <span className="text-[10px] font-bold text-gray-400 block uppercase">Nhóm máu</span>
+                            <span className="font-bold text-sm text-gray-800">{result.nhomMau}</span>
+                          </div>
+                        )}
+                        {result.dongMauCoBan && (
+                          <div className="p-3 border rounded-lg bg-gray-50/20">
+                            <span className="text-[10px] font-bold text-gray-400 block uppercase">Đông máu cơ bản</span>
+                            <span className="font-bold text-sm text-gray-800">{result.dongMauCoBan}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {result.ghiChuThem && (
+                        <div className="mb-6 p-3 border rounded-xl bg-gray-50/30 text-xs">
+                          <strong className="text-[10px] text-gray-400 uppercase block mb-1">Ghi chú thêm</strong>
+                          <p className="text-gray-700 italic">{result.ghiChuThem}</p>
+                        </div>
+                      )}
+
+                      <div className="mb-8 p-4 border-2 border-indigo-900/10 rounded-2xl bg-indigo-50/10 text-xs">
+                        <strong className="text-[11px] text-indigo-900 uppercase block mb-1">Kết luận chuyên môn</strong>
+                        <p className="font-bold text-gray-800 text-sm whitespace-pre-wrap leading-relaxed">{result.ketLuan}</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-gray-100">
+                        <div className="text-center min-w-[200px]">
+                          <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-12">Kỹ thuật viên thực hiện</p>
+                          <span className="font-semibold text-xs text-gray-600">Mã nhân viên: #{result.nguoiThucHien}</span>
+                        </div>
+                        <div className="text-center ml-auto min-w-[200px]">
+                          <p className="text-xs italic mb-1">Ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                          <p className="font-bold text-xs uppercase mb-12">Bác sĩ kết luận & ký duyệt</p>
+                          <p className="font-serif italic text-lg text-indigo-800">{user?.hoTen || user?.username || 'Bác sĩ chuyên khoa'}</p>
+                          <p className="text-[10px] text-gray-400 mt-1">Đã ký điện tử</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>;
       })}

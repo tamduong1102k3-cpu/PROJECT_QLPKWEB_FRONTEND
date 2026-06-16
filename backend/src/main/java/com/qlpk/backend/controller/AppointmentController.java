@@ -11,7 +11,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/appointments")
-@CrossOrigin("*")
 public class AppointmentController {
 
     @Autowired 
@@ -20,6 +19,12 @@ public class AppointmentController {
     @GetMapping
     public List<Map<String, Object>> getAll() {
         return service.getAllDetailed();
+    }
+
+    @PostMapping
+    public ResponseEntity<LichTaiKham> create(@RequestBody LichTaiKham entity) {
+        LichTaiKham saved = service.create(entity);
+        return ResponseEntity.ok(saved);
     }
 
     @PutMapping("/{id}")

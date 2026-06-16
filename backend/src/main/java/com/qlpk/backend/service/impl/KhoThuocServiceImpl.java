@@ -68,4 +68,63 @@ public class KhoThuocServiceImpl implements KhoThuocService {
         }
         return result;
     }
+
+    /**
+     * Xác định trạng thái cảnh báo dựa trên số lượng tồn
+     */
+    private String getAlertStatus(Integer soLuongTon) {
+        if (soLuongTon == null || soLuongTon <= 0) {
+            return "HẾT_HÀNG";
+        } else if (soLuongTon < 20) {
+            return "CẢNH_BÁO";
+        } else if (soLuongTon <= 50) {
+            return "SẮP_HẾT";
+        }
+        return "BÌNH_THƯỜNG";
+    }
+
+    @Override
+    public List<Map<String, Object>> getAllWithAlertStatus() {
+        List<KhoThuoc> allKho = repository.findAll();
+
+        Map<Integer, Thuoc> thuocMap = new HashMap<>();
+        thuocRepository.findAll().forEach(t -> thuocMap.put(t.getMaThuoc(), t));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (KhoThuoc k : allKho) {
+            Thuoc t = thuocMap.get(k.getMaThuoc());
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("idKho",       k.getIdKho());
+            row.put("maThuoc",     k.getMaThuoc());
+            row.put("tenThuoc",    t != null ? t.getTenThuoc()  : "N/A");
+            row.put("donViTinh",   t != null ? t.getDonViTinh() : "");
+            row.put("soLuongTon",  k.getSoLuongTon());
+            row.put("trangThai",   getAlertStatus(k.getSoLuongTon()));
+            result.add(row);
+        }
+        return result;
+    }
+
+    @Override
+    public List<Map<String, Object>> getAlertList() {
+        // Lấy tất cả thuốc có số lượng tồn < 50 (bao gồm SẮP_HẾT, CẢNH_BÁO, HẾT_HÀNG)
+        List<KhoThuoc> alertStock = repository.findBySoLuongTonLessThanOrderBySoLuongTonAsc(50);
+
+        Map<Integer, Thuoc> thuocMap = new HashMap<>();
+        thuocRepository.findAll().forEach(t -> thuocMap.put(t.getMaThuoc(), t));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (KhoThuoc k : alertStock) {
+            Thuoc t = thuocMap.get(k.getMaThuoc());
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("idKho",       k.getIdKho());
+            row.put("maThuoc",     k.getMaThuoc());
+            row.put("tenThuoc",    t != null ? t.getTenThuoc()  : "N/A");
+            row.put("donViTinh",   t != null ? t.getDonViTinh() : "");
+            row.put("soLuongTon",  k.getSoLuongTon());
+            row.put("trangThai",   getAlertStatus(k.getSoLuongTon()));
+            result.add(row);
+        }
+        return result;
+    }
 }

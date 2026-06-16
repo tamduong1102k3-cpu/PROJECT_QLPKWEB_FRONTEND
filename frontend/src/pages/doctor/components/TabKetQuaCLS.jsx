@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAvailableClsResultsApi } from '../../../api/phieuKhamApi';
 import { getDetailClsResultApi } from '../../../api/ketQuaClsApi';
+import { useNotification } from '../../../components/NotificationContext';
 
 const TabKetQuaCLS = ({ maPhieuKham }) => {
+  const { showError } = useNotification();
   const [availableCls, setAvailableCls] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null);
@@ -40,7 +42,7 @@ const TabKetQuaCLS = ({ maPhieuKham }) => {
       setSelectedResult(detail);
     } catch (error) {
       console.error("Lỗi lấy chi tiết kết quả CLS:", error);
-      alert("Không thể tải kết quả chi tiết!");
+      showError("Không thể tải kết quả chi tiết!");
     } finally {
       setDetailLoading(false);
     }

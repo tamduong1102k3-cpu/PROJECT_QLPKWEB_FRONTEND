@@ -284,3 +284,27 @@ export const getAvailableClsResultsApi = async id => {
     throw error;
   }
 };
+
+/**
+ * GET /specialty-history
+ */
+export const getSpecialtyHistoryApi = async maChuyenKhoa => {
+  try {
+    const response = await fetchClient(`${API_URL}/specialty-history?maChuyenKhoa=${maChuyenKhoa}`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : [];
+  } catch (error) {
+    console.error("Error in getSpecialtyHistoryApi:", error);
+    throw error;
+  }
+};

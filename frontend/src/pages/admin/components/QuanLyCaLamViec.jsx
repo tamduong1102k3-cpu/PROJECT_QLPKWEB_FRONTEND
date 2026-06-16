@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getAllShiftsApi, createShiftApi, deleteShiftApi } from '../../api/shiftApi';
-import { getAllNhanVienApi as getAllEmployeesApi } from '../../api/employeeApi';
-import { getAllChucVuApi as getChucVuApi, getAllPhongApi as getPhongApi, getAllChuyenKhoaApi as getChuyenKhoaApi } from '../../api/danhMucApi';
+import { getAllShiftsApi, createShiftApi, deleteShiftApi } from '../../../api/shiftApi';
+import { getAllNhanVienApi as getAllEmployeesApi } from '../../../api/employeeApi';
+import { getAllChucVuApi as getChucVuApi, getAllPhongApi as getPhongApi, getAllChuyenKhoaApi as getChuyenKhoaApi } from '../../../api/danhMucApi';
 
 const DAYS = [
   { id: 'Thứ 2', label: 'Thứ 2' },

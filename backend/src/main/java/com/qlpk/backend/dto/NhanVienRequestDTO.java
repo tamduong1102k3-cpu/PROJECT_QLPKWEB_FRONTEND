@@ -10,7 +10,7 @@ public class NhanVienRequestDTO {
     private String diaChi;
     private String soDienThoai;
     private String email;
-    private String chuyenKhoa;
+    private Integer chuyenKhoa;
     private String bangCap;
     private String chucVu;
     private Date ngayVaoLam;
@@ -39,8 +39,8 @@ public class NhanVienRequestDTO {
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
-    public String getChuyenKhoa() { return chuyenKhoa; }
-    public void setChuyenKhoa(String chuyenKhoa) { this.chuyenKhoa = chuyenKhoa; }
+    public Integer getChuyenKhoa() { return chuyenKhoa; }
+    public void setChuyenKhoa(Integer chuyenKhoa) { this.chuyenKhoa = chuyenKhoa; }
 
     public String getBangCap() { return bangCap; }
     public void setBangCap(String bangCap) { this.bangCap = bangCap; }

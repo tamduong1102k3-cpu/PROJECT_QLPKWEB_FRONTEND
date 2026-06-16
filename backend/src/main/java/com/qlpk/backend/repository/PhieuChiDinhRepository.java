@@ -41,14 +41,19 @@ public interface PhieuChiDinhRepository extends JpaRepository<PhieuChiDinh, Inte
     @Query(value = "SELECT ct.id as id, p.ma_phieu_kham as maPhieuKham, pk.ma_benh_nhan as maBenhNhan, " +
                    "b.ho_ten as hoTen, b.gioi_tinh as gioiTinh, b.ngay_sinh as ngaySinh, " +
                    "dv.ten_dich_vu as tenDichVu, p.ngay_chi_dinh as ngayChiDinh, ct.trang_thai_dv as trangThaiDv, " +
-                   "ct.ma_nhan_vien_thuc_hien as maNhanVienThucHien " +
+                   "ct.ma_nhan_vien_thuc_hien as maNhanVienThucHien, " +
+                   "COALESCE(kqxn.trang_thai, kqcdha.trang_thai, 'CHO_DUYET') as trangThaiKq " +
                    "FROM chi_tiet_chi_dinh ct " +
                    "JOIN phieu_chi_dinh p ON ct.ma_phieu_chi_dinh = p.ma_phieu_chi_dinh " +
                    "JOIN phieu_kham pk ON p.ma_phieu_kham = pk.ma_phieu_kham " +
                    "JOIN benh_nhan b ON pk.ma_benh_nhan = b.ma_benh_nhan " +
                    "JOIN dich_vu dv ON ct.ma_dich_vu = dv.ma_dich_vu " +
+                   "LEFT JOIN ket_qua_xet_nghiem kqxn ON kqxn.ma_chi_tiet_chi_dinh = ct.id " +
+                   "LEFT JOIN ket_qua_cdha kqcdha ON kqcdha.id_chi_tiet_chi_dinh = ct.id " +
                    "WHERE (:maChuyenKhoa IS NULL OR dv.ma_chuyen_khoa = :maChuyenKhoa) " +
                    "AND ct.trang_thai_dv = 'DA_THUC_HIEN' " +
+                   "AND (kqxn.id IS NULL OR kqxn.trang_thai != 'DA_DUYET') " +
+                   "AND (kqcdha.id IS NULL OR kqcdha.trang_thai != 'DA_DUYET') " +
                    "AND DATE(p.ngay_chi_dinh) = CURRENT_DATE " +
                    "ORDER BY p.ngay_chi_dinh DESC", nativeQuery = true)
     List<java.util.Map<String, Object>> findCompletedTestsToday(@Param("maChuyenKhoa") Integer maChuyenKhoa);

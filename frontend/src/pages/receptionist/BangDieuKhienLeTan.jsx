@@ -2,7 +2,7 @@ import { getAllApi as _getAllAppointments } from '../../api/appointmentApi';
 import { getTodayApi as _getTodayDangKy } from '../../api/dangKyKhamBenhApi';
 import { getTodayApi as _getTodayPhieuKham } from '../../api/phieuKhamApi';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import QuanLyBenhNhan from '../admin/QuanLyBenhNhan';
+import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import TheThongKe from './components/TheThongKe';
 import DanhSachCho from './components/DanhSachCho';
 import LichHenHomNay from './components/LichHenHomNay';
@@ -11,9 +11,10 @@ import DangKyBenhNhan from './components/DangKyBenhNhan';
 import NhomOSoLieu from '../doctor/components/NhomOSoLieu';
 
 import UserMenu from '../../components/UserMenu';
-import QuanLyLichHen from '../admin/QuanLyLichHen';
-import QuanLyHoaDon from '../admin/QuanLyHoaDon';
-import QuanLyDichVu from '../admin/QuanLyDichVu';
+import QuanLyLichHen from '../../pages/admin/components/QuanLyLichHen';
+import QuanLyHoaDon from '../../pages/admin/components/QuanLyHoaDon';
+import QuanLyDichVu from '../../pages/admin/components/QuanLyDichVu';
+import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 
 
 
@@ -26,6 +27,7 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
     completedToday: 0,
     todayRevenue: 0
   });
+  const [quickCheckInAppt, setQuickCheckInAppt] = useState(null);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -114,14 +116,24 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
         );
       case 'checkin':
         return <QuyTrinhTiepDon 
-          onCancel={() => setActiveTab('dashboard')} 
-          onSuccess={() => { setActiveTab('dashboard'); fetchStats(); }} 
-          waitingCount={stats.waitingPatients} 
+          onCancel={() => { setActiveTab('dashboard'); setQuickCheckInAppt(null); }} 
+          onSuccess={() => { setActiveTab('dashboard'); setQuickCheckInAppt(null); fetchStats(); }} 
+          waitingCount={stats.waitingPatients}
+          presetPatient={quickCheckInAppt ? { maBenhNhan: quickCheckInAppt.maBenhNhan, hoTen: quickCheckInAppt.tenBenhNhan } : undefined}
+          presetDepartment={quickCheckInAppt ? quickCheckInAppt.maChuyenKhoa : undefined}
+          presetDoctor={quickCheckInAppt ? quickCheckInAppt.maNhanVien : undefined}
+          appointmentId={quickCheckInAppt ? quickCheckInAppt.id : undefined}
         />;
       case 'patients':
-        return <QuanLyBenhNhan />;
+        return <QuanLyBenhNhan allowViewDetail={false} />;
       case 'appointments':
-        return <QuanLyLichHen />;
+        return <QuanLyLichHen
+          showActions="checkin"
+          onQuickCheckIn={(appt) => {
+            setQuickCheckInAppt(appt);
+            setActiveTab('checkin');
+          }}
+        />;
       case 'invoices':
         return <QuanLyHoaDon />;
       case 'services':
@@ -133,6 +145,12 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
 
   return (
     <div className="flex h-screen bg-[#f3f4f6] font-body-md text-on-background overflow-hidden">
+      <WebSocketAutoRefresh
+        topics={['/topic/phieu-kham', '/topic/dang-ky-kham']}
+        onMessage={(topic, data) => {
+          fetchStats();
+        }}
+      />
       {/* Sidebar */}
       <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20`}>
         <div className="h-16 flex items-center justify-center border-b border-gray-200">

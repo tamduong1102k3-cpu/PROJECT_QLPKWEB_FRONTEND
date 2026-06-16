@@ -1,5 +1,5 @@
-import { getAllApi as _getAllAppointments } from '../../api/appointmentApi';
-import { apiClient } from "../../api/apiClient";
+import { getAllApi as _getAllAppointments, deleteApi } from '../../../api/appointmentApi';
+import { apiClient } from "../../../api/apiClient";
 import React, { useState, useEffect } from 'react';
 const API = 'http://localhost:8080/api/appointments';
 const formatStatus = status => {
@@ -26,7 +26,8 @@ const formatStatus = status => {
       };
   }
 };
-const QuanLyLichHen = () => {
+
+const QuanLyLichHen = ({ showActions = 'all', onQuickCheckIn }) => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -88,6 +89,8 @@ const QuanLyLichHen = () => {
     }
   };
   const filtered = appointments.filter(a => {
+    // Không hiển thị lịch hẹn đã đến (DA_DEN) hoặc đã hoàn thành (HOAN)
+    if (a.trangThai === 'DA_DEN' || a.trangThai === 'HOAN') return false;
     const matchesSearch = a.tenBenhNhan.toLowerCase().includes(search.toLowerCase()) || a.tenNhanVien.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = filterStatus === 'ALL' || a.trangThai === filterStatus;
     return matchesSearch && matchesStatus;
@@ -97,7 +100,7 @@ const QuanLyLichHen = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Quản Lý Lịch Hẹn</h2>
-            <p className="text-sm text-gray-500">Xem và can thiệp danh sách lịch tái khám của bệnh nhân</p>
+            <p className="text-sm text-gray-500">Xem danh sách lịch tái khám của bệnh nhân</p>
           </div>
           
           <div className="flex flex-wrap gap-3">
@@ -148,12 +151,21 @@ const QuanLyLichHen = () => {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-right space-x-2">
-                      <button onClick={() => setEditing(a)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Can thiệp">
-                        <span className="material-symbols-outlined text-[20px]">edit</span>
-                      </button>
-                      <button onClick={() => handleDelete(a.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Xóa lịch">
-                        <span className="material-symbols-outlined text-[20px]">delete</span>
-                      </button>
+                      {showActions === 'checkin' ? (
+                        <button onClick={() => onQuickCheckIn && onQuickCheckIn(a)} className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-md shadow-emerald-200 hover:shadow-lg hover:shadow-emerald-300 font-semibold text-sm transform hover:scale-105 active:scale-95" title="Tiếp đón ngay">
+                          <span className="material-symbols-outlined text-lg">assignment_turned_in</span>
+                          <span>Tiếp đón</span>
+                        </button>
+                      ) : (
+                        <>
+                          <button onClick={() => setEditing(a)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Can thiệp">
+                            <span className="material-symbols-outlined text-[20px]">edit</span>
+                          </button>
+                          <button onClick={() => handleDelete(a.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Xóa lịch">
+                            <span className="material-symbols-outlined text-[20px]">delete</span>
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>;
             })}
@@ -163,7 +175,7 @@ const QuanLyLichHen = () => {
       </div>
 
       {/* Edit Modal */}
-      {editing && <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      {editing && showActions !== 'checkin' && <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-scale-up overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <h3 className="font-bold text-gray-800">Can Thiệp Lịch Hẹn #{editing.id}</h3>

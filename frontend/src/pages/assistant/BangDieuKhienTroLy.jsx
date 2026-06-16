@@ -7,11 +7,18 @@ import { apiClient } from "../../api/apiClient";
 import { useNotification } from '../../components/NotificationContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import React, { useState, useEffect, useCallback } from 'react';
-import QuanLyBenhNhan from '../admin/QuanLyBenhNhan';
+import { sqlLikeMatch } from '../../utils/searchUtils';
+import VitalSignsFormComponent from '../../components/VitalSignsForm';
+import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
+import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import TroLyRHMForm from './TroLyRHMForm';
 import TroLyTMHForm from './TroLyTMHForm';
+import TroLyTimMachForm from './TroLyTimMachForm';
+import TroLyNhiForm from './TroLyNhiForm';
+import BangDanhSachCongViec from '../technician/component/BangDanhSachCongViec';
 import NhomOSoLieu from '../doctor/components/NhomOSoLieu';
 import UserMenu from '../../components/UserMenu';
+import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 
 // KHAI BÁO API_BASE
 const API_BASE = 'http://localhost:8080/api';
@@ -20,20 +27,23 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [patients, setPatients] = useState({ waiting: [], absent: [] });
+  const [patients, setPatients] = useState({ pending: [], completed: [], absent: [] });
   const [loadingQueue, setLoadingQueue] = useState(true);
-  const [queueTab, setQueueTab] = useState('waiting');
+  const [queueTab, setQueueTab] = useState('pending');
+  const [searchQuery, setSearchQuery] = useState('');
   const [stats, setStats] = useState({ waitingToday: 0, processedToday: 0, absentToday: 0 });
   const [currentRoom, setCurrentRoom] = useState("Đang tải...");
   const { showSuccess, showError } = useNotification();
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
 
-  const isRhmAssistant = user?.tenChuyenKhoa?.toLowerCase()?.includes('răng') || 
-                         user?.tenChuyenKhoa?.toLowerCase()?.includes('nha khoa');
-
-  const isTmhAssistant = user?.maChuyenKhoa === 6 ||
-                         (user?.tenChuyenKhoa?.toLowerCase()?.includes('tai') && user?.tenChuyenKhoa?.toLowerCase()?.includes('họng')) ||
-                         user?.tenChuyenKhoa?.toLowerCase()?.includes('tmh');
+  const isRhmAssistant = Number(user?.maChuyenKhoa) === 5;
+  const isTmhAssistant = Number(user?.maChuyenKhoa) === 4;
+  const isCardiologyAssistant = Number(user?.maChuyenKhoa) === 11;
+  const isNhiAssistant = Number(user?.maChuyenKhoa) === 3;
+  const isSpecialtyAssistant = isRhmAssistant || isTmhAssistant || isCardiologyAssistant || isNhiAssistant;
+  const isImagingOrLabAssistant = Number(user?.maChuyenKhoa) === 6 || Number(user?.maChuyenKhoa) === 7; // Assuming 6 for Imaging and 7 for Lab
+  
+  const [initialFormTab, setInitialFormTab] = useState('vitals');
 
   const fetchStats = useCallback(async () => {
     try {
@@ -42,14 +52,14 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
       if (data) {
         let filteredData = data;
         if (user?.maChuyenKhoa) {
-          filteredData = data.filter(r => r.maChuyenKhoa === user.maChuyenKhoa);
+          filteredData = data.filter(r => Number(r.maChuyenKhoa) === Number(user.maChuyenKhoa));
         }
-        const waiting = filteredData.filter(r => r.trangThai === 'CHO_KHAM' || r.trangThai === 'DANG_KHAM');
+        const pending = filteredData.filter(r => r.trangThai === 'CHO_KHAM' || r.trangThai === 'DANG_KHAM');
         const absent = filteredData.filter(r => r.trangThai === 'VANG_MAT');
-        const processed = filteredData.filter(r => r.trangThai === 'CHO_BAC_SI' || r.trangThai === 'HOAN_THANH').length;
+        const completedList = filteredData.filter(r => r.trangThai === 'CHO_BAC_SI' || r.trangThai === 'HOAN_THANH');
         
-        setPatients({ waiting, absent });
-        setStats({ waitingToday: waiting.length, processedToday: processed, absentToday: absent.length });
+        setPatients({ pending, completed: completedList, absent });
+        setStats({ waitingToday: pending.length, processedToday: completedList.length, absentToday: absent.length });
       }
       if (user?.maNhanVien) {
         const roomData = await _getCurrentRoomApi(user.maNhanVien);
@@ -65,15 +75,16 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
   }, [fetchStats]);
 
   const handleSelectPatient = async (patient) => {
-    if (patient.trangThai === 'DANG_KHAM') { 
+    if (patient.trangThai !== 'CHO_KHAM') { 
       setSelectedPatient(patient); 
+      setActiveTab('dashboard');
       return; 
     }
 
     setConfirmState({
       isOpen: true,
       title: 'Xác nhận tiếp nhận',
-      message: `Tiếp nhận bệnh nhân "${patient.hoTen}" để đo sinh hiệu?`,
+      message: `Tiếp nhận bệnh nhân "${patient.hoTen}"?`,
       type: 'primary',
       icon: 'assignment_ind',
       onConfirm: async () => {
@@ -93,9 +104,60 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
               maPhieuKham: data.phieuKhamId 
             });
             showSuccess(`Đã tiếp nhận bệnh nhân "${patient.hoTen}"`);
+            setActiveTab('dashboard');
           }
         } catch (error) { 
           showError("Lỗi tiếp nhận: " + error.message); 
+        }
+      }
+    });
+  };
+
+  const handleOpenVitals = (patient) => {
+    setInitialFormTab('vitals');
+    handleSelectPatient(patient);
+  };
+
+  const handleOpenResult = (patient) => {
+    setInitialFormTab('info');
+    handleSelectPatient(patient);
+  };
+
+  const handleMarkAbsent = (patient) => {
+    setConfirmState({
+      isOpen: true,
+      title: 'Xác nhận vắng mặt',
+      message: `Đánh dấu bệnh nhân "${patient.hoTen}" vắng mặt?`,
+      type: 'warning',
+      icon: 'person_off',
+      onConfirm: async () => {
+        setConfirmState(prev => ({ ...prev, isOpen: false }));
+        try {
+          await _updateDangKyStatus(patient.id, { trangThai: 'VANG_MAT' });
+          showSuccess(`Đã đánh dấu vắng mặt "${patient.hoTen}"`);
+          fetchStats();
+        } catch (e) {
+          showError("Lỗi: " + e.message);
+        }
+      }
+    });
+  };
+
+  const handleMarkPresent = (patient) => {
+    setConfirmState({
+      isOpen: true,
+      title: 'Xác nhận có mặt',
+      message: `Đánh dấu bệnh nhân "${patient.hoTen}" đã có mặt?`,
+      type: 'primary',
+      icon: 'person',
+      onConfirm: async () => {
+        setConfirmState(prev => ({ ...prev, isOpen: false }));
+        try {
+          await _updateDangKyStatus(patient.id, { trangThai: 'CHO_KHAM' });
+          showSuccess(`Đã đánh dấu có mặt "${patient.hoTen}"`);
+          fetchStats();
+        } catch (e) {
+          showError("Lỗi: " + e.message);
         }
       }
     });
@@ -114,23 +176,46 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
           <div className="animate-fade-in space-y-6">
             <NhomOSoLieu user={user} />
 
+            {(!selectedPatient && isSpecialtyAssistant) ? (
+              <BangDanhSachCongViec
+                list={{
+                  data: patients[queueTab]?.filter(p => sqlLikeMatch(p.hoTen, searchQuery)) || [],
+                  pendingCount: patients.pending.length,
+                  completedCount: patients.completed.length,
+                  absentCount: patients.absent.length
+                }}
+                worklistTab={queueTab}
+                setWorklistTab={setQueueTab}
+                onOpenVitals={handleOpenVitals}
+                onOpenResult={handleOpenResult}
+                onMarkAbsent={handleMarkAbsent}
+                onMarkPresent={handleMarkPresent}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                isRefreshing={loadingQueue}
+                onManualRefresh={fetchStats}
+                loading={loadingQueue}
+              />
+            ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px] w-full">
+              {(!selectedPatient && !isSpecialtyAssistant) && (
               <div className="lg:col-span-4 xl:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[600px] lg:h-[calc(100vh-180px)] lg:sticky lg:top-6 w-full">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold flex items-center gap-2 text-gray-800"><span className="material-symbols-outlined text-indigo-600">view_list</span>Hàng đợi</h3>
                   <button onClick={fetchStats} className="p-2 hover:bg-gray-100 rounded-xl text-gray-400"><span className="material-symbols-outlined text-sm">refresh</span></button>
                 </div>
                 <div className="flex p-1 bg-gray-50 rounded-xl mb-4">
-                  <button onClick={() => setQueueTab('waiting')} className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${queueTab === 'waiting' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Đang chờ</button>
-                  <button onClick={() => setQueueTab('absent')} className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${queueTab === 'absent' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400'}`}>Vắng mặt</button>
+                  <button onClick={() => setQueueTab("pending")} className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${queueTab === "pending" ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Đang chờ</button>
+                  <button onClick={() => setQueueTab("absent")} className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all ${queueTab === "absent" ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400'}`}>Vắng mặt</button>
                 </div>
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin">
-                  <PatientQueue list={queueTab === 'waiting' ? patients.waiting : patients.absent} loading={loadingQueue} onSelectPatient={handleSelectPatient} selectedId={selectedPatient?.maBenhNhan} isAbsentQueue={queueTab === 'absent'} />
+                  <PatientQueue list={queueTab === "pending" ? patients.pending : patients.absent} loading={loadingQueue} onSelectPatient={handleOpenVitals} selectedId={selectedPatient?.maBenhNhan} isAbsentQueue={queueTab === "absent"} />
                 </div>
               </div>
+              )}
 
-              <div className="lg:col-span-8 xl:col-span-9 w-full">
-                {selectedPatient ? (
+              <div className={`${(!selectedPatient && !isSpecialtyAssistant) ? 'lg:col-span-8 xl:col-span-9' : 'col-span-12'} w-full`}>
+                {activeTab === 'dashboard' && selectedPatient && (
                   <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 animate-scale-up h-full w-full">
                     <div className="flex items-start justify-between mb-8 pb-6 border-b border-gray-50">
                       <div className="flex items-center gap-5">
@@ -142,7 +227,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
                           <div className="flex items-center gap-3 text-sm text-gray-500 font-medium">
                             <span className="px-2 py-0.5 bg-gray-100 rounded-md">#{selectedPatient.maBenhNhan}</span>
                             <span>{selectedPatient.gioiTinh ? 'Nam' : 'Nữ'}</span>
-                            <span>{new Date(selectedPatient.ngaySinh).toLocaleDateString('vi-VN')}</span>
+                            <span>{new Date(selectedPatient.ngaySinh).toLocaleDateString("vi-VN")}</span>
                           </div>
                         </div>
                       </div>
@@ -150,38 +235,56 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
                     </div>
                     <div className="bg-white rounded-2xl p-8 h-full">
                        {isRhmAssistant ? (
-                        <TroLyRHMForm selectedPatient={selectedPatient} user={user} onSaved={() => { setSelectedPatient(null); fetchStats(); }} />
+                        <TroLyRHMForm selectedPatient={selectedPatient} user={user} onSaved={() => { setSelectedPatient(null); fetchStats(); }} initialTab={initialFormTab} onBack={() => setSelectedPatient(null)} />
                       ) : isTmhAssistant ? (
-                        <TroLyTMHForm selectedPatient={selectedPatient} user={user} onSaved={() => { setSelectedPatient(null); fetchStats(); }} />
+                        <TroLyTMHForm selectedPatient={selectedPatient} user={user} onSaved={() => { setSelectedPatient(null); fetchStats(); }} initialTab={initialFormTab} onBack={() => setSelectedPatient(null)} />
+                      ) : isCardiologyAssistant ? (
+                        <TroLyTimMachForm selectedPatient={selectedPatient} user={user} onSaved={() => { setSelectedPatient(null); fetchStats(); }} initialTab={initialFormTab} onBack={() => setSelectedPatient(null)} />
+                      ) : isNhiAssistant ? (
+                        <TroLyNhiForm selectedPatient={selectedPatient} user={user} onSaved={() => { setSelectedPatient(null); fetchStats(); }} initialTab={initialFormTab} onBack={() => setSelectedPatient(null)} />
                       ) : (
                         <VitalSignsForm phieuKhamId={selectedPatient.maPhieuKham} registrationId={selectedPatient.id} assistantId={user?.maNhanVien} initialGhiChu={selectedPatient.ghiChu} onSaved={() => { setSelectedPatient(null); fetchStats(); }} />
                       )}
                     </div>
                   </div>
-                ) : (
+                )}
+                {activeTab === 'dashboard' && !selectedPatient && !isSpecialtyAssistant && (
                   <div className="w-full h-full min-h-[500px] bg-white border-2 border-dashed border-gray-200 rounded-3xl flex items-center justify-center text-center">
                     <div>
                       <div className="w-24 h-24 bg-gray-50 rounded-full inline-flex items-center justify-center mb-6 text-gray-300"><span className="material-symbols-outlined text-5xl">assignment_ind</span></div>
                       <h3 className="text-2xl font-bold text-gray-800 mb-4 whitespace-nowrap">Sẵn sàng hỗ trợ</h3>
-                      <p className="text-gray-500 text-base leading-relaxed">Vui lòng chọn một bệnh nhân từ danh sách chờ để bắt đầu đo chỉ số sinh hiệu.</p>
+                      <p className="text-gray-500 text-base leading-relaxed">Vui lòng chọn một bệnh nhân từ danh sách chờ để bắt đầu khám sinh hiệu.</p>
                     </div>
                   </div>
                 )}
               </div>
             </div>
+            )}
           </div>
         );
       case 'patients': return <QuanLyBenhNhan />;
-      case 'history': return <LichSuKham user={user} onEdit={item => {
-          setSelectedPatient({...item, trangThai: 'DANG_KHAM'});
-          setActiveTab('dashboard');
-        }} />;
+      case 'history':
+        return (
+          <LichSuChuyenKhoa
+            user={user}
+            onReview={(item) => {
+              setSelectedPatient({ ...item, trangThai: 'DANG_KHAM' });
+              setActiveTab('dashboard');
+            }}
+          />
+        );
       default: return null;
     }
   };
 
   return (
     <div className="flex h-screen bg-[#f3f4f6] font-body-md overflow-hidden text-gray-900">
+      <WebSocketAutoRefresh
+        topics={['/topic/phieu-kham', '/topic/dang-ky-kham']}
+        onMessage={(topic, data) => {
+          fetchStats();
+        }}
+      />
       <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20`}>
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
           <div className="flex items-center gap-2">
@@ -203,12 +306,6 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
             ))}
           </ul>
         </nav>
-        <div className="p-4 border-t border-gray-200">
-          <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors font-medium">
-            <span className="material-symbols-outlined">logout</span>
-            {isSidebarOpen && <span>Đăng xuất</span>}
-          </button>
-        </div>
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -267,60 +364,25 @@ const PatientQueue = ({ list, loading, onSelectPatient, selectedId, isAbsentQueu
 };
 
 const VitalSignsForm = ({ phieuKhamId, registrationId, assistantId, initialGhiChu, onSaved }) => {
+  const vitalsRef = React.useRef(null);
   const { showSuccess, showError } = useNotification();
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
-  const [vitals, setVitals] = useState({ nhietDo: '', nhipTim: '', huyetApThu: '', huyetApTruong: '', nhipTho: '', canNang: '', chieuCao: '', spo2: '', ghiChu: initialGhiChu || '' });
-
-  useEffect(() => {
-    if (phieuKhamId) {
-      getByPhieuKhamApi(phieuKhamId).then(data => {
-        if (data) {
-          setVitals(prev => ({ ...prev, nhietDo: data.nhietDo || '', nhipTim: data.nhipTim || '', huyetApThu: data.huyetApTamThu || '', huyetApTruong: data.huyetApTamTruong || '', nhipTho: data.nhipTho || '', canNang: data.canNang || '', chieuCao: data.chieuCao || '', spo2: data.spo2 || '' }));
-        }
-      });
-    }
-  }, [phieuKhamId]);
-
-  const handleConfirm = async () => {
-    try {
-      const payload = {
-        maPhieuKham: phieuKhamId,
-        nhietDo: parseFloat(vitals.nhietDo) || null,
-        nhipTim: parseInt(vitals.nhipTim) || null,
-        nhipTho: parseInt(vitals.nhipTho) || null,
-        huyetApTamThu: parseInt(vitals.huyetApThu) || null,
-        huyetApTamTruong: parseInt(vitals.huyetApTruong) || null,
-        canNang: parseFloat(vitals.canNang) || null,
-        chieuCao: parseFloat(vitals.chieuCao) || null,
-        spo2: parseFloat(vitals.spo2) || null,
-        maNhanVienNhap: assistantId
-      };
-      await saveAndUpdateApi(payload);
-      await updateToWaitingForDoctorApi(phieuKhamId);
-      showSuccess("✅ Đã hoàn tất đo sinh hiệu và chuyển Bác sĩ khám.");
-      onSaved();
-    } catch (e) { showError("Lỗi: " + e.message); }
-  };
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <h3 className="text-xl font-bold text-indigo-700 text-center uppercase border-b pb-4">Thông tin chỉ số sinh tồn</h3>
-      <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-        <div className="space-y-4">
-          <div className="flex justify-between items-center"><label className="text-sm font-bold text-gray-700">Nhiệt độ (°C)</label><input type="number" step="0.1" className="w-32 p-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none" value={vitals.nhietDo} onChange={e => setVitals({...vitals, nhietDo: e.target.value})} /></div>
-          <div className="flex justify-between items-center"><label className="text-sm font-bold text-gray-700">Huyết áp thu</label><input type="number" className="w-32 p-2 border rounded" value={vitals.huyetApThu} onChange={e => setVitals({...vitals, huyetApThu: e.target.value})} /></div>
-          <div className="flex justify-between items-center"><label className="text-sm font-bold text-gray-700">Nhịp thở</label><input type="number" className="w-32 p-2 border rounded" value={vitals.nhipTho} onChange={e => setVitals({...vitals, nhipTho: e.target.value})} /></div>
-          <div className="flex justify-between items-center"><label className="text-sm font-bold text-gray-700">Chiều cao (cm)</label><input type="number" className="w-32 p-2 border rounded" value={vitals.chieuCao} onChange={e => setVitals({...vitals, chieuCao: e.target.value})} /></div>
-        </div>
-        <div className="space-y-4">
-          <div className="flex justify-between items-center"><label className="text-sm font-bold text-gray-700">Nhịp tim</label><input type="number" className="w-32 p-2 border rounded" value={vitals.nhipTim} onChange={e => setVitals({...vitals, nhipTim: e.target.value})} /></div>
-          <div className="flex justify-between items-center"><label className="text-sm font-bold text-gray-700">Huyết áp trương</label><input type="number" className="w-32 p-2 border rounded" value={vitals.huyetApTruong} onChange={e => setVitals({...vitals, huyetApTruong: e.target.value})} /></div>
-          <div className="flex justify-between items-center"><label className="text-sm font-bold text-gray-700">Cân nặng (kg)</label><input type="number" step="0.1" className="w-32 p-2 border rounded" value={vitals.canNang} onChange={e => setVitals({...vitals, canNang: e.target.value})} /></div>
-          <div className="flex justify-between items-center"><label className="text-sm font-bold text-gray-700">Chỉ số SpO2 (%)</label><input type="number" className="w-32 p-2 border rounded" value={vitals.spo2} onChange={e => setVitals({...vitals, spo2: e.target.value})} /></div>
-        </div>
-      </div>
+      <h3 className="text-xl font-bold text-indigo-700 text-center uppercase border-b pb-4">Thông tin chỉ số sinh hiệu</h3>
+      <VitalSignsFormComponent ref={vitalsRef} phieuKhamId={phieuKhamId} assistantId={assistantId} initialGhiChu={initialGhiChu || ''} showSaveOnly />
       <div className="flex gap-4 pt-6">
-        <button onClick={handleConfirm} className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-md hover:bg-indigo-700 transition-all">XÁC NHẬN & CHUYỂN BÁC SĨ</button>
+        <button onClick={async () => {
+          if (vitalsRef.current) {
+            const success = await vitalsRef.current.handleSave();
+            if (success) {
+              await updateToWaitingForDoctorApi(phieuKhamId);
+              showSuccess("✅ Đã hoàn tất đo sinh hiệu và chuyển Bác sĩ khám.");
+              onSaved();
+            }
+          }
+        }} className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-md hover:bg-indigo-700 transition-all">XÁC NHẬN & CHUYỂN BÁC SĨ</button>
         <button onClick={() => setConfirmState({
           isOpen: true,
           title: 'Xác nhận vắng mặt',

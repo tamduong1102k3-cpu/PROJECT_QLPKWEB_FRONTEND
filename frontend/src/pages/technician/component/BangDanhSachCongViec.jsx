@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatDateOfBirth, calculateAge, formatDateTime } from './TienIchKyThuatVien';
 
-const BangDanhSachCongViec = ({ list, worklistTab, setWorklistTab, isImaging, onOpenResult, onOpenView, searchQuery, setSearchQuery, isRefreshing, onManualRefresh, loading }) => {
+const BangDanhSachCongViec = ({ list, worklistTab, setWorklistTab, isImaging, onOpenResult, onOpenView, onOpenVitals, onEditResult, onMarkAbsent, onMarkPresent, searchQuery, setSearchQuery, isRefreshing, onManualRefresh, loading }) => {
   return (
     <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-sm border border-slate-200/60 space-y-8">
       <div className="flex justify-between items-center border-b border-slate-100 pb-5">
@@ -18,13 +18,17 @@ const BangDanhSachCongViec = ({ list, worklistTab, setWorklistTab, isImaging, on
 
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div className="flex gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/50 w-fit backdrop-blur-sm">
-          <button onClick={() => setWorklistTab('pending')} className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+          <button onClick={() => setWorklistTab('pending')} className={`flex-1 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
             <span>CHỜ THỰC HIỆN</span>
             <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'pending' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>{list.pendingCount}</span>
           </button>
-          <button onClick={() => setWorklistTab('completed')} className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'completed' ? 'bg-white text-teal-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+          <button onClick={() => setWorklistTab('completed')} className={`flex-1 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'completed' ? 'bg-white text-teal-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
             <span>ĐÃ HOÀN THÀNH</span>
             <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'completed' ? 'bg-teal-100 text-teal-700' : 'bg-slate-200 text-slate-600'}`}>{list.completedCount}</span>
+          </button>
+          <button onClick={() => setWorklistTab('absent')} className={`flex-1 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'absent' ? 'bg-white text-red-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+            <span>VẮNG MẶT</span>
+            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'absent' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600'}`}>{list.absentCount || 0}</span>
           </button>
         </div>
 
@@ -57,7 +61,7 @@ const BangDanhSachCongViec = ({ list, worklistTab, setWorklistTab, isImaging, on
             ) : list.data.map(item => (
               <tr key={item.id} className="hover:bg-slate-50/80 transition-colors duration-200 group">
                 <td className="py-4 px-6">
-                  <span className="font-extrabold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200/50">#{item.maPhieuKham}</span>
+                  <span className="font-extrabold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200/50">#{item.maPhieuKham || item.id}</span>
                 </td>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-4">
@@ -67,7 +71,7 @@ const BangDanhSachCongViec = ({ list, worklistTab, setWorklistTab, isImaging, on
                     <div className="min-w-0">
                       <h4 className="font-black text-slate-800 text-base truncate">{item.hoTen}</h4>
                       <div className="flex items-center gap-2 mt-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${item.gioiTinh === 'Nam' ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>{item.gioiTinh}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${item.gioiTinh === 'Nam' || item.gioiTinh === 1 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>{item.gioiTinh === 1 || item.gioiTinh === 'Nam' ? 'Nam' : 'Nữ'}</span>
                         <span>•</span>
                         <span>{formatDateOfBirth(item.ngaySinh)}</span>
                         <span className="text-slate-400">({calculateAge(item.ngaySinh)})</span>
@@ -77,23 +81,91 @@ const BangDanhSachCongViec = ({ list, worklistTab, setWorklistTab, isImaging, on
                 </td>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-2.5">
-                    <span className={`w-2 h-2 rounded-full ${worklistTab === 'pending' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></span>
-                    <span className="font-bold text-slate-700">{item.tenDichVu}</span>
+                    <span className={`w-2 h-2 rounded-full ${worklistTab === 'pending' ? 'bg-amber-400 animate-pulse' : worklistTab === 'completed' ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+                    <span className="font-bold text-slate-700">{item.tenDichVu || item.tenChuyenKhoa || 'Khám bệnh'}</span>
                   </div>
                 </td>
                 <td className="py-4 px-6 text-center">
                   {worklistTab === 'pending' ? (
-                    <button onClick={() => onOpenResult(item)} className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-indigo-600 shadow-md shadow-indigo-500/20 text-xs flex items-center gap-2 mx-auto transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
-                      <span className="material-symbols-outlined text-[18px]">edit_note</span> NHẬP KẾT QUẢ
-                    </button>
-                  ) : (
-                    <div className="flex items-center justify-center gap-3">
-                      <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-lg border border-emerald-100 text-[11px] flex items-center gap-1.5 shadow-sm">
-                        <span className="material-symbols-outlined text-sm">check_circle</span> HOÀN TẤT
-                      </span>
-                      <button onClick={() => onOpenView(item)} className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-indigo-600 rounded-lg border border-slate-200 transition-all shadow-sm hover:shadow group/btn">
-                        <span className="material-symbols-outlined text-sm group-hover/btn:scale-110 transition-transform">visibility</span>
+                    <div className="flex items-center justify-center gap-2">
+                      {/* Nút SINH HIỆU - thêm/xem/sửa */}
+                      <button 
+                        onClick={() => onOpenVitals(item)} 
+                        className={`px-3 py-2.5 font-bold rounded-xl shadow-md text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm ${
+                          item.hasVitals 
+                            ? 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 border border-emerald-200 hover:from-emerald-200 hover:to-teal-200 shadow-emerald-500/10' 
+                            : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-amber-500/20'
+                        }`}
+                        title={item.hasVitals ? 'Sửa chỉ số sinh hiệu' : 'Nhập chỉ số sinh hiệu'}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">monitor_heart</span> 
+                        <span className="flex items-center gap-1">
+                          SINH HIỆU
+                          {item.hasVitals && <span className="material-symbols-outlined text-sm">check_circle</span>}
+                        </span>
                       </button>
+                      {/* Nút KẾT QUẢ chuyên môn */}
+                      <button onClick={() => onOpenResult(item)} className="px-3 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-indigo-600 shadow-md shadow-indigo-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
+                        <span className="material-symbols-outlined text-[18px]">edit_note</span> KẾT QUẢ
+                      </button>
+                      {/* Nút VẮNG MẶT */}
+                      {onMarkAbsent && (
+                        <button onClick={() => onMarkAbsent(item)} className="px-3 py-2.5 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center gap-1.5 transition-all">
+                          <span className="material-symbols-outlined text-[18px]">person_off</span> VẮNG
+                        </button>
+                      )}
+                    </div>
+                  ) : worklistTab === 'absent' ? (
+                    <div className="flex items-center justify-center gap-2">
+                      {onMarkPresent && (
+                        <button onClick={() => onMarkPresent(item)} className="px-3 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-teal-600 shadow-md shadow-emerald-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
+                          <span className="material-symbols-outlined text-[18px]">person</span> GỌI LẠI
+                        </button>
+                      )}
+                      {onOpenView ? (
+                        <button onClick={() => onOpenView(item)} className="px-3 py-2.5 bg-gradient-to-r from-slate-600 to-slate-500 text-white font-bold rounded-xl hover:from-slate-700 hover:to-slate-600 shadow-md shadow-slate-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
+                          <span className="material-symbols-outlined text-[18px]">visibility</span> XEM
+                        </button>
+                      ) : (
+                        <button onClick={() => onOpenResult(item)} className="px-3 py-2.5 bg-gradient-to-r from-slate-600 to-slate-500 text-white font-bold rounded-xl hover:from-slate-700 hover:to-slate-600 shadow-md shadow-slate-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
+                          <span className="material-symbols-outlined text-[18px]">visibility</span> XEM
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      {onOpenView ? (
+                        <>
+                          {/* Nút SINH HIỆU - sửa lại chỉ số */}
+                          <button 
+                            onClick={() => onOpenVitals(item)} 
+                            className={`px-3 py-2.5 font-bold rounded-xl shadow-md text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm ${
+                              item.hasVitals 
+                                ? 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 border border-emerald-200 hover:from-emerald-200 hover:to-teal-200 shadow-emerald-500/10' 
+                                : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-amber-500/20'
+                            }`}
+                            title={item.hasVitals ? 'Sửa chỉ số sinh hiệu' : 'Nhập chỉ số sinh hiệu'}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">monitor_heart</span> 
+                            <span className="flex items-center gap-1">
+                              SINH HIỆU
+                              {item.hasVitals && <span className="material-symbols-outlined text-sm">check_circle</span>}
+                            </span>
+                          </button>
+                          {/* Nút SỬA kết quả chuyên môn */}
+                          <button onClick={() => onEditResult ? onEditResult(item) : onOpenResult(item)} className="px-3 py-2.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold rounded-xl hover:from-amber-500 hover:to-orange-600 shadow-md shadow-amber-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
+                            <span className="material-symbols-outlined text-[18px]">edit</span> KẾT QUẢ
+                          </button>
+                          {/* Nút XEM */}
+                          <button onClick={() => onOpenView(item)} className="px-3 py-2.5 bg-gradient-to-r from-slate-600 to-slate-500 text-white font-bold rounded-xl hover:from-slate-700 hover:to-slate-600 shadow-md shadow-slate-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
+                            <span className="material-symbols-outlined text-[18px]">visibility</span> XEM
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => onOpenResult(item)} className="px-3 py-2.5 bg-gradient-to-r from-slate-600 to-slate-500 text-white font-bold rounded-xl hover:from-slate-700 hover:to-slate-600 shadow-md shadow-slate-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
+                          <span className="material-symbols-outlined text-[18px]">visibility</span> XEM / SỬA
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>

@@ -16,6 +16,9 @@ public class ChuyenKhoa {
     @Column(name = "mo_ta")
     private String moTa;
 
+    @Column(name = "so_luong_toi_da")
+    private Integer soLuongToiDa;
+
     // Getters and Setters
     public Integer getMaChuyenKhoa() { return maChuyenKhoa; }
     public void setMaChuyenKhoa(Integer maChuyenKhoa) { this.maChuyenKhoa = maChuyenKhoa; }
@@ -25,4 +28,7 @@ public class ChuyenKhoa {
 
     public String getMoTa() { return moTa; }
     public void setMoTa(String moTa) { this.moTa = moTa; }
+
+    public Integer getSoLuongToiDa() { return soLuongToiDa; }
+    public void setSoLuongToiDa(Integer soLuongToiDa) { this.soLuongToiDa = soLuongToiDa; }
 }

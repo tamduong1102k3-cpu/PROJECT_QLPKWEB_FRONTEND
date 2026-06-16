@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { getAvailableClsResultsApi } from '../../../api/phieuKhamApi';
 import { getByPhieuKhamApi as _getToaThuocByPhieuKhamApi, getDetailsApi as _getToaThuocDetailsApi } from '../../../api/toaThuocApi';
+import { useNotification } from '../../../components/NotificationContext';
 
 const TabLichSuKhamChiTiet = ({ examHistory, allMeds = [] }) => {
+  const { showError } = useNotification();
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailData, setDetailData] = useState(null);
@@ -50,7 +52,7 @@ const TabLichSuKhamChiTiet = ({ examHistory, allMeds = [] }) => {
       });
     } catch (error) {
       console.error("Lỗi tải chi tiết lịch sử:", error);
-      alert("Không thể tải toàn bộ chi tiết lịch sử khám!");
+      showError("Không thể tải toàn bộ chi tiết lịch sử khám!");
     } finally {
       setDetailLoading(false);
     }
@@ -285,4 +287,3 @@ const TabLichSuKhamChiTiet = ({ examHistory, allMeds = [] }) => {
 };
 
 export default TabLichSuKhamChiTiet;
-

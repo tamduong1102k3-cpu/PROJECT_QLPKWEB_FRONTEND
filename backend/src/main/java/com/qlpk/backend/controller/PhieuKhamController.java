@@ -23,6 +23,15 @@ public class PhieuKhamController {
         return phieuKhamService.getAll();
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<PhieuKham> getById(@PathVariable Integer id) {
+        PhieuKham pk = phieuKhamService.getById(id);
+        if (pk != null) {
+            return ResponseEntity.ok(pk);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
     @PostMapping
     public ResponseEntity<PhieuKham> create(@RequestBody PhieuKham phieuKham) {
         return ResponseEntity.ok(phieuKhamService.create(phieuKham));
@@ -112,5 +121,24 @@ public class PhieuKhamController {
     @GetMapping("/{id}/available-cls-results")
     public ResponseEntity<?> getAvailableClsResults(@PathVariable Integer id) {
         return ResponseEntity.ok(phieuKhamService.getAvailableClsResults(id));
+    }
+
+    /** Lấy danh sách bệnh nhân đã hoàn thành khám hôm nay (cho thu ngân) */
+    @GetMapping("/completed-patients")
+    public ResponseEntity<?> getCompletedPatients(@RequestParam(value = "keyword", required = false) String keyword) {
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(phieuKhamService.getCompletedPatientsTodayWithSearch(keyword.trim()));
+        }
+        return ResponseEntity.ok(phieuKhamService.getCompletedPatientsToday());
+    }
+
+    /** Lấy lịch sử khám theo chuyên khoa cho tất cả các ngày */
+    @GetMapping("/specialty-history")
+    public ResponseEntity<?> getSpecialtyHistory(@RequestParam Integer maChuyenKhoa) {
+        try {
+            return ResponseEntity.ok(phieuKhamService.getHistoryByChuyenKhoaAllDays(maChuyenKhoa));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Lỗi: " + e.getMessage()));
+        }
     }
 }

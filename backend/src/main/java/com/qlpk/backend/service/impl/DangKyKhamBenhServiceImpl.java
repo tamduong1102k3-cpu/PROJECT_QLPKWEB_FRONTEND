@@ -52,6 +52,12 @@ public class DangKyKhamBenhServiceImpl implements DangKyKhamBenhService {
     }
 
     @Override
+    public List<Map<String, Object>> getTodayRegistrationsDetailedWithSearch(String keyword) {
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        return repository.findTodayRegistrationsDetailedWithSearch(startOfDay, keyword);
+    }
+
+    @Override
     public DangKyKhamBenh updateStatus(Integer id, String status) {
         return repository.findById(id).map(dangKy -> {
             dangKy.setTrangThai(status);

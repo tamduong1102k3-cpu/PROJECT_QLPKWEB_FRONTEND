@@ -1,21 +1,29 @@
 import { getAllApi as _getDichVuAll } from '../../api/dichVuApi';
-import { getByPhieuKhamApi as _getByPhieuKhamApi } from '../../api/chiSoKhamTongHopApi';
-import { apiClient } from "../../api/apiClient";
+import { getByPhieuKhamApi as _getByPhieuKhamApi, saveAndUpdateApi as _saveVitalsApi } from '../../api/chiSoKhamTongHopApi';
+import { getAllThuocApi as _getAllMeds } from '../../api/khoThuocApi';
 import { useNotification } from '../../components/NotificationContext';
+import VitalSignsForm from '../../components/VitalSignsForm';
 import React, { useState, useEffect, useCallback } from 'react';
 import TabKhamRHM from '../doctor/components/TabKhamRHM';
 import TabDichVuChiDinh from '../doctor/components/TabDichVuChiDinh';
 import TabKeDonThuoc from '../doctor/components/TabKeDonThuoc';
+import { updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
 
 const TroLyRHMForm = ({
   selectedPatient,
   user,
-  onSaved
+  onSaved,
+  initialTab = 'vitals',
+  onBack
 }) => {
-  const [examSubTab, setExamSubTab] = useState('vitals');
+  const [examSubTab, setExamSubTab] = useState(initialTab);
   const { showSuccess, showError } = useNotification();
 
-  // 1. Sinh Hiệu State (Khớp tên trường với DB/Backend)
+  useEffect(() => {
+    setExamSubTab(initialTab);
+  }, [initialTab]);
+
+  // 1. Sinh Hiệu State
   const [vitals, setVitals] = useState({
     nhietDo: '',
     nhipTim: '',
@@ -51,72 +59,68 @@ const TroLyRHMForm = ({
   const [allMeds, setAllMeds] = useState([]);
   const [selectedMeds, setSelectedMeds] = useState([]);
 
-  // --- HÀM LOAD DỮ LIỆU SINH HIỆU (TÁCH RIÊNG) ---
+  // --- LOAD VITALS ---
   const loadVitals = useCallback(async () => {
     if (!selectedPatient?.maPhieuKham) return;
     try {
-      let res = {
-        ok: false
-      };
-      let data = null;
-      try {
-        data = await _getByPhieuKhamApi(selectedPatient.maPhieuKham);
-        res.ok = true;
-      } catch (e) {}
-      if (res.ok) {
-        if (data) {
-          setVitals({
-            nhietDo: data.nhietDo ?? '',
-            nhipTim: data.nhipTim ?? '',
-            // QUAN TRỌNG: Map đúng tên trường từ Backend (huyetApTamThu -> huyetApThu)
-            huyetApThu: data.huyetApTamThu ?? '',
-            huyetApTruong: data.huyetApTamTruong ?? '',
-            nhipTho: data.nhipTho ?? '',
-            canNang: data.canNang ?? '',
-            chieuCao: data.chieuCao ?? '',
-            spo2: data.spo2 ?? '',
-            ghiChu: data.ghiChu ?? selectedPatient?.ghiChu ?? ''
-          });
-
-          // Cập nhật cả các trường RHM nếu chúng nằm chung bảng chi_so_kham_tong_hop
-          setExamData(prev => ({
-            ...prev,
-            sauRang: data.sauRang || '',
-            caoRang: data.caoRang || '',
-            viemNuou: data.viemNuou || '',
-            khopCan: data.khopCan || '',
-            doLungLay: data.doLungLay || '',
-            niemMacMieng: data.niemMacMieng || '',
-            phuHinhCu: data.phuHinhCu || '',
-            benhLyKhacRhm: data.benhLyKhacRhm || ''
-          }));
-        }
+      const data = await _getByPhieuKhamApi(selectedPatient.maPhieuKham);
+      if (data) {
+        setVitals({
+          nhietDo: data.nhietDo ?? '',
+          nhipTim: data.nhipTim ?? '',
+          huyetApThu: data.huyetApTamThu ?? '',
+          huyetApTruong: data.huyetApTamTruong ?? '',
+          nhipTho: data.nhipTho ?? '',
+          canNang: data.canNang ?? '',
+          chieuCao: data.chieuCao ?? '',
+          spo2: data.spo2 ?? '',
+          ghiChu: data.ghiChu ?? selectedPatient?.ghiChu ?? ''
+        });
+        setExamData(prev => ({
+          ...prev,
+          sauRang: data.sauRang || '',
+          caoRang: data.caoRang || '',
+          viemNuou: data.viemNuou || '',
+          khopCan: data.khopCan || '',
+          doLungLay: data.doLungLay || '',
+          niemMacMieng: data.niemMacMieng || '',
+          phuHinhCu: data.phuHinhCu || '',
+          benhLyKhacRhm: data.benhLyKhacRhm || ''
+        }));
       }
     } catch (e) {
       console.error("Lỗi load sinh hiệu:", e);
     }
   }, [selectedPatient?.maPhieuKham, selectedPatient?.ghiChu]);
 
-  // Load tất cả dữ liệu khi chọn bệnh nhân
   useEffect(() => {
     if (selectedPatient?.maPhieuKham) {
       loadVitals();
-      // Các hàm load khác (Services, Toa thuốc) giữ nguyên logic của bạn...
     }
   }, [selectedPatient, loadVitals]);
 
-  // Fetch danh mục dùng chung
+  // Fetch danh mục
   useEffect(() => {
-    (async () => ({
-      ok: true,
-      json: async () => await _getDichVuAll()
-    }))().then(r => r.json()).then(setAllServices).catch(console.error);
-    apiClient(`${API_BASE}/kho-thuoc/thuoc`).then(r => r.json()).then(setAllMeds).catch(console.error);
+    _getDichVuAll().then(setAllServices).catch(console.error);
+    _getAllMeds().then(setAllMeds).catch(console.error);
   }, []);
 
-  // --- HÀM LƯU SINH HIỆU ---
+  const vitalsRef = React.useRef(null);
+
+  // --- LƯU SINH HIỆU ---
   const handleSaveVitals = async () => {
+    if (vitalsRef.current) {
+      const success = await vitalsRef.current.handleSave();
+      if (success) loadVitals();
+    }
+  };
+
+  const handleFinishAssistant = async () => {
     if (!selectedPatient?.maPhieuKham) return;
+    if (vitalsRef.current) {
+      const success = await vitalsRef.current.handleSave();
+      if (!success) return;
+    }
     try {
       const payload = {
         maPhieuKham: selectedPatient.maPhieuKham,
@@ -131,133 +135,43 @@ const TroLyRHMForm = ({
         ghiChu: vitals.ghiChu,
         maNhanVienNhap: user?.maNhanVien
       };
-      const res = await apiClient(`${API_BASE}/chi-so-tong-hop/save-and-update`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        showSuccess("✅ Đã lưu chỉ số sinh hiệu thành công.");
-        loadVitals(); // Load lại để đồng bộ dữ liệu
-      }
+      await _saveVitalsApi(payload);
+      await updateToWaitingForDoctorApi(selectedPatient.maPhieuKham);
+      showSuccess("✅ Đã hoàn tất quy trình trợ lý và chuyển Bác sĩ khám.");
+      onSaved();
     } catch (e) {
-      showError("❌ Lỗi lưu sinh hiệu.");
+      console.error("Lỗi hoàn tất quy trình trợ lý:", e);
+      showError("❌ Lỗi hoàn tất quy trình trợ lý: " + e.message);
     }
   };
 
-  const handleFinishAssistant = async () => {
-    onSaved();
-  };
-
-  // Giữ các hàm handleSaveClinicalExam, handleSaveReferral... giống của bạn
-
   return <div className="flex flex-col h-full space-y-4">
-      {/* Sub-Tabs Navigation */}
-      <div className="flex gap-2 p-1 bg-gray-100 rounded-xl w-fit">
-        {[{
-        id: 'vitals',
-        label: 'Sinh Hiệu'
-      }, {
-        id: 'info',
-        label: 'Khám RHM'
-      }, {
-        id: 'services',
-        label: 'Chỉ Định'
-      }, {
-        id: 'prescription',
-        label: 'Kê Đơn'
-      }].map(t => <button key={t.id} onClick={() => setExamSubTab(t.id)} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${examSubTab === t.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>
-            {t.label}
-          </button>)}
+      <div className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+        <div className="flex gap-2 p-1 bg-slate-100/80 rounded-xl w-fit">
+          {[{
+          id: 'vitals',
+          label: 'Sinh Hiệu'
+        }, {
+          id: 'info',
+          label: 'Khám RHM'
+        }].map(t => <button key={t.id} onClick={() => setExamSubTab(t.id)} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${examSubTab === t.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200'}`}>
+              {t.label}
+            </button>)}
+        </div>
+        {onBack && (
+          <button onClick={onBack} className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 font-bold rounded-lg transition-all">
+            <span className="material-symbols-outlined text-lg">arrow_back</span>
+            QUAY LẠI DANH SÁCH
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {examSubTab === 'vitals' && <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-8 animate-fade-in">
-            <h3 className="text-xl font-bold text-indigo-700 uppercase border-b pb-4">Thông tin chỉ số sinh tồn</h3>
-            <div className="grid grid-cols-2 gap-x-20 gap-y-6">
-              {/* Cột 1 */}
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-gray-600">Nhiệt độ (°C)</label>
-                    <input type="number" step="0.1" className="w-40 px-4 py-2 bg-gray-50 border rounded-xl text-right focus:ring-2 focus:ring-indigo-500 outline-none" value={vitals.nhietDo} onChange={e => setVitals({
-                ...vitals,
-                nhietDo: e.target.value
-              })} />
-                </div>
-                <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-gray-600">Huyết áp thu (mmHg)</label>
-                    <input type="number" className="w-40 px-4 py-2 bg-gray-50 border rounded-xl text-right focus:ring-2 focus:ring-indigo-500 outline-none" value={vitals.huyetApThu} onChange={e => setVitals({
-                ...vitals,
-                huyetApThu: e.target.value
-              })} />
-                </div>
-                <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-gray-600">Nhịp thở (lần/phút)</label>
-                    <input type="number" className="w-40 px-4 py-2 bg-gray-50 border rounded-xl text-right focus:ring-2 focus:ring-indigo-500 outline-none" value={vitals.nhipTho} onChange={e => setVitals({
-                ...vitals,
-                nhipTho: e.target.value
-              })} />
-                </div>
-                <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-gray-600">Chiều cao (cm)</label>
-                    <input type="number" className="w-40 px-4 py-2 bg-gray-50 border rounded-xl text-right focus:ring-2 focus:ring-indigo-500 outline-none" value={vitals.chieuCao} onChange={e => setVitals({
-                ...vitals,
-                chieuCao: e.target.value
-              })} />
-                </div>
-              </div>
-              {/* Cột 2 */}
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-gray-600">Nhịp tim (lần/phút)</label>
-                    <input type="number" className="w-40 px-4 py-2 bg-gray-50 border rounded-xl text-right focus:ring-2 focus:ring-indigo-500 outline-none" value={vitals.nhipTim} onChange={e => setVitals({
-                ...vitals,
-                nhipTim: e.target.value
-              })} />
-                </div>
-                <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-gray-600">Huyết áp trương (mmHg)</label>
-                    <input type="number" className="w-40 px-4 py-2 bg-gray-50 border rounded-xl text-right focus:ring-2 focus:ring-indigo-500 outline-none" value={vitals.huyetApTruong} onChange={e => setVitals({
-                ...vitals,
-                huyetApTruong: e.target.value
-              })} />
-                </div>
-                <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-gray-600">Cân nặng (kg)</label>
-                    <input type="number" step="0.1" className="w-40 px-4 py-2 bg-gray-50 border rounded-xl text-right focus:ring-2 focus:ring-indigo-500 outline-none" value={vitals.canNang} onChange={e => setVitals({
-                ...vitals,
-                canNang: e.target.value
-              })} />
-                </div>
-                <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-gray-600">Chỉ số SpO2 (%)</label>
-                    <input type="number" className="w-40 px-4 py-2 bg-gray-50 border rounded-xl text-right focus:ring-2 focus:ring-indigo-500 outline-none" value={vitals.spo2} onChange={e => setVitals({
-                ...vitals,
-                spo2: e.target.value
-              })} />
-                </div>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Ghi chú / Triệu chứng lâm sàng</label>
-              <textarea className="w-full px-4 py-3 bg-gray-50 border rounded-xl min-h-[120px] focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Nhập ghi chú hoặc triệu chứng bệnh nhân mô tả..." value={vitals.ghiChu} onChange={e => setVitals({
-            ...vitals,
-            ghiChu: e.target.value
-          })}></textarea>
-            </div>
-            <div className="flex justify-end">
-              <button onClick={handleSaveVitals} className="px-10 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-all flex items-center gap-2">
-                <span className="material-symbols-outlined">save</span>
-                LƯU CHỈ SỐ SINH HIỆU
-              </button>
-            </div>
-          </div>}
+        {examSubTab === 'vitals' && (
+          <VitalSignsForm ref={vitalsRef} phieuKhamId={selectedPatient.maPhieuKham} assistantId={user?.maNhanVien} initialGhiChu={selectedPatient?.ghiChu} />
+        )}
 
-        {examSubTab === 'info' && <TabKhamRHM maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} handleSaveVitals={handleSaveVitals} isAssistant={true} />}
-        
-        {/* Render các tab Services và Prescription giữ nguyên */}
+        {examSubTab === 'info' && <TabKhamRHM maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} isAssistant={true} />}
       </div>
 
       <div className="pt-4 border-t border-gray-100 flex justify-end gap-4">

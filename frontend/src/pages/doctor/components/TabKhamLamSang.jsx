@@ -3,8 +3,10 @@ import { getByPhieuKhamApi as getClinicalExamByPhieuKhamApi, saveWithVitalsApi }
 import { getByPhieuKhamApi as getVitalsByPhieuKhamApi } from '../../../api/chiSoKhamTongHopApi';
 import { getAvailableClsResultsApi } from '../../../api/phieuKhamApi';
 import { getDetailClsResultApi } from '../../../api/ketQuaClsApi';
+import { useNotification } from '../../../components/NotificationContext';
 
 const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
+  const { showSuccess, showError, showWarning } = useNotification();
   const [examData, setExamData] = useState({
     lyDoKham: '',
     tienSuBanThan: '',
@@ -39,6 +41,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState("saved"); // editing | saving | saved | error
   const [hasChanges, setHasChanges] = useState(false);
+  const [errors, setErrors] = useState({});
 
   // CLS selection integration state
   const [availableCls, setAvailableCls] = useState([]);
@@ -50,6 +53,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
     if (selectedPatient?.maPhieuKham) {
       setHasChanges(false);
       setSaveStatus("saved");
+      setErrors({});
       setSelectedLabId('');
       setSelectedCdhaId('');
 
@@ -84,7 +88,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
       getVitalsByPhieuKhamApi(selectedPatient.maPhieuKham)
         .then(data => {
           if (data) {
-            setVitals({
+            const loadedVitals = {
               nhietDo: data.nhietDo ?? '',
               nhipTim: data.nhipTim ?? '',
               huyetApThu: data.huyetApTamThu ?? '',
@@ -103,7 +107,14 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
               doLungLay: data.doLungLay || '',
               phuHinhCu: data.phuHinhCu || '',
               benhLyKhacRhm: data.benhLyKhacRhm || ''
-            });
+            };
+            setVitals(loadedVitals);
+            // Nếu tất cả chỉ số sinh hiệu chính đều rỗng, đặt trạng thái là "chưa lưu"
+            if (!loadedVitals.nhietDo && !loadedVitals.nhipTim && !loadedVitals.huyetApThu && !loadedVitals.huyetApTruong &&
+                !loadedVitals.nhipTho && !loadedVitals.spo2 && !loadedVitals.canNang && !loadedVitals.chieuCao) {
+              setSaveStatus("editing");
+              setHasChanges(true);
+            }
           } else {
             setVitals({
               nhietDo: '',
@@ -125,6 +136,9 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
               phuHinhCu: '',
               benhLyKhacRhm: ''
             });
+            // Không có dữ liệu từ server -> cần nhập mới
+            setSaveStatus("editing");
+            setHasChanges(true);
           }
         })
         .catch(e => console.error("Lỗi tải sinh hiệu:", e));
@@ -138,18 +152,88 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
     }
   }, [selectedPatient]);
 
-  const handleFieldChange = (setter, value) => {
-    setter(value);
+  // Validate form fields
+  const validateForm = (latestExamData = examData, latestVitals = vitals) => {
+    const newErrors = {};
+
+    // Required: Lý do khám
+    if (!latestExamData.lyDoKham || !latestExamData.lyDoKham.trim()) {
+      newErrors.lyDoKham = 'Vui lòng nhập lý do khám';
+    }
+
+    // Required: Chẩn đoán sơ bộ
+    if (!latestExamData.chanDoanSoBo || !latestExamData.chanDoanSoBo.trim()) {
+      newErrors.chanDoanSoBo = 'Vui lòng nhập chẩn đoán sơ bộ';
+    }
+
+    // Validate vitals numeric fields if not empty (vitals are entered by assistant, not by doctor)
+    if (latestVitals.nhietDo !== '' && isNaN(parseFloat(latestVitals.nhietDo))) {
+      newErrors.nhietDo = 'Nhiệt độ phải là số';
+    }
+    if (latestVitals.nhipTim !== '' && (isNaN(parseInt(latestVitals.nhipTim)) || parseInt(latestVitals.nhipTim) < 0 || parseInt(latestVitals.nhipTim) > 300)) {
+      newErrors.nhipTim = 'Nhịp tim không hợp lệ (0-300)';
+    }
+    if (latestVitals.huyetApThu !== '' && (isNaN(parseInt(latestVitals.huyetApThu)) || parseInt(latestVitals.huyetApThu) < 30 || parseInt(latestVitals.huyetApThu) > 300)) {
+      newErrors.huyetApThu = 'HA tâm thu không hợp lệ (30-300)';
+    }
+    if (latestVitals.huyetApTruong !== '' && (isNaN(parseInt(latestVitals.huyetApTruong)) || parseInt(latestVitals.huyetApTruong) < 20 || parseInt(latestVitals.huyetApTruong) > 200)) {
+      newErrors.huyetApTruong = 'HA tâm trương không hợp lệ (20-200)';
+    }
+    if (latestVitals.nhipTho !== '' && (isNaN(parseInt(latestVitals.nhipTho)) || parseInt(latestVitals.nhipTho) < 0 || parseInt(latestVitals.nhipTho) > 100)) {
+      newErrors.nhipTho = 'Nhịp thở không hợp lệ (0-100)';
+    }
+    if (latestVitals.spo2 !== '' && (isNaN(parseFloat(latestVitals.spo2)) || parseFloat(latestVitals.spo2) < 0 || parseFloat(latestVitals.spo2) > 100)) {
+      newErrors.spo2 = 'SpO2 không hợp lệ (0-100)';
+    }
+    if (latestVitals.canNang !== '' && (isNaN(parseFloat(latestVitals.canNang)) || parseFloat(latestVitals.canNang) <= 0 || parseFloat(latestVitals.canNang) > 500)) {
+      newErrors.canNang = 'Cân nặng không hợp lệ (0-500)';
+    }
+    if (latestVitals.chieuCao !== '' && (isNaN(parseFloat(latestVitals.chieuCao)) || parseFloat(latestVitals.chieuCao) <= 0 || parseFloat(latestVitals.chieuCao) > 250)) {
+      newErrors.chieuCao = 'Chiều cao không hợp lệ (0-250)';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleFieldChange = (field, value) => {
+    const newExamData = { ...examData, [field]: value };
+    setExamData(newExamData);
     setHasChanges(true);
     setSaveStatus("editing");
+    // Clear error for this field if valid
+    if (errors[field] && value.trim()) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const handleVitalChange = (field, value) => {
+    const newVitals = { ...vitals, [field]: value };
+    setVitals(newVitals);
+    setHasChanges(true);
+    setSaveStatus("editing");
+    // Clear error for this field on change
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
   };
 
   const autoSave = async (latestExamData = examData, latestVitals = vitals, force = false) => {
-    if (!hasChanges && !force) return true;
+    // Validate before save
+    if (!validateForm(latestExamData, latestVitals) && !force) {
+      showError('Vui lòng kiểm tra lại thông tin trước khi lưu!');
+      return false;
+    }
 
     try {
       setIsSaving(true);
       setSaveStatus("saving");
+      setErrors({});
+
+      // Check if vitals have been filled (by assistant) - if not, don't save vitals portion
+      const vitalsHaveData = latestVitals.nhietDo && latestVitals.nhipTim && latestVitals.huyetApThu && 
+                              latestVitals.huyetApTruong && latestVitals.nhipTho && latestVitals.spo2 && 
+                              latestVitals.canNang && latestVitals.chieuCao;
 
       const payload = {
         khamLamSang: {
@@ -157,7 +241,28 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
           maPhieuKham: selectedPatient.maPhieuKham,
           maBacSi: user?.maNhanVien
         },
-        chiSoKhamTongHop: {
+        chiSoKhamTongHop: vitalsHaveData ? {
+          maPhieuKham: selectedPatient.maPhieuKham,
+          nhietDo: parseFloat(latestVitals.nhietDo),
+          nhipTim: parseInt(latestVitals.nhipTim),
+          nhipTho: parseInt(latestVitals.nhipTho),
+          huyetApTamThu: parseInt(latestVitals.huyetApThu),
+          huyetApTamTruong: parseInt(latestVitals.huyetApTruong),
+          canNang: parseFloat(latestVitals.canNang),
+          chieuCao: parseFloat(latestVitals.chieuCao),
+          spo2: parseFloat(latestVitals.spo2),
+          maNhanVienNhap: user?.maNhanVien,
+          tinhTrangRang: latestVitals.tinhTrangRang || null,
+          sauRang: latestVitals.sauRang || null,
+          caoRang: latestVitals.caoRang || null,
+          viemNuou: latestVitals.viemNuou || null,
+          khopCan: latestVitals.khopCan || null,
+          niemMacMieng: latestVitals.niemMacMieng || null,
+          doLungLay: latestVitals.doLungLay || null,
+          phuHinhCu: latestVitals.phuHinhCu || null,
+          benhLyKhacRhm: latestVitals.benhLyKhacRhm || null,
+          ghiChu: latestVitals.ghiChu || null
+        } : {
           maPhieuKham: selectedPatient.maPhieuKham,
           nhietDo: latestVitals.nhietDo === '' ? null : parseFloat(latestVitals.nhietDo),
           nhipTim: latestVitals.nhipTim === '' ? null : parseInt(latestVitals.nhipTim),
@@ -198,7 +303,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
   // Expose autoSave capability to parent container
   useImperativeHandle(ref, () => ({
     triggerAutoSave: async () => {
-      return await autoSave(examData, vitals);
+      return await autoSave(examData, vitals, true);
     }
   }));
 
@@ -217,7 +322,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
         // Check for duplicates
         const servicePattern = `[${detail.loaiDichVu === 'XET_NGHIEM' ? 'XÉT NGHIỆM' : 'CĐHA'}] ${detail.tenDichVu}`;
         if (examData.ketQuaKhamCanLamSang.includes(servicePattern)) {
-          alert(`Kết quả dịch vụ "${detail.tenDichVu}" đã được chọn trước đó!`);
+          showWarning(`Kết quả dịch vụ "${detail.tenDichVu}" đã được chọn trước đó!`);
           if (loai === 'XET_NGHIEM') setSelectedLabId('');
           else setSelectedCdhaId('');
           return;
@@ -249,7 +354,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
       }
     } catch (error) {
       console.error("Lỗi lấy chi tiết kết quả CLS:", error);
-      alert("Không thể tải chi tiết kết quả cận lâm sàng!");
+      showError("Không thể tải chi tiết kết quả cận lâm sàng!");
     } finally {
       // Reset dropdowns to permit repeated selects of other elements
       if (loai === 'XET_NGHIEM') setSelectedLabId('');
@@ -275,6 +380,18 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
   const labs = availableCls.filter(item => item.loai === 'XET_NGHIEM');
   const cdhas = availableCls.filter(item => item.loai === 'CDHA');
 
+  const getErrorBorder = (field) => {
+    return errors[field] ? 'border-red-400 bg-red-50' : 'border-gray-300';
+  };
+
+  const renderError = (field) => {
+    if (!errors[field]) return null;
+    return <p className="mt-1 text-[11px] font-bold text-red-500 flex items-center gap-1">
+      <span className="material-symbols-outlined text-[14px]">error</span>
+      {errors[field]}
+    </p>;
+  };
+
   return (
     <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 animate-fade-in relative">
       <div className="flex items-center justify-between mb-6 border-b border-gray-50 pb-4">
@@ -282,18 +399,29 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
           <span className="material-symbols-outlined text-indigo-600">assignment</span>
           Khám Lâm Sàng
         </h3>
-        <div>{renderStatus()}</div>
+        <div className="flex items-center gap-2">
+          {Object.keys(errors).length > 0 && (
+            <span className="text-xs text-red-500 font-bold bg-red-50 px-2.5 py-1 rounded-full flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px]">error</span>
+              {Object.keys(errors).length} lỗi
+            </span>
+          )}
+          {renderStatus()}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
         <div>
-          <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Lý do khám</label>
+          <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">
+            Lý do khám <span className="text-red-500">*</span>
+          </label>
           <textarea
             value={examData.lyDoKham}
-            onChange={(e) => handleFieldChange(setExamData, { ...examData, lyDoKham: e.target.value })}
-            className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[80px] transition-all text-sm shadow-sm"
+            onChange={(e) => handleFieldChange('lyDoKham', e.target.value)}
+            className={`w-full p-4 border ${getErrorBorder('lyDoKham')} rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[80px] transition-all text-sm shadow-sm`}
             placeholder="Triệu chứng khiến bệnh nhân đi khám..."
           />
+          {renderError('lyDoKham')}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -301,7 +429,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
             <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Tiền sử bản thân</label>
             <textarea
               value={examData.tienSuBanThan}
-              onChange={(e) => handleFieldChange(setExamData, { ...examData, tienSuBanThan: e.target.value })}
+              onChange={(e) => handleFieldChange('tienSuBanThan', e.target.value)}
               className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[100px] transition-all text-sm shadow-sm"
               placeholder="Các bệnh lý đã mắc, dị ứng..."
             />
@@ -310,7 +438,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
             <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Bệnh sử</label>
             <textarea
               value={examData.benhSu}
-              onChange={(e) => handleFieldChange(setExamData, { ...examData, benhSu: e.target.value })}
+              onChange={(e) => handleFieldChange('benhSu', e.target.value)}
               className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[100px] transition-all text-sm shadow-sm"
               placeholder="Quá trình diễn biến bệnh..."
             />
@@ -321,10 +449,67 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
           <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Khám lâm sàng</label>
           <textarea
             value={examData.khamLamSang}
-            onChange={(e) => handleFieldChange(setExamData, { ...examData, khamLamSang: e.target.value })}
+            onChange={(e) => handleFieldChange('khamLamSang', e.target.value)}
             className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[100px] transition-all text-sm shadow-sm"
             placeholder="Ghi nhận khi thăm khám trực tiếp..."
           />
+        </div>
+
+        <div className="bg-sky-50/30 p-6 rounded-2xl border border-sky-100 space-y-6">
+          <h4 className="font-bold text-sky-800 text-sm uppercase flex items-center gap-2">
+            <span className="material-symbols-outlined text-sky-600 text-lg">vital_signs</span>
+            Chỉ Số Sinh Hiệu
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Nhiệt độ (°C)</label>
+              <input type="number" step="0.1" value={vitals.nhietDo} onChange={(e) => handleVitalChange('nhietDo', e.target.value)} 
+                className={`w-full p-2 border ${getErrorBorder('nhietDo')} rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-500`} placeholder="36.5" />
+              {renderError('nhietDo')}
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Nhịp tim (l/p)</label>
+              <input type="number" value={vitals.nhipTim} onChange={(e) => handleVitalChange('nhipTim', e.target.value)} 
+                className={`w-full p-2 border ${getErrorBorder('nhipTim')} rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-500`} placeholder="80" />
+              {renderError('nhipTim')}
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Nhịp thở (l/p)</label>
+              <input type="number" value={vitals.nhipTho} onChange={(e) => handleVitalChange('nhipTho', e.target.value)} 
+                className={`w-full p-2 border ${getErrorBorder('nhipTho')} rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-500`} placeholder="18" />
+              {renderError('nhipTho')}
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">SpO2 (%)</label>
+              <input type="number" step="0.1" value={vitals.spo2} onChange={(e) => handleVitalChange('spo2', e.target.value)} 
+                className={`w-full p-2 border ${getErrorBorder('spo2')} rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-500`} placeholder="98" />
+              {renderError('spo2')}
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">HA tâm thu (mmHg)</label>
+              <input type="number" value={vitals.huyetApThu} onChange={(e) => handleVitalChange('huyetApThu', e.target.value)} 
+                className={`w-full p-2 border ${getErrorBorder('huyetApThu')} rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-500`} placeholder="120" />
+              {renderError('huyetApThu')}
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">HA tâm trương (mmHg)</label>
+              <input type="number" value={vitals.huyetApTruong} onChange={(e) => handleVitalChange('huyetApTruong', e.target.value)} 
+                className={`w-full p-2 border ${getErrorBorder('huyetApTruong')} rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-500`} placeholder="80" />
+              {renderError('huyetApTruong')}
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Cân nặng (kg)</label>
+              <input type="number" step="0.1" value={vitals.canNang} onChange={(e) => handleVitalChange('canNang', e.target.value)} 
+                className={`w-full p-2 border ${getErrorBorder('canNang')} rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-500`} placeholder="65" />
+              {renderError('canNang')}
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Chiều cao (cm)</label>
+              <input type="number" step="0.1" value={vitals.chieuCao} onChange={(e) => handleVitalChange('chieuCao', e.target.value)} 
+                className={`w-full p-2 border ${getErrorBorder('chieuCao')} rounded-lg text-sm outline-none focus:ring-1 focus:ring-indigo-500`} placeholder="170" />
+              {renderError('chieuCao')}
+            </div>
+          </div>
         </div>
 
         <div>
@@ -362,7 +547,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
             <div>
               <textarea
                 value={examData.ketQuaKhamCanLamSang}
-                onChange={(e) => handleFieldChange(setExamData, { ...examData, ketQuaKhamCanLamSang: e.target.value })}
+                onChange={(e) => handleFieldChange('ketQuaKhamCanLamSang', e.target.value)}
                 className="w-full p-4 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[100px] transition-all text-sm bg-white shadow-sm"
                 placeholder="Chi tiết kết quả cận lâm sàng..."
               />
@@ -371,21 +556,24 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
         </div>
 
         <div>
-          <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Chẩn đoán sơ bộ / Xác định</label>
+          <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">
+            Chẩn đoán sơ bộ / Xác định <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
             value={examData.chanDoanSoBo}
-            onChange={(e) => handleFieldChange(setExamData, { ...examData, chanDoanSoBo: e.target.value })}
-            className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-bold text-indigo-700 shadow-sm"
+            onChange={(e) => handleFieldChange('chanDoanSoBo', e.target.value)}
+            className={`w-full p-4 border ${getErrorBorder('chanDoanSoBo')} rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-bold text-indigo-700 shadow-sm`}
             placeholder="Tên bệnh chẩn đoán..."
           />
+          {renderError('chanDoanSoBo')}
         </div>
 
         <div>
           <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Lời dặn bác sĩ</label>
           <textarea
             value={examData.loiDanBacSi}
-            onChange={(e) => handleFieldChange(setExamData, { ...examData, loiDanBacSi: e.target.value })}
+            onChange={(e) => handleFieldChange('loiDanBacSi', e.target.value)}
             className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[80px] transition-all text-sm shadow-sm"
             placeholder="Chế độ ăn uống, sinh hoạt, hẹn tái khám..."
           />

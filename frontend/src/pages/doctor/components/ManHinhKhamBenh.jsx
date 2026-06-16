@@ -10,7 +10,7 @@ import {
   getXetNhiemResultsByPhieuKhamApi,
   getCdhaResultsByPhieuKhamApi
 } from '../../../api/phieuChiDinhApi';
-import { getAllThuocApi as _getAllThuocApi } from '../../../api/khoThuocApi';
+import { getAllThuocApi as _getAllThuocApi, getKhoCanhBaoApi } from '../../../api/khoThuocApi';
 import { 
   getByBenhNhanApi as _getToaThuocByBenhNhanApi, 
   getDetailsApi as _getToaThuocDetailsApi,
@@ -21,6 +21,7 @@ import {
   getByBenhNhanApi as _getKhamLamSangByBenhNhanApi,
   getByPhieuKhamApi as _getKhamLamSangByPhieuKhamApi
 } from '../../../api/khamLamSangApi';
+import { getByPhieuKhamApi as _getChiSoKhamByPhieuKhamApi } from '../../../api/chiSoKhamTongHopApi';
 import { 
   finishConsultationApi as _finishKhamApi 
 } from '../../../api/phieuKhamApi';
@@ -31,13 +32,20 @@ import TabKetQuaCLS from './TabKetQuaCLS';
 import TabDichVuChiDinh from './TabDichVuChiDinh';
 import TabKeDonThuoc from './TabKeDonThuoc';
 import TabLichSuKhamChiTiet from './TabLichSuKhamChiTiet';
+import TabKhamTMH from './TabKhamTMH';
+import TabKhamRHM from './TabKhamRHM';
+import TabKhamTimMach from './TabKhamTimMach';
+import TabKhamNhi from './TabKhamNhi';
+import TabHenTaiKham from './TabHenTaiKham';
 
 const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQueue }) => {
   const { showSuccess, showError, showWarning } = useNotification();
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
-  const isTmhDoc = user?.maChuyenKhoa === 6 ||
-    (user?.tenChuyenKhoa?.toLowerCase()?.includes('tai') && user?.tenChuyenKhoa?.toLowerCase()?.includes('họng')) ||
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('tmh');
+  // Mã chuyên khoa: 1: Nội tổng quát, 3: Nhi khoa, 4: TMH, 5: RHM, 11: Tim mạch
+  const isTmhDoc = Number(user?.maChuyenKhoa) === 4;
+  const isRhmDoc = Number(user?.maChuyenKhoa) === 5;
+  const isCardiologyDoc = Number(user?.maChuyenKhoa) === 11;
+  const isNhiDoc = Number(user?.maChuyenKhoa) === 3;
 
   const [examSubTab, setExamSubTab] = useState('info');
   
@@ -56,6 +64,57 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const [showMedList, setShowMedList] = useState(false);
   const [prescriptionHistory, setPrescriptionHistory] = useState([]);
   const [examHistory, setExamHistory] = useState([]);
+
+  // TMH/RHM exam data (loaded from chiSoKhamTongHopApi) - shared with TabKhamTMH / TabKhamRHM
+  const [examData, setExamData] = useState({
+    tinhTrangMui: '',
+    tinhTrangHong: '',
+    soiTaiMuiHong: '',
+    ongTai: '',
+    mangNhiPhai: '',
+    mangNhiTrai: '',
+    vachNgan: '',
+    cuonMui: '',
+    kheMui: '',
+    amidan: '',
+    thanhQuan: '',
+    thinhLucTaiTrai: '',
+    thinhLucTaiPhai: '',
+    ghiChu: '',
+    tinhTrangRang: '',
+    sauRang: '',
+    caoRang: '',
+    viemNuou: '',
+    khopCan: '',
+    doLungLay: '',
+    niemMacMieng: '',
+    phuHinhCu: '',
+    benhLyKhacRhm: '',
+    cholesterol: '',
+    hdlCholesterol: '',
+    ldlCholesterol: '',
+    triglyceride: '',
+    duongHuyet: '',
+    ecgKetQua: '',
+    sieuAmTim: '',
+    // Nhi khoa fields
+    nhietDo: '',
+    nhipTim: '',
+    nhipTho: '',
+    huyetApTamThu: '',
+    huyetApTamTruong: '',
+    canNang: '',
+    chieuCao: '',
+    spo2: '',
+    vongDau: '',
+    tinhTrangDinhDuong: '',
+    tamLyHanhVi: '',
+    khamTaiMuiHongNhi: '',
+    khamHoHapNhi: '',
+    khamDaNiemMacNhi: '',
+    khamDuNiemMacNhi: '',
+    coQuanKhacNhi: ''
+  });
 
   // Reference to TabKhamLamSang to trigger auto-save before changing tabs
   const tabKhamLamSangRef = useRef(null);
@@ -133,6 +192,63 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
             }
           })
           .catch(e => console.error("Lỗi tải đơn thuốc:", e));
+
+        // Tải dữ liệu khám chuyên khoa (TMH/RHM)
+        _getChiSoKhamByPhieuKhamApi(selectedPatient.maPhieuKham)
+          .then(data => {
+            if (data) {
+              setExamData({
+                tinhTrangMui: data.tinhTrangMui ?? '',
+                tinhTrangHong: data.tinhTrangHong ?? '',
+                soiTaiMuiHong: data.soiTaiMuiHong ?? '',
+                ongTai: data.ongTai ?? '',
+                mangNhiPhai: data.mangNhiPhai ?? '',
+                mangNhiTrai: data.mangNhiTrai ?? '',
+                vachNgan: data.vachNgan ?? '',
+                cuonMui: data.cuonMui ?? '',
+                kheMui: data.kheMui ?? '',
+                amidan: data.amidan ?? '',
+                thanhQuan: data.thanhQuan ?? '',
+                thinhLucTaiTrai: data.thinhLucTaiTrai ?? '',
+                thinhLucTaiPhai: data.thinhLucTaiPhai ?? '',
+                ghiChu: data.ghiChu ?? '',
+                tinhTrangRang: data.tinhTrangRang ?? '',
+                sauRang: data.sauRang ?? '',
+                caoRang: data.caoRang ?? '',
+                viemNuou: data.viemNuou ?? '',
+                khopCan: data.khopCan ?? '',
+                doLungLay: data.doLungLay ?? '',
+                niemMacMieng: data.niemMacMieng ?? '',
+                phuHinhCu: data.phuHinhCu ?? '',
+                benhLyKhacRhm: data.benhLyKhacRhm ?? '',
+                cholesterol: data.cholesterol ?? '',
+                hdlCholesterol: data.hdlCholesterol ?? '',
+                ldlCholesterol: data.ldlCholesterol ?? '',
+                triglyceride: data.triglyceride ?? '',
+                duongHuyet: data.duongHuyet ?? '',
+                ecgKetQua: data.ecgKetQua ?? '',
+                sieuAmTim: data.sieuAmTim ?? '',
+                // Nhi khoa fields
+                nhietDo: data.nhietDo ?? '',
+                nhipTim: data.nhipTim ?? '',
+                nhipTho: data.nhipTho ?? '',
+                huyetApTamThu: data.huyetApTamThu ?? '',
+                huyetApTamTruong: data.huyetApTamTruong ?? '',
+                canNang: data.canNang ?? '',
+                chieuCao: data.chieuCao ?? '',
+                spo2: data.spo2 ?? '',
+                vongDau: data.vongDau ?? '',
+                tinhTrangDinhDuong: data.tinhTrangDinhDuong ?? '',
+                tamLyHanhVi: data.tamLyHanhVi ?? '',
+                khamTaiMuiHongNhi: data.khamTaiMuiHongNhi ?? '',
+                khamHoHapNhi: data.khamHoHapNhi ?? '',
+                khamDaNiemMacNhi: data.khamDaNiemMacNhi ?? '',
+                khamDuNiemMacNhi: data.khamDuNiemMacNhi ?? '',
+                coQuanKhacNhi: data.coQuanKhacNhi ?? ''
+              });
+            }
+          })
+          .catch(e => console.error("Lỗi tải dữ liệu khám chuyên khoa:", e));
       }
     }
   }, [selectedPatient, allMeds, allServices]);
@@ -219,8 +335,25 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
 
   const fetchMeds = useCallback(async () => {
     try {
-      const data = await _getAllThuocApi();
-      if (data) setAllMeds(data);
+      const [thuocData, khoData] = await Promise.all([
+        _getAllThuocApi(),
+        getKhoCanhBaoApi()
+      ]);
+      if (thuocData) {
+        // Merge stock info and expiry into medicine list
+        const khoMap = {};
+        if (khoData) {
+          khoData.forEach(k => {
+            khoMap[k.maThuoc] = { tonKho: k.soLuongTon, trangThai: k.trangThai };
+          });
+        }
+        const enrichedMeds = thuocData.map(m => ({
+          ...m,
+          tonKho: khoMap[m.maThuoc]?.tonKho ?? 0,
+          trangThaiKho: khoMap[m.maThuoc]?.trangThai || 'BÌNH_THƯỜNG',
+        }));
+        setAllMeds(enrichedMeds);
+      }
     } catch (error) {
       console.error("Lỗi khi tải danh mục thuốc:", error);
     }
@@ -288,6 +421,8 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     if (!selectedPatient?.maPhieuKham) return true;
     try {
       const targetMeds = customMeds || selectedMedsRef.current;
+      // Nếu không có thuốc nào thì không cần lưu, coi như thành công
+      if (!targetMeds || targetMeds.length === 0) return true;
       const payload = {
         toaThuoc: {
           maPhieuKham: selectedPatient.maPhieuKham,
@@ -340,13 +475,11 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     setSelectedMeds(newMeds);
     setShowMedList(false);
     setMedSearch('');
-    // Auto-save silently on addition
     handleSavePrescription(true, newMeds);
   };
 
   const handleSetSelectedMeds = newMeds => {
     setSelectedMeds(newMeds);
-    // Auto-save silently on deletion
     handleSavePrescription(true, newMeds);
   };
 
@@ -354,7 +487,6 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     setSelectedMeds(prev => prev.map(m => m.maThuoc === maThuoc ? { ...m, [field]: value } : m));
   };
 
-  // Modern tab change interceptor with auto-save & block on fail
   const handleTabChange = async (newTabId) => {
     if (examSubTab === 'info' && tabKhamLamSangRef.current) {
       const success = await tabKhamLamSangRef.current.triggerAutoSave();
@@ -377,21 +509,12 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, isOpen: false }));
         try {
-          // 1. Flush clinical examination and vitals
           let examPromise = Promise.resolve(true);
           if (tabKhamLamSangRef.current) {
             examPromise = tabKhamLamSangRef.current.triggerAutoSave();
           }
-
-          // 2. Flush prescription
           const prescriptionPromise = handleSavePrescription(true);
-
-          // 3. Wait for all saves to successfully commit
-          const [examSuccess, prescriptionSuccess] = await Promise.all([
-            examPromise,
-            prescriptionPromise
-          ]);
-
+          const [examSuccess, prescriptionSuccess] = await Promise.all([examPromise, prescriptionPromise]);
           if (!examSuccess) {
             showError("Không thể kết thúc khám vì thông tin khám lâm sàng/sinh hiệu chưa được lưu.");
             return;
@@ -400,8 +523,6 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
             showError("Không thể kết thúc khám vì thông tin đơn thuốc chưa được lưu.");
             return;
           }
-
-          // 4. Update consultation status
           const res = await _finishKhamApi(selectedPatient.maPhieuKham);
           if (res) {
             showSuccess("Đã kết thúc lượt khám thành công!");
@@ -460,10 +581,14 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
         {[
           { id: 'info', label: 'Thông Tin Khám', icon: 'description' },
           ...(isTmhDoc ? [{ id: 'tmh_info', label: 'Khám Tai Mũi Họng', icon: 'hearing' }] : []),
+          ...(isRhmDoc ? [{ id: 'rhm_info', label: 'Khám Răng Hàm Mặt', icon: 'dentistry' }] : []),
+          ...(isCardiologyDoc ? [{ id: 'cardio_info', label: 'Khám Tim Mạch', icon: 'cardiology' }] : []),
+          ...(isNhiDoc ? [{ id: 'nhi_info', label: 'Khám Nhi Khoa', icon: 'child_care' }] : []),
           { id: 'results', label: 'Kết Quả CLS', icon: 'visibility' },
           { id: 'history', label: 'Lịch Sử Khám', icon: 'history' },
           { id: 'services', label: 'Dịch Vụ Chỉ Định', icon: 'medical_services' },
-          { id: 'prescription', label: 'Kê Đơn Thuốc', icon: 'medication' }
+          { id: 'prescription', label: 'Kê Đơn Thuốc', icon: 'medication' },
+          { id: 'appointment', label: 'Hẹn Khám', icon: 'calendar_month' }
         ].map(t => (
           <button 
             key={t.id} 
@@ -488,9 +613,33 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
 
           {examSubTab === 'tmh_info' && (
             <TabKhamTMH 
-              examData={{}} 
-              setExamData={() => {}} 
-              maPhieuKham={selectedPatient.maPhieuKham} 
+              examData={examData}
+              setExamData={setExamData}
+              maPhieuKham={selectedPatient.maPhieuKham}
+            />
+          )}
+
+          {examSubTab === 'rhm_info' && (
+            <TabKhamRHM 
+              examData={examData}
+              setExamData={setExamData}
+              maPhieuKham={selectedPatient.maPhieuKham}
+            />
+          )}
+
+          {examSubTab === 'cardio_info' && (
+            <TabKhamTimMach 
+              examData={examData}
+              setExamData={setExamData}
+              maPhieuKham={selectedPatient.maPhieuKham}
+            />
+          )}
+
+          {examSubTab === 'nhi_info' && (
+            <TabKhamNhi 
+              examData={examData}
+              setExamData={setExamData}
+              maPhieuKham={selectedPatient.maPhieuKham}
             />
           )}
 
@@ -527,6 +676,10 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
               onUpdateMedField={handleUpdateMedField}
             />
           )}
+
+          {examSubTab === 'appointment' && (
+            <TabHenTaiKham user={user} patient={selectedPatient} />
+          )}
         </div>
 
         <div className="lg:col-span-4 space-y-6">
@@ -547,8 +700,5 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     </div>
   );
 };
-
-// Simple stub components to avoid errors if other imports were using local variables
-const TabKhamTMH = ({ maPhieuKham }) => <div className="p-8 bg-white rounded-2xl shadow-sm border border-gray-100">Khám Tai Mũi Họng - Mã Phiếu: #{maPhieuKham}</div>;
 
 export default ManHinhKhamBenh;

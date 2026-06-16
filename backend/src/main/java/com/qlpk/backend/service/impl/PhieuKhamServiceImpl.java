@@ -2,6 +2,7 @@ package com.qlpk.backend.service.impl;
 
 import com.qlpk.backend.dto.CheckInRequest;
 import com.qlpk.backend.entity.*;
+import com.qlpk.backend.payment.WebSocketPublisher;
 import com.qlpk.backend.repository.*;
 import com.qlpk.backend.service.PhieuKhamService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,10 +36,16 @@ public class PhieuKhamServiceImpl implements PhieuKhamService {
     private DichVuRepository dichVuRepository;
 
     @Autowired
+    private LichTaiKhamRepository lichTaiKhamRepository;
+
+    @Autowired
     private KetQuaXetNghiemRepository ketQuaXetNghiemRepository;
 
     @Autowired
     private KetQuaCdhaRepository ketQuaCdhaRepository;
+
+    @Autowired
+    private WebSocketPublisher webSocketPublisher;
 
     @Override
     public List<PhieuKham> getAll() {
@@ -66,7 +73,9 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
         if (entity.getTrangThai() == null) {
             entity.setTrangThai("CHO");
         }
-        return repository.save(entity);
+        PhieuKham saved = repository.save(entity);
+        webSocketPublisher.publishPhieuKhamChange("CREATED", saved);
+        return saved;
     }
 
     @Override
@@ -77,7 +86,9 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
             if (entity.getTrangThai() != null) existing.setTrangThai(entity.getTrangThai());
             if (entity.getGhiChu() != null) existing.setGhiChu(entity.getGhiChu());
 
-            return repository.save(existing);
+            PhieuKham saved = repository.save(existing);
+            webSocketPublisher.publishPhieuKhamChange("UPDATED", saved);
+            return saved;
         }).orElse(null);
     }
 
@@ -100,9 +111,21 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
             throw new Exception("Thiếu mã bệnh nhân hoặc chuyên khoa");
         }
 
-        // Lấy thông tin chuyên khoa để kiểm tra tên
+        // Lấy thông tin chuyên khoa để kiểm tra tên và số lượng tối đa
         ChuyenKhoa ck = chuyenKhoaRepository.findById(request.getMaChuyenKhoa()).orElse(null);
-        String tenCK = (ck != null) ? ck.getTenChuyenKhoa().toLowerCase() : "";
+        if (ck == null) {
+            throw new Exception("Không tìm thấy chuyên khoa");
+        }
+        String tenCK = ck.getTenChuyenKhoa().toLowerCase();
+
+        // Kiểm tra số lượng tối đa
+        if (ck.getSoLuongToiDa() != null && ck.getSoLuongToiDa() > 0) {
+            LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+            long todayCount = dangKyRepository.countTodayRegistrationsByChuyenKhoa(startOfDay, request.getMaChuyenKhoa());
+            if (todayCount >= ck.getSoLuongToiDa()) {
+                throw new Exception("Chuyên khoa '" + ck.getTenChuyenKhoa() + "' đã đạt số lượng tối đa hôm nay (" + ck.getSoLuongToiDa() + "). Vui lòng chọn chuyên khoa khác hoặc quay lại vào ngày mai.");
+            }
+        }
 
         boolean canTaoPhieuKham = tenCK.contains("xét nghiệm") || tenCK.contains("hình ảnh");
         PhieuKham pk = null;
@@ -123,6 +146,7 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
             pk.setGhiChu(request.getGhiChu());
             pk.setMaDichVu(request.getMaDichVu());
             pk = repository.saveAndFlush(pk);
+            webSocketPublisher.publishPhieuKhamChange("CREATED", pk);
 
             if (request.getMaDichVu() != null) {
                 Double donGia = 0.0;
@@ -169,7 +193,16 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
         long count = dangKyRepository.countTodayRegistrations(startOfDay);
         dk.setSoThuTu((int)count + 1);
 
-        dangKyRepository.saveAndFlush(dk);
+        DangKyKhamBenh savedDk = dangKyRepository.saveAndFlush(dk);
+        webSocketPublisher.publishDangKyKhamChange("CREATED", savedDk.getId(), savedDk.getTrangThai());
+
+        // Nếu có appointmentId → tự động cập nhật trạng thái lịch hẹn thành DA_DEN
+        if (request.getAppointmentId() != null) {
+            lichTaiKhamRepository.findById(request.getAppointmentId()).ifPresent(l -> {
+                l.setTrangThai("DA_DEN");
+                lichTaiKhamRepository.save(l);
+            });
+        }
 
         return Map.of(
             "message", "Tiếp đón thành công",
@@ -197,10 +230,12 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
         pk.setNgayTao(LocalDateTime.now());
         pk.setTrangThai("CHO"); 
         pk = repository.saveAndFlush(pk);
+        webSocketPublisher.publishPhieuKhamChange("CREATED", pk);
 
         dk.setMaPhieuKham(pk.getMaPhieuKham());
         dk.setTrangThai("DANG_KHAM");
         dangKyRepository.saveAndFlush(dk);
+        webSocketPublisher.publishDangKyKhamChange("UPDATED", dk.getId(), dk.getTrangThai());
 
         return Map.of(
             "message", "Đã tạo phiếu khám thành công", 
@@ -223,11 +258,13 @@ public void updateToWaitingForDoctor(Integer maPhieuKham) throws Exception {
             .orElseThrow(() -> new Exception("Không tìm thấy phiếu khám #" + maPhieuKham));
     pk.setTrangThai("CHO_BAC_SI");
     repository.save(pk);
+    webSocketPublisher.publishPhieuKhamChange("UPDATED", pk);
 
     // 2. Cập nhật trạng thái trong bảng dang_ky_kham_benh (để lễ tân/hàng đợi thấy)
     dangKyRepository.findByMaPhieuKham(maPhieuKham).ifPresent(dk -> {
         dk.setTrangThai("CHO_BAC_SI");
         dangKyRepository.save(dk);
+        webSocketPublisher.publishDangKyKhamChange("UPDATED", dk.getId(), dk.getTrangThai());
     });
 }
 
@@ -239,11 +276,28 @@ public void updateToWaitingForDoctor(Integer maPhieuKham) throws Exception {
 
         pk.setTrangThai("HOAN_THANH");
         repository.save(pk);
+        webSocketPublisher.publishPhieuKhamChange("UPDATED", pk);
 
         dangKyRepository.findByMaPhieuKham(maPhieuKham).ifPresent(dk -> {
             dk.setTrangThai("HOAN_THANH");
             dangKyRepository.save(dk);
+            webSocketPublisher.publishDangKyKhamChange("UPDATED", dk.getId(), dk.getTrangThai());
         });
+    }
+
+    @Override
+    public List<Map<String, Object>> getCompletedPatientsToday() {
+        return repository.findCompletedPatientsToday();
+    }
+
+    @Override
+    public List<Map<String, Object>> getCompletedPatientsTodayWithSearch(String keyword) {
+        return repository.findCompletedPatientsTodayWithSearch(keyword);
+    }
+
+    @Override
+    public List<Map<String, Object>> getHistoryByChuyenKhoaAllDays(Integer maChuyenKhoa) {
+        return repository.findHistoryByChuyenKhoaAllDays(maChuyenKhoa);
     }
 
     @Override

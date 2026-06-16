@@ -12,7 +12,9 @@
   "dependencies": {
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-toastify": "^11.1.0"
+    "react-toastify": "^11.1.0",
+    "sockjs-client": "^1.6.1",
+    "stompjs": "^2.3.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

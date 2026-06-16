@@ -36,4 +36,10 @@ public class HoaDon {
 
     @Column(name = "trang_thai", length = 30)
     private String trangThai;
+
+    @Column(name = "phuong_thuc_thanh_toan", length = 50)
+    private String phuongThucThanhToan;
+
+    @Column(name = "ma_giao_dich", length = 100)
+    private String maGiaoDich;
 }

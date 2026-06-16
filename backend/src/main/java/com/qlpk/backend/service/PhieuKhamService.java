@@ -20,4 +20,8 @@ public interface PhieuKhamService {
     List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa);
     void updateToWaitingForDoctor(Integer maPhieuKham) throws Exception;
     List<Map<String, Object>> getAvailableClsResults(Integer maPhieuKham);
+    /** Lấy danh sách bệnh nhân đã hoàn thành khám hôm nay (cho thu ngân) */
+    List<Map<String, Object>> getCompletedPatientsToday();
+    List<Map<String, Object>> getCompletedPatientsTodayWithSearch(String keyword);
+    List<Map<String, Object>> getHistoryByChuyenKhoaAllDays(Integer maChuyenKhoa);
 }

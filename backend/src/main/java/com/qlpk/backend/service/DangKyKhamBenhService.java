@@ -12,5 +12,6 @@ public interface DangKyKhamBenhService {
     void delete(Integer id);
     
     List<Map<String, Object>> getTodayRegistrationsDetailed();
+    List<Map<String, Object>> getTodayRegistrationsDetailedWithSearch(String keyword);
     DangKyKhamBenh updateStatus(Integer id, String status);
 }

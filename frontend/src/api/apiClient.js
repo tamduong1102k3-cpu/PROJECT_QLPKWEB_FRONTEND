@@ -102,6 +102,12 @@ const dispatchToApi = async (path, method, body, url) => {
     if (method === 'GET') return await employeeApi.getAllNhanVienApi();
   }
   // 7. Kho Thuoc / Thuoc
+  else if (path.startsWith('/kho-thuoc/phieu-nhap')) {
+    const subPath = path.replace('/kho-thuoc', '');
+    if (subPath.includes('/chi-tiet')) return await khoThuocApi.getChiTietPhieuNhapApi(subPath.split('/')[3]);
+    else if (method === 'GET') return await khoThuocApi.getAllPhieuNhapApi();
+    else if (method === 'POST') return await khoThuocApi.createPhieuNhapApi(body);
+  }
   else if (path.startsWith('/thuoc') || path.startsWith('/kho-thuoc/thuoc')) {
     if (method === 'GET') return await khoThuocApi.getAllThuocApi();
     else if (method === 'POST') return await khoThuocApi.createThuocApi(body);
@@ -125,6 +131,14 @@ const dispatchToApi = async (path, method, body, url) => {
     if (path.includes('/full-check-in')) return await phieuKhamApi.fullCheckInApi(body);
     else if (path.includes('/accept-patient')) return await phieuKhamApi.acceptPatientApi(path.split('/')[3], { assistantId: new URL(url).searchParams.get('assistantId') });
     else if (path.includes('/finish')) return await phieuKhamApi.finishConsultationApi(path.split('/')[3]);
+    else if (path.includes('/completed-patients')) {
+      const r = await fetchClient(url, { method: 'GET' });
+      if (!r.ok) throw new Error('Lỗi: ' + r.status);
+      return await r.json();
+    }
+    else if (path.includes('/specialty-history')) {
+      return await phieuKhamApi.getSpecialtyHistoryApi(new URL(url).searchParams.get('maChuyenKhoa'));
+    }
     else if (method === 'PUT') return await phieuKhamApi.updateApi(path.split('/')[2], body);
   }
   // 10. Chi So Kham
@@ -171,6 +185,25 @@ const dispatchToApi = async (path, method, body, url) => {
   else if (path.startsWith('/thong-ke')) {
     if (path.includes('/dashboard-summary')) return await statisticsApi.getDashboardSummaryApi();
     else if (path.includes('/theo-nam')) return await statisticsApi.namCoDuLieuApi();
+  }
+  // 16. Payment
+  else if (path.startsWith('/payment')) {
+    const r = await fetchClient(url, { 
+      method, 
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}) 
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      let errJson;
+      try { errJson = JSON.parse(errText); } catch(e) {}
+      throw new Error(errJson?.error || errText || 'Lỗi xử lý thanh toán');
+    }
+    // Check if the response body is empty (e.g. mockSuccess returning 200 OK without body)
+    const text = await r.text();
+    return text ? JSON.parse(text) : {};
   }
 
   throw new Error(`No API match for: ${method} ${path}`);

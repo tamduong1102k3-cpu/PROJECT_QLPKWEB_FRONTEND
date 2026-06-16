@@ -1,16 +1,17 @@
 import { apiClient } from "../../api/apiClient";
 import React, { useState, useEffect } from 'react';
 import UserMenu from '../../components/UserMenu';
-import QuanLyNhanVien from './QuanLyNhanVien';
-import QuanLyTaiKhoan from './QuanLyTaiKhoan';
-import QuanLyHoaDon from './QuanLyHoaDon';
-import QuanLyNhaThuoc from './QuanLyNhaThuoc';
-import QuanLyCaLamViec from './QuanLyCaLamViec';
-import QuanLyThongKe from './QuanLyThongKe';
-import QuanLyPhong from './QuanLyPhong';
-import QuanLyDichVu from './QuanLyDichVu';
-import QuanLyBenhNhan from './QuanLyBenhNhan';
-import QuanLyLichHen from './QuanLyLichHen';
+import QuanLyNhanVien from './components/QuanLyNhanVien';
+import QuanLyTaiKhoan from './components/QuanLyTaiKhoan';
+import QuanLyHoaDon from './components/QuanLyHoaDon';
+import QuanLyNhaThuoc from './components/QuanLyNhaThuoc';
+import QuanLyCaLamViec from './components/QuanLyCaLamViec';
+import QuanLyThongKe from './components/QuanLyThongKe';
+import QuanLyPhong from './components/QuanLyPhong';
+import QuanLyDichVu from './components/QuanLyDichVu';
+import QuanLyBenhNhan from './components/QuanLyBenhNhan';
+import QuanLyCauHinh from './components/QuanLyCauHinh';
+import QuanLyCaiDat from './components/QuanLyCaiDat';
 const BangDieuKhienAdmin = ({
   onLogout,
   user
@@ -101,10 +102,6 @@ const BangDieuKhienAdmin = ({
     label: 'Nhân Viên',
     icon: 'badge'
   }, {
-    id: 'appointments',
-    label: 'Lịch Hẹn',
-    icon: 'calendar_month'
-  }, {
     id: 'invoices',
     label: 'Hóa Đơn',
     icon: 'receipt_long'
@@ -160,13 +157,6 @@ const BangDieuKhienAdmin = ({
               </li>)}
           </ul>
         </nav>
-
-        <div className="p-4 border-t border-gray-200">
-          <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-            <span className="material-symbols-outlined">logout</span>
-            {isSidebarOpen && <span>Đăng xuất</span>}
-          </button>
-        </div>
       </aside>
 
       {/* Main Content */}
@@ -314,7 +304,7 @@ const BangDieuKhienAdmin = ({
                       <span className="material-symbols-outlined text-orange-500 text-xl">medication_liquid</span>
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-gray-800">⚠Đ Thuốc Sắp Hết Trong Kho</h2>
+                      <h2 className="text-lg font-bold text-gray-800">⚠ Thuốc Sắp Hết Trong Kho</h2>
                       <p className="text-xs text-gray-400">Dưới 20 đơn vị tồn kho</p>
                     </div>
                   </div>
@@ -370,7 +360,7 @@ const BangDieuKhienAdmin = ({
                     </table>
                   </div>}
               </div>
-            </div> : activeTab === 'patients' ? <QuanLyBenhNhan /> : activeTab === 'employees' ? <QuanLyNhanVien /> : activeTab === 'accounts' ? <QuanLyTaiKhoan /> : activeTab === 'appointments' ? <QuanLyLichHen /> : activeTab === 'invoices' ? <QuanLyHoaDon /> : activeTab === 'pharmacy' ? <QuanLyNhaThuoc /> : activeTab === 'shifts' ? <QuanLyCaLamViec /> : activeTab === 'statistics' ? <QuanLyThongKe /> : activeTab === 'rooms' ? <QuanLyPhong /> : activeTab === 'services' ? <QuanLyDichVu /> :
+            </div> : activeTab === 'patients' ? <QuanLyBenhNhan /> : activeTab === 'employees' ? <QuanLyNhanVien /> : activeTab === 'accounts' ? <QuanLyTaiKhoan /> : activeTab === 'invoices' ? <QuanLyHoaDon /> : activeTab === 'pharmacy' ? <QuanLyNhaThuoc /> : activeTab === 'shifts' ? <QuanLyCaLamViec /> : activeTab === 'statistics' ? <QuanLyThongKe /> : activeTab === 'rooms' ? <QuanLyPhong /> : activeTab === 'services' ? <QuanLyDichVu /> : activeTab === 'settings' ? <QuanLyCaiDat /> :
         // Placeholder for other tabs
         <div className="flex flex-col items-center justify-center h-full text-gray-400 animate-fade-in">
               <span className="material-symbols-outlined text-6xl mb-4 opacity-50">

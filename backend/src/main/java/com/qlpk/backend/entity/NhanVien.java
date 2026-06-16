@@ -34,8 +34,8 @@ public class NhanVien {
     @Column(name = "email", length = 40)
     private String email;
 
-    @Column(name = "chuyen_khoa", length = 30)
-    private String chuyenKhoa;
+    @Column(name = "chuyen_khoa")
+    private Integer chuyenKhoa;
 
     @Column(name = "bang_cap", length = 100)
     private String bangCap;
@@ -72,8 +72,8 @@ public class NhanVien {
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
-    public String getChuyenKhoa() { return chuyenKhoa; }
-    public void setChuyenKhoa(String chuyenKhoa) { this.chuyenKhoa = chuyenKhoa; }
+    public Integer getChuyenKhoa() { return chuyenKhoa; }
+    public void setChuyenKhoa(Integer chuyenKhoa) { this.chuyenKhoa = chuyenKhoa; }
 
     public String getBangCap() { return bangCap; }
     public void setBangCap(String bangCap) { this.bangCap = bangCap; }

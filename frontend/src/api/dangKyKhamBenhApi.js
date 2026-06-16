@@ -2,11 +2,14 @@ import fetchClient from './fetchClient';
 const API_URL = 'http://localhost:8080/api/dang-ky';
 
 /**
- * GET /today
+ * GET /today?keyword=xxx
  */
-export const getTodayApi = async () => {
+export const getTodayApi = async (keyword = '') => {
   try {
-    const response = await fetchClient(`${API_URL}/today`, {
+    const url = keyword
+      ? `${API_URL}/today?keyword=${encodeURIComponent(keyword)}`
+      : `${API_URL}/today`;
+    const response = await fetchClient(url, {
       method: 'GET'
     });
     if (!response.ok) {

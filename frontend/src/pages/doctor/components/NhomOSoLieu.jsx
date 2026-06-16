@@ -21,29 +21,14 @@ const NhomOSoLieu = ({ user }) => {
   const isTroLy = vaiTro.startsWith('TRO_LY_') || vaiTro === 'TRO_LY_BAC_SI';
   const isBacSi = vaiTro.startsWith('BAC_SI_') || vaiTro === 'BAC_SI';
 
-  const isXetNghiemDoc = user?.maChuyenKhoa === 7 || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('xét nghiệm') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('xact nghiem') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('xact nghi?m');
-
-  const isCdhaDoc = user?.maChuyenKhoa === 8 || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('chẩn đoán hình ảnh') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('chan doan hinh anh') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('cdha') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('siêu âm') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('sieu am') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('x-quang') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('xquang');
-
-  const isRhmDoc = user?.maChuyenKhoa === 5 ||
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('răng') || 
-    user?.tenChuyenKhoa?.toLowerCase()?.includes('nha khoa');
+  // Mã chuyên khoa: 1: Nội, 3: Nhi, 4: TMH, 5: RHM, 7: XN, 11: Tim mạch, 12: CĐHA
+  const isXetNghiemDoc = Number(user?.maChuyenKhoa) === 7;
+  const isCdhaDoc = Number(user?.maChuyenKhoa) === 12;
+  const isRhmDoc = Number(user?.maChuyenKhoa) === 5;
 
   const fetchData = useCallback(async () => {
     try {
-      // 1. Fetch statistics depending on user role
       if (isLeTan) {
-        // Appointments today
         const appointments = await getAllAppointmentsApi();
         const todayApp = appointments.filter(a => {
           const d = new Date(a.ngayTaiKham);
@@ -53,11 +38,9 @@ const NhomOSoLieu = ({ user }) => {
                  d.getFullYear() === today.getFullYear();
         }).length;
 
-        // Waiting registrations
         const registrations = await getTodayDangKyApi();
         const waitingRegs = registrations.filter(r => r.trangThai === 'CHO_KHAM').length;
 
-        // Completed medical records today
         const pks = await getTodayPhieuKhamApi();
         const completed = pks.filter(p => p.trangThai === 'HOAN_THANH').length;
 
@@ -73,7 +56,7 @@ const NhomOSoLieu = ({ user }) => {
         if (data) {
           let filteredData = data;
           if (user?.maChuyenKhoa) {
-            filteredData = data.filter(r => r.maChuyenKhoa === user.maChuyenKhoa);
+            filteredData = data.filter(r => Number(r.maChuyenKhoa) === Number(user.maChuyenKhoa));
           }
           const waiting = filteredData.filter(r => r.trangThai === 'CHO_KHAM' || r.trangThai === 'DANG_KHAM').length;
           const absent = filteredData.filter(r => r.trangThai === 'VANG_MAT').length;
@@ -88,7 +71,6 @@ const NhomOSoLieu = ({ user }) => {
         }
 
       } else {
-        // Doctor or generic staff
         let data = null;
         if (isXetNghiemDoc) {
           data = await getTodayResultsXetNghiemApi();
@@ -106,7 +88,7 @@ const NhomOSoLieu = ({ user }) => {
             completed = data.filter(r => r.trangThai === 'DA_DUYET' || r.trangThai === 'HOAN_THANH' || r.trangThai === 'CHO_BAC_SI');
           } else {
             if (user?.maChuyenKhoa) {
-              data = data.filter(r => r.maChuyenKhoa === user.maChuyenKhoa);
+              data = data.filter(r => Number(r.maChuyenKhoa) === Number(user.maChuyenKhoa));
             }
             waiting = data.filter(r => r.trangThai === 'CHO_BAC_SI' || r.trangThai === 'DA_KHAM_LAM_SANG' || (isRhmDoc && r.trangThai === 'DANG_KHAM'));
             completed = data.filter(r => r.trangThai === 'HOAN_THANH');
@@ -120,7 +102,6 @@ const NhomOSoLieu = ({ user }) => {
         }
       }
 
-      // 2. Fetch current duty room
       if (user?.maNhanVien) {
         const roomData = await getCurrentRoomApi(user.maNhanVien);
         setCurrentRoom(roomData?.phong || 'Chưa có lịch trực');
@@ -160,7 +141,6 @@ const NhomOSoLieu = ({ user }) => {
     );
   }
 
-  // Doctor or generic role
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 animate-fade-in">
       <TheThongKe 
