@@ -81,7 +81,19 @@ export const createApi = async (data) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
-      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
+      // Đọc full response body để debug
+      let responseBody = null;
+      try {
+        const clonedResponse = response.clone();
+        const textBody = await clonedResponse.text();
+        responseBody = textBody;
+        try {
+          const errorData = JSON.parse(textBody);
+          responseBody = errorData;
+          errorMsg = errorData.message || errorMsg;
+        } catch (jsonParseError) {}
+      } catch (readError) {}
+      console.error("Server response chi tiết:", { status: response.status, body: responseBody });
       throw new Error(errorMsg);
     }
     const text = await response.text();

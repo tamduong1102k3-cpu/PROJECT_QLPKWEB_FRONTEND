@@ -32,6 +32,22 @@ const fetchClient = async (url, options = {}) => {
   try {
     const response = await fetch(url, enhancedOptions);
 
+    // Log chi tiết response khi bị 403
+    if (response.status === 403) {
+      try {
+        const cloned = response.clone();
+        const textBody = await cloned.text();
+        console.error("=== 403 FORBIDDEN DEBUG ===");
+        console.error("URL:", url);
+        console.error("Method:", options.method || 'GET');
+        console.error("Status text:", response.statusText);
+        console.error("Response body:", textBody || "(empty)");
+        console.error("===========================");
+      } catch (e) {
+        console.error("Could not read 403 response body:", e);
+      }
+    }
+
     // Handle 401 - token hết hạn hoặc không hợp lệ
     if (response.status === 401) {
       handleUnauthorized();

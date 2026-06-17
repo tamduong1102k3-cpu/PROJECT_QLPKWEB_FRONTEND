@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Logs and backups
+*.log
+backend_log.txt
+backups/
+

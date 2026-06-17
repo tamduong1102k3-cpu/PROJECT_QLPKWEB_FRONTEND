@@ -175,6 +175,12 @@ const QuyTrinhTiepDon = ({
     }
 
     try {
+      // Log request details để debug
+      console.log("=== DEBUG REQUEST ===");
+      console.log("Token gửi đi:", token ? token.substring(0, 30) + "..." : "KHÔNG CÓ TOKEN");
+      console.log("URL:", 'https://qlpk-backend-spring-boot.onrender.com/api/dang-ky');
+      console.log("Headers:", { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : 'N/A' });
+
       // Bước 1: Tạo đăng ký khám bệnh (DangKyKhamBenh)
       const dangKyData = {
         maBenhNhan: selectedPatient.maBenhNhan,
@@ -182,6 +188,7 @@ const QuyTrinhTiepDon = ({
         maChuyenKhoa: parseInt(checkInData.maChuyenKhoa),
         ghiChu: checkInData.ghiChu ? `[Dịch vụ ID: ${checkInData.maDichVu}] ${checkInData.ghiChu}` : `[Dịch vụ ID: ${checkInData.maDichVu}]`
       };
+      console.log("Request body:", JSON.stringify(dangKyData));
 
       const dangKyResult = await createDangKyApi(dangKyData);
       const soThuTu = dangKyResult.soThuTu;

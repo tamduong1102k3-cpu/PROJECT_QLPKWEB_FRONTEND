@@ -70,11 +70,6 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/phieu-kham/accept-patient/**").authenticated()
                 // Doctor/Assistant endpoints
                 .requestMatchers(HttpMethod.POST, "/api/phieu-kham/**").authenticated()
-                // DangKyKhamBenh endpoints (đăng ký khám bệnh)
-                .requestMatchers(HttpMethod.GET, "/api/dang-ky/**").authenticated()
-                .requestMatchers(HttpMethod.POST, "/api/dang-ky/**").authenticated()
-                .requestMatchers(HttpMethod.PUT, "/api/dang-ky/**").authenticated()
-                .requestMatchers(HttpMethod.DELETE, "/api/dang-ky/**").authenticated()
                 // Tất cả các API còn lại cần xác thực
                 .anyRequest().authenticated()
             )
