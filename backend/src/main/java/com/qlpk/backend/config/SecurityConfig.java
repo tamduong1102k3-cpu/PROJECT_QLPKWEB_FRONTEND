@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -31,7 +32,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        // Cho phép tất cả origin pattern (cần thiết cho allowCredentials=true)
+        config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -66,7 +68,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/hoa-don/*/thanh-toan").hasAnyRole("THU_NGAN", "QUAN_TRI_VIEN", "LE_TAN")
                 // Receptionist endpoints - full check-in
                 .requestMatchers(HttpMethod.POST, "/api/phieu-kham/full-check-in").authenticated()
-                // Assistant endpoints - accept patient (dùng authority để hỗ trợ TRO_LY_RHM, TRO_LY_TMH...)
+                // Assistant endpoints - accept patient
                 .requestMatchers(HttpMethod.POST, "/api/phieu-kham/accept-patient/**").authenticated()
                 // Doctor/Assistant endpoints
                 .requestMatchers(HttpMethod.POST, "/api/phieu-kham/**").authenticated()
