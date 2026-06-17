@@ -1,12 +1,24 @@
-# Bước 1: Sử dụng Maven kết hợp JDK 21 để biên dịch mã nguồn
+# Stage 1: Build with Maven + JDK 21
 FROM maven:3.9.6-eclipse-temurin-21-jammy AS build
 WORKDIR /app
-COPY . .
-RUN mvn clean package -DskipTests
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
 
-# Bước 2: Sử dụng JRE/JDK 21 gọn nhẹ phiên bản Alpine để chạy ứng dụng thương mại
-FROM eclipse-temurin:21-jdk-alpine
+COPY src ./src
+RUN mvn clean package -DskipTests -B
+
+# Stage 2: Runtime with slim JDK 21 Alpine
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
+
+# Cài đặt mysql-client để hỗ trợ backup
+RUN apk add --no-cache mysql-client
+
+# Tạo thư mục backups
+RUN mkdir -p /app/backups
+
 COPY --from=build /app/target/*.jar app.jar
+
 EXPOSE 8080
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
