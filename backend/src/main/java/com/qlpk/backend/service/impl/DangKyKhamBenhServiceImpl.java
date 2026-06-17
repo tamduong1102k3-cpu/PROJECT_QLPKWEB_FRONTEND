@@ -29,6 +29,17 @@ public class DangKyKhamBenhServiceImpl implements DangKyKhamBenhService {
 
     @Override
     public DangKyKhamBenh create(DangKyKhamBenh entity) {
+        if (entity.getThoiGianDangKy() == null) {
+            entity.setThoiGianDangKy(LocalDateTime.now());
+        }
+        if (entity.getTrangThai() == null) {
+            entity.setTrangThai("CHO_KHAM");
+        }
+        if (entity.getSoThuTu() == null) {
+            LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+            long count = repository.countTodayRegistrations(startOfDay);
+            entity.setSoThuTu((int) count + 1);
+        }
         return repository.save(entity);
     }
 

@@ -2,11 +2,11 @@ import { getAllChuyenKhoaApi as _getChuyenKhoaAll } from '../../../api/danhMucAp
 import { getAllNhanVienApi as _getNhanVienAll } from '../../../api/employeeApi';
 import { getAllApi as _getDichVuAll } from '../../../api/dichVuApi';
 import { getWorkingTodayApi as _getWorkingToday } from '../../../api/shiftApi';
-import { apiClient } from "../../../api/apiClient";
 import { getAllApi as getBenhNhanAll, searchApi } from '../../../api/benhNhanApi';
-import { fullCheckInApi } from '../../../api/phieuKhamApi';
+import { createApi as createDangKyApi } from '../../../api/dangKyKhamBenhApi';
+import { createApi as createPhieuKhamApi } from '../../../api/phieuKhamApi';
 import { useNotification } from '../../../components/NotificationContext';
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const removeVietnameseTones = str => {
   if (!str) return '';
@@ -168,27 +168,39 @@ const QuyTrinhTiepDon = ({
       }
     }
 
-    // Bắt buộc chọn chuyên khoa và dịch vụ
-    if (!checkInData.maChuyenKhoa || !checkInData.maDichVu) {
-        showWarning("Vui lòng chọn Chuyên khoa và Dịch vụ khám!");
+    // Bắt buộc chọn chuyên khoa
+    if (!checkInData.maChuyenKhoa) {
+        showWarning("Vui lòng chọn Chuyên khoa khám!");
         return;
     }
 
-    const requestBody = {
-      maBenhNhan: selectedPatient.maBenhNhan,
-      maNhanVienLeTan: maLeTan,
-      maNhanVienBacSi: checkInData.maNhanVien ? parseInt(checkInData.maNhanVien) : null,
-      maChuyenKhoa: parseInt(checkInData.maChuyenKhoa),
-      maDichVu: parseInt(checkInData.maDichVu),
-      appointmentId: appointmentId || null,
-      ghiChu: checkInData.ghiChu
-    };
-
     try {
-      // Sử dụng fullCheckInApi (dùng fetchClient - tự động gắn JWT)
-      const result = await fullCheckInApi(requestBody);
+      // Bước 1: Tạo đăng ký khám bệnh (DangKyKhamBenh)
+      const dangKyData = {
+        maBenhNhan: selectedPatient.maBenhNhan,
+        maNhanVien: maLeTan,
+        maChuyenKhoa: parseInt(checkInData.maChuyenKhoa),
+        ghiChu: checkInData.ghiChu ? `[Dịch vụ ID: ${checkInData.maDichVu}] ${checkInData.ghiChu}` : `[Dịch vụ ID: ${checkInData.maDichVu}]`
+      };
 
-      showSuccess(`Tiếp đón thành công! Số thứ tự: #${result.soThuTu}`);
+      const dangKyResult = await createDangKyApi(dangKyData);
+      const soThuTu = dangKyResult.soThuTu;
+      const dangKyId = dangKyResult.id;
+
+      // Bước 2: Nếu có dịch vụ, tạo phiếu khám riêng (PhieuKham)
+      if (checkInData.maDichVu) {
+        const phieuKhamData = {
+          maBenhNhan: selectedPatient.maBenhNhan,
+          maNhanVien: checkInData.maNhanVien ? parseInt(checkInData.maNhanVien) : maLeTan,
+          maChuyenKhoa: parseInt(checkInData.maChuyenKhoa),
+          maDichVu: parseInt(checkInData.maDichVu),
+          ghiChu: checkInData.ghiChu,
+          trangThai: "CHO"
+        };
+        await createPhieuKhamApi(phieuKhamData);
+      }
+
+      showSuccess(`Tiếp đón thành công! Số thứ tự: #${soThuTu}`);
       onSuccess();
     } catch (error) {
       console.error("Lỗi check-in:", error);

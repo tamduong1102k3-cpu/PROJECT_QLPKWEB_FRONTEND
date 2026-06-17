@@ -17,6 +17,42 @@ public class DangKyKhamBenhController {
     @Autowired
     private DangKyKhamBenhService service;
 
+    @GetMapping
+    public ResponseEntity<List<DangKyKhamBenh>> getAll() {
+        return ResponseEntity.ok(service.getAll());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<DangKyKhamBenh> getById(@PathVariable Integer id) {
+        DangKyKhamBenh entity = service.getById(id);
+        if (entity != null) {
+            return ResponseEntity.ok(entity);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @PostMapping
+    public ResponseEntity<DangKyKhamBenh> create(@RequestBody DangKyKhamBenh entity) {
+        DangKyKhamBenh created = service.create(entity);
+        return ResponseEntity.ok(created);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<DangKyKhamBenh> update(@PathVariable Integer id, @RequestBody DangKyKhamBenh entity) {
+        entity.setId(id);
+        DangKyKhamBenh updated = service.update(id, entity);
+        if (updated != null) {
+            return ResponseEntity.ok(updated);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Integer id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/today")
     public ResponseEntity<List<Map<String, Object>>> getToday(
             @RequestParam(value = "keyword", required = false, defaultValue = "") String keyword) {
