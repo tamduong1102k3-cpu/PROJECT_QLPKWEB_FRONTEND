@@ -43,16 +43,19 @@ const BangBenhNhan = ({
         <table className="w-full text-left border-collapse text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-[11px]">
-              <th className="py-5 px-6 w-32">Mã Khám</th>
-              <th className="py-5 px-6">Bệnh nhân</th>
-              <th className="py-5 px-6">Chuyên khoa</th>
-              <th className="py-5 px-6 text-center w-48">Thao tác</th>
+              <th className="py-5 px-4 w-14 text-center">STT</th>
+              <th className="py-5 px-4 w-36">Mã Khám</th>
+              <th className="py-5 px-4">Bệnh nhân</th>
+              <th className="py-5 px-4">CCCD</th>
+              <th className="py-5 px-4">SĐT</th>
+              <th className="py-5 px-4">Chuyên khoa</th>
+              <th className="py-5 px-4 text-center w-48">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {isLoading ? (
               <tr>
-                <td colSpan="4" className="py-16 text-center text-slate-400">
+                <td colSpan="7" className="py-16 text-center text-slate-400">
                   <div className="flex items-center justify-center">
                     <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
                     Đang tải...
@@ -61,7 +64,7 @@ const BangBenhNhan = ({
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan="4" className="py-16 text-center text-slate-400">
+                <td colSpan="7" className="py-16 text-center text-slate-400">
                   <div className="flex flex-col items-center gap-3">
                     <span className="material-symbols-outlined text-4xl text-slate-300">search_off</span>
                     <p className="font-medium">Không tìm thấy bệnh nhân.</p>
@@ -69,7 +72,7 @@ const BangBenhNhan = ({
                 </td>
               </tr>
             ) : (
-              filtered.map(item => {
+              filtered.map((item, index) => {
                 const isSelected = selectedPatient?.maPhieuKham === item.maPhieuKham;
                 return (
                   <tr
@@ -77,26 +80,32 @@ const BangBenhNhan = ({
                     onClick={() => worklistTab === 'pending' ? handleSelectPatient(item) : handleSelectPaidPatient(item)}
                     className={`hover:bg-slate-50/80 transition-colors duration-200 cursor-pointer ${isSelected ? 'bg-emerald-50/40 font-medium' : ''}`}
                   >
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-4 text-center">
+                      <span className="text-xs font-bold text-slate-400">{index + 1}</span>
+                    </td>
+                    <td className="py-4 px-4">
                       <span className="font-extrabold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200/50">#{item.maPhieuKham}</span>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-4">
                       <div className="flex items-center gap-4">
                         <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black shadow-sm flex-shrink-0 ${item.gioiTinh === 'Nam' || item.gioiTinh === 1 ? 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 border border-blue-200/50' : 'bg-gradient-to-br from-rose-100 to-pink-100 text-rose-700 border border-rose-200/50'}`}>
                           {item.hoTen ? item.hoTen[0].toUpperCase() : 'BN'}
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-black text-slate-800 text-base truncate">{item.hoTen}</h4>
-                          <div className="flex items-center gap-2 mt-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                            <span>{item.soDienThoai || 'Chưa có SĐT'}</span>
-                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-4">
+                      <span className="text-sm font-medium text-slate-700">{item.cccd || <span className="text-slate-300 italic">N/A</span>}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="text-sm font-medium text-slate-700">{item.soDienThoai || <span className="text-slate-300 italic">N/A</span>}</span>
+                    </td>
+                    <td className="py-4 px-4">
                       <span className="font-bold text-slate-700">{item.tenChuyenKhoa || '—'}</span>
                     </td>
-                    <td className="py-4 px-6 text-center">
+                    <td className="py-4 px-4 text-center">
                       {worklistTab === 'pending' ? (
                         <button
                           onClick={(e) => handlePayClick(item, e)}
