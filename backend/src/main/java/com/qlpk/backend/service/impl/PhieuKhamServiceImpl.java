@@ -63,6 +63,7 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
 }
 
     @Override
+    @Transactional
     public PhieuKham create(PhieuKham entity) {
         if (entity.getNgayKham() == null) {
             entity.setNgayKham(LocalDateTime.now());
@@ -75,6 +76,31 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
         }
         PhieuKham saved = repository.save(entity);
         webSocketPublisher.publishPhieuKhamChange("CREATED", saved);
+
+        // Tự động tạo PhieuChiDinh + ChiTietChiDinh khi có dịch vụ
+        // để KTV XN/CDHA có thể thấy bệnh nhân trong danh sách chờ
+        if (entity.getMaDichVu() != null) {
+            DichVu dv = dichVuRepository.findById(entity.getMaDichVu()).orElse(null);
+            if (dv != null) {
+                Double donGia = dv.getDonGia() != null ? dv.getDonGia().doubleValue() : 0.0;
+
+                PhieuChiDinh pcd = new PhieuChiDinh();
+                pcd.setMaPhieuKham(saved.getMaPhieuKham());
+                pcd.setMaNhanVienChiDinh(entity.getMaNhanVien());
+                pcd.setNgayChiDinh(LocalDateTime.now());
+                pcd.setTongTien(donGia);
+                pcd = phieuChiDinhRepository.saveAndFlush(pcd);
+
+                ChiTietChiDinh ct = new ChiTietChiDinh();
+                ct.setMaPhieuChiDinh(pcd.getMaPhieuChiDinh());
+                ct.setMaDichVu(entity.getMaDichVu());
+                ct.setSoLuong(1);
+                ct.setDonGia(donGia);
+                ct.setTrangThaiDv("CHUA_THUC_HIEN");
+                chiTietRepository.saveAndFlush(ct);
+            }
+        }
+
         return saved;
     }
 
