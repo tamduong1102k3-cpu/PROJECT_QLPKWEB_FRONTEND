@@ -103,20 +103,33 @@ const AssistantLayout = ({
     if (!selectedPatient?.maPhieuKham) return;
 
     // Validate specialty exam data if validation function is provided
+    // Always validate, regardless of which tab the user is currently on
     if (validateExamData && examData) {
       const validationErrors = validateExamData(examData);
       if (validationErrors && validationErrors.length > 0) {
-        showError('Vui lòng kiểm tra lại thông tin khám:\n- ' + validationErrors.join('\n- '));
+        showError('⚠️ THIẾU THÔNG TIN: ' + validationErrors.join('. '));
+        // Switch to specialty tab so user can see the form
+        setExamSubTab('specialty');
         return;
       }
     }
 
     setSaveStatus('saving');
+
+    // Save current tab first
     if (examSubTab === 'vitals' && vitalsRef.current) {
       const success = await vitalsRef.current.handleSave();
       if (!success) { setSaveStatus('unsaved'); return; }
     }
-    if (examSubTab !== 'vitals' && examData) {
+    // Also save specialty tab data if we are on vitals tab
+    if (examSubTab === 'vitals' && examData) {
+      const specialtyPayload = {
+        maPhieuKham: selectedPatient.maPhieuKham,
+        ...examData,
+        maNhanVienNhap: user?.maNhanVien || user?.id
+      };
+      await saveAndUpdateApi(specialtyPayload);
+    } else if (examSubTab !== 'vitals' && examData) {
       const payload = {
         maPhieuKham: selectedPatient.maPhieuKham,
         ...examData,

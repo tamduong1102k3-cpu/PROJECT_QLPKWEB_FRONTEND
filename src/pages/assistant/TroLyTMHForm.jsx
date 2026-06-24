@@ -42,14 +42,29 @@ const TroLyTMHForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals', o
     }
   }, [selectedPatient?.maPhieuKham, selectedPatient?.ghiChu]);
 
-  // Validate TMH exam data: ít nhất một field chuyên khoa phải có dữ liệu
+  // Validate TMH exam data: tất cả các field chuyên khoa không được để trống
   const validateTmhExam = (data) => {
     const errors = [];
-    const fields = ['tinhTrangMui', 'tinhTrangHong', 'soiTaiMuiHong', 'ongTai', 'mangNhiPhai', 'mangNhiTrai', 'vachNgan', 'cuonMui', 'kheMui', 'amidan', 'thanhQuan', 'thinhLucTaiTrai', 'thinhLucTaiPhai'];
-    const hasAny = fields.some(f => data[f] && data[f].toString().trim());
-    if (!hasAny) {
-      errors.push('Vui lòng nhập ít nhất một thông tin khám Tai Mũi Họng');
-    }
+    const fieldLabels = {
+      tinhTrangMui: 'Tình trạng mũi',
+      tinhTrangHong: 'Tình trạng họng',
+      soiTaiMuiHong: 'Nội soi TMH',
+      ongTai: 'Ống tai',
+      mangNhiPhai: 'Màng nhĩ phải',
+      mangNhiTrai: 'Màng nhĩ trái',
+      vachNgan: 'Vách ngăn',
+      cuonMui: 'Cuốn mũi',
+      kheMui: 'Khe mũi',
+      amidan: 'Amidan',
+      thanhQuan: 'Thanh quản',
+      thinhLucTaiTrai: 'Thính lực tai trái',
+      thinhLucTaiPhai: 'Thính lực tai phải'
+    };
+    Object.entries(fieldLabels).forEach(([field, label]) => {
+      if (!data[field] || !data[field].toString().trim()) {
+        errors.push(label + ' không được để trống');
+      }
+    });
     return errors.length > 0 ? errors : null;
   };
 

@@ -36,14 +36,23 @@ const TroLyTimMachForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals
     }
   }, [selectedPatient?.maPhieuKham, selectedPatient?.ghiChu]);
 
-  // Validate Tim Mach exam data: ít nhất một field CLS/text phải có dữ liệu
+  // Validate Tim Mach exam data: tất cả các field chuyên khoa không được để trống
   const validateTimMachExam = (data) => {
     const errors = [];
-    const fields = ['cholesterol', 'hdlCholesterol', 'ldlCholesterol', 'triglyceride', 'duongHuyet', 'ecgKetQua', 'sieuAmTim'];
-    const hasAny = fields.some(f => data[f] && data[f].toString().trim());
-    if (!hasAny) {
-      errors.push('Vui lòng nhập ít nhất một thông tin khám Tim Mạch');
-    }
+    const fieldLabels = {
+      cholesterol: 'Cholesterol',
+      hdlCholesterol: 'HDL-Cholesterol',
+      ldlCholesterol: 'LDL-Cholesterol',
+      triglyceride: 'Triglyceride',
+      duongHuyet: 'Đường huyết',
+      ecgKetQua: 'Điện tâm đồ (ECG)',
+      sieuAmTim: 'Siêu âm tim'
+    };
+    Object.entries(fieldLabels).forEach(([field, label]) => {
+      if (!data[field] || !data[field].toString().trim()) {
+        errors.push(label + ' không được để trống');
+      }
+    });
     return errors.length > 0 ? errors : null;
   };
 

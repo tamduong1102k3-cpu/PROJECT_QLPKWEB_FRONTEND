@@ -42,14 +42,25 @@ const TroLyRHMForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals', o
     }
   }, [selectedPatient?.maPhieuKham, selectedPatient?.ghiChu]);
 
-  // Validate RHM exam data: ít nhất một field chuyên khoa phải có dữ liệu
+  // Validate RHM exam data: tất cả các field chuyên khoa không được để trống
   const validateRhmExam = (data) => {
     const errors = [];
-    const fields = ['tinhTrangRang', 'sauRang', 'caoRang', 'viemNuou', 'niemMacMieng', 'doLungLay', 'phuHinhCu', 'benhLyKhacRhm', 'khopCan'];
-    const hasAny = fields.some(f => data[f] && data[f].toString().trim());
-    if (!hasAny) {
-      errors.push('Vui lòng nhập ít nhất một thông tin khám Răng Hàm Mặt');
-    }
+    const fieldLabels = {
+      tinhTrangRang: 'Tình trạng răng',
+      sauRang: 'Sâu răng',
+      caoRang: 'Cao răng',
+      viemNuou: 'Viêm nướu',
+      niemMacMieng: 'Niêm mạc miệng',
+      doLungLay: 'Độ lung lay',
+      phuHinhCu: 'Phục hình cũ',
+      benhLyKhacRhm: 'Bệnh lý khác',
+      khopCan: 'Khớp cắn'
+    };
+    Object.entries(fieldLabels).forEach(([field, label]) => {
+      if (!data[field] || !data[field].toString().trim()) {
+        errors.push(label + ' không được để trống');
+      }
+    });
     return errors.length > 0 ? errors : null;
   };
 
