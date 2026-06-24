@@ -21,6 +21,7 @@ import ConfirmDialog from './ConfirmDialog';
  * - examData: object - dữ liệu khám chuyên khoa
  * - setExamData: function - setter cho examData
  * - payloadExtras: function - trả về các field bổ sung cho payload hoàn tất (VD: parse float...)
+ * - validateExamData: function - nhận examData, trả về null nếu hợp lệ hoặc mảng các lỗi (optional)
  */
 const AssistantLayout = ({
   selectedPatient,
@@ -36,6 +37,7 @@ const AssistantLayout = ({
   setExamData,
   confirmMessage = 'Xác nhận hoàn tất quy trình trợ lý và chuyển hồ sơ cho Bác sĩ?',
   payloadExtras = () => ({}),
+  validateExamData,
 }) => {
   const [examSubTab, setExamSubTab] = useState(initialTab);
   const [loading, setLoading] = useState(false);
@@ -99,6 +101,16 @@ const AssistantLayout = ({
 
   const handleFinishAssistant = async () => {
     if (!selectedPatient?.maPhieuKham) return;
+
+    // Validate specialty exam data if validation function is provided
+    if (validateExamData && examData) {
+      const validationErrors = validateExamData(examData);
+      if (validationErrors && validationErrors.length > 0) {
+        showError('Vui lòng kiểm tra lại thông tin khám:\n- ' + validationErrors.join('\n- '));
+        return;
+      }
+    }
+
     setSaveStatus('saving');
     if (examSubTab === 'vitals' && vitalsRef.current) {
       const success = await vitalsRef.current.handleSave();

@@ -36,6 +36,17 @@ const TroLyTimMachForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals
     }
   }, [selectedPatient?.maPhieuKham, selectedPatient?.ghiChu]);
 
+  // Validate Tim Mach exam data: ít nhất một field CLS/text phải có dữ liệu
+  const validateTimMachExam = (data) => {
+    const errors = [];
+    const fields = ['cholesterol', 'hdlCholesterol', 'ldlCholesterol', 'triglyceride', 'duongHuyet', 'ecgKetQua', 'sieuAmTim'];
+    const hasAny = fields.some(f => data[f] && data[f].toString().trim());
+    if (!hasAny) {
+      errors.push('Vui lòng nhập ít nhất một thông tin khám Tim Mạch');
+    }
+    return errors.length > 0 ? errors : null;
+  };
+
   return (
     <AssistantLayout
       selectedPatient={selectedPatient}
@@ -48,6 +59,7 @@ const TroLyTimMachForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals
       setVitalsFields={setVitals}
       examData={examData}
       setExamData={setExamData}
+      validateExamData={validateTimMachExam}
       payloadExtras={() => {
         const p = {};
         if (examData.cholesterol !== '') p.cholesterol = parseFloat(examData.cholesterol) || null;

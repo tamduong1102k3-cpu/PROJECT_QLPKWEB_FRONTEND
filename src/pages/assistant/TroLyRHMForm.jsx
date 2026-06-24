@@ -42,6 +42,17 @@ const TroLyRHMForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals', o
     }
   }, [selectedPatient?.maPhieuKham, selectedPatient?.ghiChu]);
 
+  // Validate RHM exam data: ít nhất một field chuyên khoa phải có dữ liệu
+  const validateRhmExam = (data) => {
+    const errors = [];
+    const fields = ['tinhTrangRang', 'sauRang', 'caoRang', 'viemNuou', 'niemMacMieng', 'doLungLay', 'phuHinhCu', 'benhLyKhacRhm', 'khopCan'];
+    const hasAny = fields.some(f => data[f] && data[f].toString().trim());
+    if (!hasAny) {
+      errors.push('Vui lòng nhập ít nhất một thông tin khám Răng Hàm Mặt');
+    }
+    return errors.length > 0 ? errors : null;
+  };
+
   return (
     <AssistantLayout
       selectedPatient={selectedPatient}
@@ -54,6 +65,7 @@ const TroLyRHMForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals', o
       setVitalsFields={setVitals}
       examData={examData}
       setExamData={setExamData}
+      validateExamData={validateRhmExam}
       specialtyForm={
         <TabKhamRHM maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} isAssistant={true} />
       }

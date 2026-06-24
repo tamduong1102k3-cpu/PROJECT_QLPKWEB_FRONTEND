@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { getByPhieuKhamApi } from '../../api/chiSoKhamTongHopApi';
+import { useNotification } from '../../components/NotificationContext';
 import AssistantLayout from '../../components/AssistantLayout';
 import TabKhamTMH from '../doctor/components/TabKhamTMH';
 
 const TroLyTMHForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals', onBack }) => {
+  const { showError } = useNotification();
   const [vitals, setVitals] = useState({
     nhietDo: '', nhipTim: '', huyetApThu: '', huyetApTruong: '',
     nhipTho: '', canNang: '', chieuCao: '', spo2: '', ghiChu: ''
@@ -40,6 +42,17 @@ const TroLyTMHForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals', o
     }
   }, [selectedPatient?.maPhieuKham, selectedPatient?.ghiChu]);
 
+  // Validate TMH exam data: ít nhất một field chuyên khoa phải có dữ liệu
+  const validateTmhExam = (data) => {
+    const errors = [];
+    const fields = ['tinhTrangMui', 'tinhTrangHong', 'soiTaiMuiHong', 'ongTai', 'mangNhiPhai', 'mangNhiTrai', 'vachNgan', 'cuonMui', 'kheMui', 'amidan', 'thanhQuan', 'thinhLucTaiTrai', 'thinhLucTaiPhai'];
+    const hasAny = fields.some(f => data[f] && data[f].toString().trim());
+    if (!hasAny) {
+      errors.push('Vui lòng nhập ít nhất một thông tin khám Tai Mũi Họng');
+    }
+    return errors.length > 0 ? errors : null;
+  };
+
   return (
     <AssistantLayout
       selectedPatient={selectedPatient}
@@ -52,6 +65,7 @@ const TroLyTMHForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals', o
       setVitalsFields={setVitals}
       examData={examData}
       setExamData={setExamData}
+      validateExamData={validateTmhExam}
       specialtyForm={
         <TabKhamTMH maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} isAssistant={true} />
       }
