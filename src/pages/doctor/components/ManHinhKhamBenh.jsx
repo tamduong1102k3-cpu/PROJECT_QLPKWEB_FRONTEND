@@ -26,6 +26,7 @@ import {
   finishConsultationApi as _finishKhamApi,
   updateToClsApi as _updateToClsApi
 } from '../../../api/phieuKhamApi';
+import { saveAndUpdateApi as _saveChiSoKhamTongHopApi } from '../../../api/chiSoKhamTongHopApi';
 
 import HienThiSinhHieu from './HienThiSinhHieu';
 import TabKhamLamSang from './TabKhamLamSang';
@@ -506,31 +507,75 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     setExamSubTab(newTabId);
   };
 
+  // Save specialty exam data (TMH, RHM, TimMach, Nhi) before finishing
+  const saveSpecialtyExamData = async () => {
+    if (!selectedPatient?.maPhieuKham) return true;
+    
+    const isSpecialtyDoc = isTmhDoc || isRhmDoc || isCardiologyDoc || isNhiDoc;
+    if (!isSpecialtyDoc) return true; // Not a specialist, skip
+
+    // Check if specialty fields have any data entered
+    const hasAnySpecialtyData = Object.entries(examData).some(([key, val]) => {
+      if (key === 'nhietDo' || key === 'nhipTim' || key === 'nhipTho' || 
+          key === 'huyetApTamThu' || key === 'huyetApTamTruong' || 
+          key === 'canNang' || key === 'chieuCao' || key === 'spo2' || 
+          key === 'vongDau' || key === 'ghiChu') return false;
+      return val && val.toString().trim() !== '';
+    });
+
+    if (!hasAnySpecialtyData) return true; // No data entered, nothing to save
+
+    try {
+      const userData = user;
+      const payload = {
+        ...examData,
+        maPhieuKham: selectedPatient.maPhieuKham,
+        maNhanVienNhap: userData?.maNhanVien
+      };
+      await _saveChiSoKhamTongHopApi(payload);
+      return true;
+    } catch (error) {
+      console.error("Lỗi lưu dữ liệu khám chuyên khoa:", error);
+      return false;
+    }
+  };
+
   const handleFinishExam = async () => {
     if (!selectedPatient?.maPhieuKham) return;
     setConfirmState({
       isOpen: true,
       title: 'Xác nhận kết thúc khám',
-      message: 'Bạn có chắc chắn muốn kết thúc lượt khám này? Dữ liệu sẽ được tự động lưu lần cuối.',
+      message: 'Bạn có chắc chắn muốn kết thúc lượt khám này? Dữ liệu sẽ được kiểm tra và tự động lưu lần cuối.',
       type: 'warning',
       icon: 'done_all',
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, isOpen: false }));
         try {
-          let examPromise = Promise.resolve(true);
+          // Step 1: Validate and save clinical exam with strict validation
+          let examSuccess = true;
           if (tabKhamLamSangRef.current) {
-            examPromise = tabKhamLamSangRef.current.triggerAutoSave();
+            examSuccess = await tabKhamLamSangRef.current.triggerFinishAutoSave();
           }
-          const prescriptionPromise = handleSavePrescription(true);
-          const [examSuccess, prescriptionSuccess] = await Promise.all([examPromise, prescriptionPromise]);
           if (!examSuccess) {
-            showError("Không thể kết thúc khám vì thông tin khám lâm sàng/sinh hiệu chưa được lưu.");
+            // Error is already shown by triggerFinishAutoSave
             return;
           }
+
+          // Step 2: Save prescription data
+          const prescriptionSuccess = await handleSavePrescription(true);
           if (!prescriptionSuccess) {
             showError("Không thể kết thúc khám vì thông tin đơn thuốc chưa được lưu.");
             return;
           }
+
+          // Step 3: Save specialty exam data (if any)
+          const specialtySuccess = await saveSpecialtyExamData();
+          if (!specialtySuccess) {
+            showError("Không thể lưu dữ liệu khám chuyên khoa. Vui lòng thử lại.");
+            return;
+          }
+
+          // Step 4: Finish consultation
           const res = await _finishKhamApi(selectedPatient.maPhieuKham);
           if (res) {
             showSuccess("Đã kết thúc lượt khám thành công!");

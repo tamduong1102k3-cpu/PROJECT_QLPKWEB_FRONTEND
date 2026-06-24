@@ -152,7 +152,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
     }
   }, [selectedPatient]);
 
-  // Validate form fields
+  // Validate form fields (basic - used for normal save)
   const validateForm = (latestExamData = examData, latestVitals = vitals) => {
     const newErrors = {};
 
@@ -190,6 +190,44 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
     }
     if (latestVitals.chieuCao !== '' && (isNaN(parseFloat(latestVitals.chieuCao)) || parseFloat(latestVitals.chieuCao) <= 0 || parseFloat(latestVitals.chieuCao) > 250)) {
       newErrors.chieuCao = 'Chiều cao không hợp lệ (0-250)';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Strict validation for finishing exam - requires ALL clinical exam fields
+  const validateAllFieldsForFinish = (latestExamData = examData) => {
+    const newErrors = {};
+
+    // Required: Lý do khám
+    if (!latestExamData.lyDoKham || !latestExamData.lyDoKham.trim()) {
+      newErrors.lyDoKham = 'Vui lòng nhập lý do khám';
+    }
+
+    // Required: Chẩn đoán sơ bộ
+    if (!latestExamData.chanDoanSoBo || !latestExamData.chanDoanSoBo.trim()) {
+      newErrors.chanDoanSoBo = 'Vui lòng nhập chẩn đoán sơ bộ';
+    }
+
+    // Required: Tiền sử bản thân (không được để trống)
+    if (!latestExamData.tienSuBanThan || !latestExamData.tienSuBanThan.trim()) {
+      newErrors.tienSuBanThan = 'Vui lòng nhập tiền sử bản thân';
+    }
+
+    // Required: Bệnh sử (không được để trống)
+    if (!latestExamData.benhSu || !latestExamData.benhSu.trim()) {
+      newErrors.benhSu = 'Vui lòng nhập bệnh sử';
+    }
+
+    // Required: Khám lâm sàng (không được để trống)
+    if (!latestExamData.khamLamSang || !latestExamData.khamLamSang.trim()) {
+      newErrors.khamLamSang = 'Vui lòng nhập kết quả khám lâm sàng';
+    }
+
+    // Required: Lời dặn bác sĩ (không được để trống)
+    if (!latestExamData.loiDanBacSi || !latestExamData.loiDanBacSi.trim()) {
+      newErrors.loiDanBacSi = 'Vui lòng nhập lời dặn bác sĩ';
     }
 
     setErrors(newErrors);
@@ -303,6 +341,16 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
   // Expose autoSave capability to parent container
   useImperativeHandle(ref, () => ({
     triggerAutoSave: async () => {
+      return await autoSave(examData, vitals, true);
+    },
+    // Strict save for finishing exam - validates ALL fields before saving
+    triggerFinishAutoSave: async () => {
+      // First validate all fields strictly
+      if (!validateAllFieldsForFinish(examData)) {
+        showError('Không thể kết thúc khám vì thông tin khám lâm sàng chưa đầy đủ! Vui lòng nhập đầy đủ: Lý do khám, Tiền sử bản thân, Bệnh sử, Khám lâm sàng, Chẩn đoán sơ bộ, Lời dặn bác sĩ.');
+        return false;
+      }
+      // Then auto-save with force=true
       return await autoSave(examData, vitals, true);
     }
   }));
