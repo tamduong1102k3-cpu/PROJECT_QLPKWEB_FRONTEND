@@ -3,6 +3,7 @@ import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
 import DuyetKetQuaXetNghiem from './components/DuyetKetQuaXetNghiem';
 import DuyetKetQuaCDHA from './components/DuyetKetQuaCDHA';
+import BangDieuKhienChanDoan from './components/BangDieuKhienChanDoan';
 import HangDoiKham from './components/HangDoiKham';
 import ManHinhKhamBenh from './components/ManHinhKhamBenh';
 import TabHenTaiKham from './components/TabHenTaiKham';
@@ -20,8 +21,9 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
   // Kiểm tra nhiều nguồn để đảm bảo phát hiện chính xác
   const isXetNghiemDoc = maCK === 7 || vaiTro.includes('XET_NGHIEM') || tenCK.includes('xét nghiệm');
   const isCdhaDoc = maCK === 12 || vaiTro.includes('CDHA') || vaiTro.includes('CHAN_DOAN_HINH_ANH') || tenCK.includes('chẩn đoán') || tenCK.includes('hình ảnh');
+  const isLabDoctor = isXetNghiemDoc || isCdhaDoc;
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(isLabDoctor ? 'examination' : 'dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
 
@@ -30,91 +32,73 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
     setActiveTab('examination');
   };
 
-  const navItems = [
-    {
-      id: 'dashboard',
-      label: 'Hàng Đợi',
-      icon: 'format_list_numbered'
-    }, 
-    {
-      id: 'examination',
-      label: isXetNghiemDoc ? 'Duyệt Xét Nghiệm' : isCdhaDoc ? 'Duyệt CĐHA' : 'Khám Bệnh',
-      icon: isXetNghiemDoc ? 'science' : isCdhaDoc ? 'image' : 'medical_services'
-    }, 
-    {
-      id: 'history',
-      label: 'Lịch Sử Khám',
-      icon: 'history'
-    }, 
-    {
-      id: 'patients',
-      label: 'Hồ Sơ Bệnh Nhân',
-      icon: 'person_search'
-    }, 
-    {
-      id: 'appointments',
-      label: 'Lịch Hẹn',
-      icon: 'calendar_month'
-    }
-  ];
+  // Bác sĩ chẩn đoán/xét nghiệm: chỉ có tab Duyệt Kết Quả, Hồ Sơ BN, Lịch Sử
+  // Bác sĩ khám bệnh: giữ nguyên các tab cũ
+  const navItems = isLabDoctor
+    ? [
+        {
+          id: 'examination',
+          label: isXetNghiemDoc ? 'Duyệt Xét Nghiệm' : 'Duyệt CĐHA',
+          icon: isXetNghiemDoc ? 'science' : 'image'
+        },
+        {
+          id: 'history',
+          label: 'Lịch Sử Khám',
+          icon: 'history'
+        },
+        {
+          id: 'patients',
+          label: 'Hồ Sơ Bệnh Nhân',
+          icon: 'person_search'
+        }
+      ]
+    : [
+        {
+          id: 'dashboard',
+          label: 'Hàng Đợi',
+          icon: 'format_list_numbered'
+        }, 
+        {
+          id: 'examination',
+          label: 'Khám Bệnh',
+          icon: 'medical_services'
+        }, 
+        {
+          id: 'history',
+          label: 'Lịch Sử Khám',
+          icon: 'history'
+        }, 
+        {
+          id: 'patients',
+          label: 'Hồ Sơ Bệnh Nhân',
+          icon: 'person_search'
+        }, 
+        {
+          id: 'appointments',
+          label: 'Lịch Hẹn',
+          icon: 'calendar_month'
+        }
+      ];
 
   // Luôn mount HangDoiKham (dùng display:none khi không active) để giữ state khi chuyển tab
   const renderContent = () => {
     return (
       <>
-        <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
-          <HangDoiKham 
-            user={user} 
-            handleSelectPatient={handleSelectPatient} 
-            refreshTrigger={refreshTrigger}
-          />
-        </div>
+        {!isLabDoctor && (
+          <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
+            <HangDoiKham 
+              user={user} 
+              handleSelectPatient={handleSelectPatient} 
+              refreshTrigger={refreshTrigger}
+            />
+          </div>
+        )}
         {activeTab === 'examination' && (
           <>
-            {isXetNghiemDoc ? (
-              selectedPatient ? (
-                <DuyetKetQuaXetNghiem 
-                  patient={selectedPatient} 
-                  user={user} 
-                  onBack={() => {
-                    setSelectedPatient(null);
-                    setActiveTab('dashboard');
-                  }} 
-                />
-              ) : (
-                <div className="bg-white p-12 text-center rounded-2xl shadow-sm border border-gray-100">
-                  <span className="material-symbols-outlined text-gray-300 text-6xl mb-4">person_search</span>
-                  <h3 className="text-xl font-bold text-gray-700 mb-2">Chưa chọn bệnh nhân</h3>
-                  <p className="text-gray-400 mx-auto w-full block" style={{ maxWidth: '400px' }}>
-                    Vui lòng chọn bệnh nhân từ hàng đợi hoặc hồ sơ để duyệt kết quả xét nghiệm.
-                  </p>
-                  <button onClick={() => setActiveTab('dashboard')} className="mt-6 px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-lg shadow-rose-100 transition-all text-xs uppercase">
-                    Tới hàng đợi
-                  </button>
-                </div>
-              )
-            ) : isCdhaDoc ? (
-              selectedPatient ? (
-                <DuyetKetQuaCDHA 
-                  patient={selectedPatient} 
-                  user={user} 
-                  onBack={() => {
-                    setSelectedPatient(null);
-                    setActiveTab('dashboard');
-                  }} 
-                />
-              ) : (
-                <div className="bg-white p-12 text-center rounded-2xl shadow-sm border border-gray-100">
-                  <span className="material-symbols-outlined text-gray-300 text-6xl mb-4">person_search</span>
-                  <h3 className="text-xl font-bold text-gray-700 mb-2">Chưa chọn bệnh nhân</h3>
-                  <p className="text-gray-400 mx-auto w-full block" style={{ maxWidth: '400px' }}>
-                    Vui lòng chọn bệnh nhân từ hàng đợi hoặc hồ sơ để duyệt kết quả chẩn đoán hình ảnh.
-                  </p>
-                  <button onClick={() => setActiveTab('dashboard')} className="mt-6 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-100 transition-all text-xs uppercase">
-                    Tới hàng đợi
-                  </button>
-                </div>
-              )
+            {isLabDoctor ? (
+              <BangDieuKhienChanDoan 
+                user={user} 
+              />
             ) : selectedPatient ? (
               <ManHinhKhamBenh 
                 selectedPatient={selectedPatient} 
@@ -141,7 +125,7 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
         )}
         {activeTab === 'history' && <LichSuChuyenKhoa user={user} onReview={handleSelectPatient} />}
         {activeTab === 'patients' && <QuanLyBenhNhan />}
-        {activeTab === 'appointments' && <TabHenTaiKham user={user} />}
+        {!isLabDoctor && activeTab === 'appointments' && <TabHenTaiKham user={user} />}
       </>
     );
   };
