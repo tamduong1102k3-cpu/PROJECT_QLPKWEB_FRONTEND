@@ -5,6 +5,7 @@ import com.qlpk.backend.repository.DangKyKhamBenhRepository;
 import com.qlpk.backend.service.DangKyKhamBenhService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,6 +29,7 @@ public class DangKyKhamBenhServiceImpl implements DangKyKhamBenhService {
     }
 
     @Override
+    @Transactional
     public DangKyKhamBenh create(DangKyKhamBenh entity) {
         if (entity.getThoiGianDangKy() == null) {
             entity.setThoiGianDangKy(LocalDateTime.now());

@@ -1,14 +1,12 @@
 package com.qlpk.backend.controller;
 
 import com.qlpk.backend.service.DatabaseBackupService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -16,68 +14,74 @@ import java.util.Map;
 @CrossOrigin("*")
 public class DatabaseBackupController {
 
+    private static final Logger logger = LoggerFactory.getLogger(DatabaseBackupController.class);
+
     @Autowired
     private DatabaseBackupService databaseBackupService;
 
+// lấy thông tin database
     @GetMapping("/info")
     public ResponseEntity<Map<String, Object>> getInfo() {
+        logger.info("API GET /api/database/info được gọi");
         return ResponseEntity.ok(databaseBackupService.getDatabaseInfo());
     }
 
+// lấy danh sách file backup
     @GetMapping("/backups")
-    public ResponseEntity<List<Map<String, Object>>> listBackups() {
-        return ResponseEntity.ok(databaseBackupService.listBackups());
+    public ResponseEntity<?> getBackups() {
+        logger.info("API GET /api/database/backups được gọi");
+        try {
+            return ResponseEntity.ok(databaseBackupService.getBackups());
+        } catch (RuntimeException e) {
+            logger.error("Lỗi lấy backup: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("message", e.getMessage()));
+        }
     }
 
+// tạo backup database
     @PostMapping("/backup")
     public ResponseEntity<?> createBackup() {
+        logger.info("API POST /api/database/backup được gọi");
         try {
             return ResponseEntity.ok(databaseBackupService.createBackup());
         } catch (RuntimeException e) {
+            logger.error("Lỗi tạo backup: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(Map.of("message", e.getMessage()));
         }
     }
 
-    @GetMapping("/backups/{filename}/download")
-    public ResponseEntity<?> downloadBackup(@PathVariable String filename) {
-        try {
-            byte[] data = databaseBackupService.downloadBackup(filename);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(data);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
-    }
-
+// khôi phục database từ file backup
     @PostMapping("/restore/{filename}")
     public ResponseEntity<?> restoreFromBackup(@PathVariable String filename) {
+        logger.info("API POST /api/database/restore/{} được gọi", filename);
         try {
-            databaseBackupService.restoreFromBackup(filename);
-            return ResponseEntity.ok(Map.of("message", "Phục hồi database thành công từ file " + filename));
+            return ResponseEntity.ok(databaseBackupService.restoreFromBackup(filename));
         } catch (RuntimeException e) {
+            logger.error("Lỗi restore: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(Map.of("message", e.getMessage()));
         }
     }
 
-    @PostMapping(value = "/restore/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> restoreFromUpload(@RequestParam("file") MultipartFile file) {
+// khôi phục database từ file upload
+    @PostMapping(value = "/restore/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> restoreFromUpload(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        logger.info("API POST /api/database/restore/upload được gọi, file: {}", file.getOriginalFilename());
         try {
-            databaseBackupService.restoreFromUpload(file);
-            return ResponseEntity.ok(Map.of("message", "Phục hồi database từ file upload thành công"));
+            // Lưu file upload vào thư mục backups rồi restore
+            java.nio.file.Path backupDir = java.nio.file.Paths.get("./backups").toAbsolutePath().normalize();
+            java.nio.file.Files.createDirectories(backupDir);
+            String filename = "upload_" + file.getOriginalFilename();
+            java.nio.file.Path targetFile = backupDir.resolve(filename);
+            file.transferTo(targetFile.toFile());
+            
+            Map<String, Object> result = databaseBackupService.restoreFromBackup(filename);
+            return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
+            logger.error("Lỗi restore upload: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(Map.of("message", e.getMessage()));
-        }
-    }
-
-    @DeleteMapping("/backups/{filename}")
-    public ResponseEntity<?> deleteBackup(@PathVariable String filename) {
-        try {
-            databaseBackupService.deleteBackup(filename);
-            return ResponseEntity.ok(Map.of("message", "Đã xóa bản sao lưu " + filename));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Lỗi restore upload: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("message", "Lỗi xử lý file: " + e.getMessage()));
         }
     }
 }

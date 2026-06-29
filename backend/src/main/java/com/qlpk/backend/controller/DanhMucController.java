@@ -24,40 +24,43 @@ public class DanhMucController {
     @Autowired private VaiTroService vaiTroService;
     @Autowired private PhongChucNangService phongChucNangService;
 
-    // ── Chức Vụ ─────────────────────────────────────────────────────────
+// lấy danh sách chức vụ
     @GetMapping("/chuc-vu")
     public ResponseEntity<List<ChucVu>> getAllChucVu() {
         return ResponseEntity.ok(chucVuService.getAll());
     }
 
-    // ── Chuyên Khoa ──────────────────────────────────────────────────────
+// lấy danh sách chuyên khoa
     @GetMapping("/chuyen-khoa")
     public ResponseEntity<List<ChuyenKhoa>> getAllChuyenKhoa() {
         return ResponseEntity.ok(chuyenKhoaService.getAll());
     }
 
-    // ── Vai Trò ──────────────────────────────────────────────────────────
+// lấy danh sách vai trò
     @GetMapping("/vai-tro")
     public ResponseEntity<List<VaiTro>> getAllVaiTro() {
         return ResponseEntity.ok(vaiTroService.getAll());
     }
 
-    // ── Phòng Chức Năng ─ CRUD ───────────────────────────────────────────
+// lấy tất cả phòng chức năng
     @GetMapping("/phong")
     public ResponseEntity<List<PhongChucNang>> getAllPhong() {
         return ResponseEntity.ok(phongChucNangService.getAll());
     }
 
+// lấy phòng chức năng theo chức vụ
     @GetMapping("/phong/by-chuc-vu/{maChucVu}")
     public ResponseEntity<List<PhongChucNang>> getPhongByChucVu(@PathVariable Integer maChucVu) {
         return ResponseEntity.ok(phongChucNangService.findByMaChucVu(maChucVu));
     }
 
+// thêm phòng chức năng mới
     @PostMapping("/phong")
     public ResponseEntity<PhongChucNang> createPhong(@RequestBody PhongChucNang phong) {
         return ResponseEntity.ok(phongChucNangService.create(phong));
     }
 
+// cập nhật phòng chức năng
     @PutMapping("/phong/{id}")
     public ResponseEntity<PhongChucNang> updatePhong(
             @PathVariable Integer id, @RequestBody PhongChucNang phong) {
@@ -68,6 +71,7 @@ public class DanhMucController {
         return ResponseEntity.ok(updated);
     }
 
+// xóa phòng chức năng
     @DeleteMapping("/phong/{id}")
     public ResponseEntity<?> deletePhong(@PathVariable Integer id) {
         if (phongChucNangService.getById(id) == null) {

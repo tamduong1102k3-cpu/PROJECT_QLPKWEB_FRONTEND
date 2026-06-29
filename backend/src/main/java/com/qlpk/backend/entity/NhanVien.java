@@ -16,7 +16,7 @@ public class NhanVien {
     private String hoTen;
 
     @Column(name = "gioi_tinh")
-    private Integer gioiTinh; // Sử dụng Integer cho bit(2)
+    private Integer gioiTinh; 
 
     @Column(name = "ngay_sinh")
     @Temporal(TemporalType.DATE)

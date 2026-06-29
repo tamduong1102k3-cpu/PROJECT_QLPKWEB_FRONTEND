@@ -30,6 +30,7 @@ public class KetQuaClsController {
     @Autowired
     private KetQuaXnChiSoRepository ketQuaXnChiSoRepository;
 
+// lấy kết quả CLS theo chi tiết chỉ định
     @GetMapping("/{chiDinhId}")
     public ResponseEntity<?> getDetail(@PathVariable Integer chiDinhId) {
         var detailOpt = chiTietRepository.findById(chiDinhId);

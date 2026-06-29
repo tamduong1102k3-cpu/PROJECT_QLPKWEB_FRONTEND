@@ -4,6 +4,7 @@ import com.qlpk.backend.dto.ReferralRequest;
 import com.qlpk.backend.entity.*;
 import com.qlpk.backend.repository.*;
 import com.qlpk.backend.service.PhieuChiDinhService;
+import com.qlpk.backend.payment.WebSocketPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,8 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
     @Autowired private KetQuaXnChiSoRepository ketQuaXnChiSoRepository;
     @Autowired private DangKyKhamBenhRepository dangKyKhamBenhRepository;
     @Autowired private DichVuRepository dichVuRepository;
+    @Autowired private PhieuKhamRepository phieuKhamRepository;
+    @Autowired private WebSocketPublisher webSocketPublisher;
 
     private static class IndicatorDef {
         String name; String unit; String refRange; Double minVal; Double maxVal; boolean isSelect;
@@ -164,22 +167,29 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
                             ketQuaXnChiSoRepository.save(chiSo);
                         }
                     }
-                } else if ("ULTRASOUND".equals(templateKey) || "XRAY".equals(templateKey) || "CT_SCAN".equals(templateKey)) {
+                } else if ("ULTRASOUND".equals(templateKey) || "XRAY".equals(templateKey) || "CT_SCAN".equals(templateKey) || "CDHA_GENERIC".equals(templateKey)) {
                     KetQuaCdha kqcdha = ketQuaCdhaRepository.findByIdChiTietChiDinh(detailId)
                             .orElse(new KetQuaCdha());
                     
                     kqcdha.setIdChiTietChiDinh(detailId);
                     kqcdha.setNgayThucHien(LocalDateTime.now());
                     kqcdha.setMaNhanVienThucHien(maNhanVienThucHien);
-                    kqcdha.setKetLuan(ketQua);
                     
-                    StringBuilder moTa = new StringBuilder();
-                    for (var key : tVals.keySet()) {
-                        if (!"ket_luan".equals(key) && !"de_nghi".equals(key) && !"duong_dan_anh_1".equals(key) && !"duong_dan_anh_2".equals(key)) {
-                            moTa.append(key.toUpperCase()).append(": ").append(tVals.get(key)).append("\n");
+                    if ("CDHA_GENERIC".equals(templateKey)) {
+                        if (tVals.get("mo_ta") != null) {
+                            kqcdha.setMoTaHinhAnh(tVals.get("mo_ta").toString());
+                        } else {
+                            kqcdha.setMoTaHinhAnh(ketQua);
                         }
+                    } else {
+                        StringBuilder moTa = new StringBuilder();
+                        for (var key : tVals.keySet()) {
+                            if (!"ket_luan".equals(key) && !"de_nghi".equals(key) && !"duong_dan_anh_1".equals(key) && !"duong_dan_anh_2".equals(key)) {
+                                moTa.append(key.toUpperCase()).append(": ").append(tVals.get(key)).append("\n");
+                            }
+                        }
+                        kqcdha.setMoTaHinhAnh(moTa.toString());
                     }
-                    kqcdha.setMoTaHinhAnh(moTa.toString());
                     
                     if (tVals.get("de_nghi") != null) kqcdha.setDeNghi(tVals.get("de_nghi").toString());
                     else if (body.get("deNghi") != null) kqcdha.setDeNghi(body.get("deNghi").toString());
@@ -195,7 +205,7 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
             }
         }
 
-        if (body.get("duongDanAnh1") != null || body.get("duongDanAnh2") != null || body.get("deNghi") != null || (body.get("templateKey") != null && ("ULTRASOUND".equals(body.get("templateKey")) || "XRAY".equals(body.get("templateKey")) || "CT_SCAN".equals(body.get("templateKey"))))) {
+        if (body.get("duongDanAnh1") != null || body.get("duongDanAnh2") != null || body.get("deNghi") != null || (body.get("templateKey") != null && ("ULTRASOUND".equals(body.get("templateKey")) || "XRAY".equals(body.get("templateKey")) || "CT_SCAN".equals(body.get("templateKey")) || "CDHA_GENERIC".equals(body.get("templateKey"))))) {
             try {
                 KetQuaCdha kqcdha = ketQuaCdhaRepository.findByIdChiTietChiDinh(detailId)
                         .orElse(new KetQuaCdha());
@@ -203,7 +213,6 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
                 kqcdha.setIdChiTietChiDinh(detailId);
                 kqcdha.setNgayThucHien(LocalDateTime.now());
                 kqcdha.setMaNhanVienThucHien(maNhanVienThucHien);
-                kqcdha.setKetLuan(ketQua);
                 
                 if (body.get("duongDanAnh1") != null) kqcdha.setDuongDanAnh1(body.get("duongDanAnh1").toString());
                 if (body.get("duongDanAnh2") != null) kqcdha.setDuongDanAnh2(body.get("duongDanAnh2").toString());
@@ -218,14 +227,16 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
             }
         }
 
-        try {
-            dangKyKhamBenhRepository.findByMaPhieuKham(maPhieuKham).ifPresent(dk -> {
-                dk.setTrangThai("CHO_DUYET");
-                dangKyKhamBenhRepository.save(dk);
-            });
-        } catch (Exception ex) {
-            System.err.println("Lỗi cập nhật trạng thái đăng ký sang CHO_DUYET: " + ex.getMessage());
-        }
+    }
+
+    @Override
+    public List<Map<String, Object>> getPendingApprovalList(Integer maChuyenKhoa) {
+        return repository.findPendingApprovalList(maChuyenKhoa);
+    }
+
+    @Override
+    public List<Map<String, Object>> getApprovedList(Integer maChuyenKhoa) {
+        return repository.findApprovedList(maChuyenKhoa);
     }
 
     @Override
@@ -269,6 +280,17 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
         for (ChiTietChiDinh item : details) {
             item.setMaPhieuChiDinh(savedPk.getMaPhieuChiDinh());
             if (item.getTrangThaiDv() == null) item.setTrangThaiDv("CHUA_THUC_HIEN");
+            
+            // Đảm bảo donGia được lấy từ catalog nếu frontend gửi null hoặc 0
+            if (item.getDonGia() == null || item.getDonGia() <= 0) {
+                if (item.getMaDichVu() != null) {
+                    DichVu dv = dichVuRepository.findById(item.getMaDichVu()).orElse(null);
+                    if (dv != null && dv.getDonGia() != null) {
+                        item.setDonGia(dv.getDonGia().doubleValue());
+                    }
+                }
+            }
+            
             chiTietRepository.save(item);
         }
         return savedPk;
@@ -353,6 +375,44 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
         return responseList;
     }
 
+    /**
+     * Kiểm tra xem dịch vụ trong chi tiết chỉ định có phải là CLS hay không
+     * dựa vào cột loai_dich_vu trong bảng dich_vu.
+     * Các loại CLS: 'CLS_XET_NGHIEM', 'CLS_CHAN_DOAN_HINH_ANH'
+     */
+    private boolean isClsService(DichVu dichVu) {
+        if (dichVu == null || dichVu.getLoaiDichVu() == null) return false;
+        String loai = dichVu.getLoaiDichVu();
+        return "CLS_XET_NGHIEM".equals(loai) || "CLS_CHAN_DOAN_HINH_ANH".equals(loai);
+    }
+
+    /**
+     * Tự động HOAN_THANH phiếu khám và đăng ký khám bệnh nếu dịch vụ TRONG PHIẾU KHÁM là CLS.
+     * Chỉ áp dụng khi loai_dich_vu là 'CLS_XET_NGHIEM' hoặc 'CLS_CHAN_DOAN_HINH_ANH'.
+     * Sử dụng HOAN_THANH để đồng bộ với finishConsultation() của bác sĩ.
+     */
+    private void completeIfClsService(PhieuKham phieuKham) {
+        if (phieuKham == null || phieuKham.getMaDichVu() == null) return;
+        
+        DichVu dichVu = dichVuRepository.findById(phieuKham.getMaDichVu()).orElse(null);
+        if (isClsService(dichVu)) {
+            phieuKham.setTrangThai("HOAN_THANH");
+            phieuKhamRepository.save(phieuKham);
+
+            if (webSocketPublisher != null) {
+                webSocketPublisher.publishPhieuKhamChange("UPDATED", phieuKham);
+            }
+
+            dangKyKhamBenhRepository.findByMaPhieuKham(phieuKham.getMaPhieuKham()).ifPresent(dk -> {
+                dk.setTrangThai("HOAN_THANH");
+                dangKyKhamBenhRepository.save(dk);
+                if (webSocketPublisher != null) {
+                    webSocketPublisher.publishDangKyKhamChange("UPDATED", dk.getId(), dk.getTrangThai());
+                }
+            });
+        }
+    }
+
     @Override
     @Transactional
     public void approveTestResult(Integer id, Map<String, Object> body) throws Exception {
@@ -383,11 +443,19 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
         kq.setTrangThai("DA_DUYET");
         ketQuaXetNghiemRepository.save(kq);
 
+        // Chỉ update maNhanVienChiDinh nếu dịch vụ trong phiếu khám là CLS
         chiTietRepository.findById(kq.getMaChiTietChiDinh()).ifPresent(detail -> {
             repository.findById(detail.getMaPhieuChiDinh()).ifPresent(pcd -> {
-                dangKyKhamBenhRepository.findByMaPhieuKham(pcd.getMaPhieuKham()).ifPresent(dk -> {
-                    dk.setTrangThai("CHO_BAC_SI");
-                    dangKyKhamBenhRepository.save(dk);
+                phieuKhamRepository.findById(pcd.getMaPhieuKham()).ifPresent(pk -> {
+                    DichVu dv = dichVuRepository.findById(pk.getMaDichVu()).orElse(null);
+                    if (isClsService(dv)) {
+                        Integer maBsDuyet = body.get("maBsKetLuan") != null ? Integer.valueOf(body.get("maBsKetLuan").toString()) : null;
+                        if (maBsDuyet != null) {
+                            pcd.setMaNhanVienChiDinh(maBsDuyet);
+                            repository.save(pcd);
+                        }
+                    }
+                    completeIfClsService(pk);
                 });
             });
         });
@@ -414,13 +482,6 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
         chiTietRepository.findById(kq.getMaChiTietChiDinh()).ifPresent(detail -> {
             detail.setTrangThaiDv("CHUA_THUC_HIEN");
             chiTietRepository.save(detail);
-
-            repository.findById(detail.getMaPhieuChiDinh()).ifPresent(pcd -> {
-                dangKyKhamBenhRepository.findByMaPhieuKham(pcd.getMaPhieuKham()).ifPresent(dk -> {
-                    dk.setTrangThai("DA_KHAM_LAM_SANG");
-                    dangKyKhamBenhRepository.save(dk);
-                });
-            });
         });
     }
 
@@ -476,39 +537,19 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
         kq.setTrangThai("DA_DUYET");
         ketQuaCdhaRepository.save(kq);
 
+        // Chỉ update maNhanVienChiDinh nếu dịch vụ trong phiếu khám là CLS
         chiTietRepository.findById(detailId).ifPresent(detail -> {
-            detail.setTrangThaiDv("DA_THUC_HIEN");
-            if (body.get("maBacSiThucHien") != null) {
-                detail.setMaNhanVienThucHien(Integer.valueOf(body.get("maBacSiThucHien").toString()));
-            }
-            chiTietRepository.save(detail);
-
             repository.findById(detail.getMaPhieuChiDinh()).ifPresent(pcd -> {
-                var klsOpt = khamLamSangRepository.findByMaPhieuKham(pcd.getMaPhieuKham());
-                KhamLamSang kls;
-                
-                String tenDichVu = dichVuRepository.findById(detail.getMaDichVu())
-                        .map(DichVu::getTenDichVu).orElse("Dịch vụ CDHA");
-                String descResult = "- CĐHA (" + tenDichVu + "): Kết luận: " + kq.getKetLuan();
-                
-                if (klsOpt.isPresent()) {
-                    kls = klsOpt.get();
-                    String existingKq = kls.getKetQuaKhamCanLamSang();
-                    if (existingKq == null || existingKq.trim().isEmpty()) {
-                        kls.setKetQuaKhamCanLamSang(descResult);
-                    } else {
-                        kls.setKetQuaKhamCanLamSang(existingKq + "\n" + descResult);
+                phieuKhamRepository.findById(pcd.getMaPhieuKham()).ifPresent(pk -> {
+                    DichVu dv = dichVuRepository.findById(pk.getMaDichVu()).orElse(null);
+                    if (isClsService(dv)) {
+                        Integer maBsDuyet = body.get("maBacSiThucHien") != null ? Integer.valueOf(body.get("maBacSiThucHien").toString()) : null;
+                        if (maBsDuyet != null) {
+                            pcd.setMaNhanVienChiDinh(maBsDuyet);
+                            repository.save(pcd);
+                        }
                     }
-                } else {
-                    kls = new KhamLamSang();
-                    kls.setMaPhieuKham(pcd.getMaPhieuKham());
-                    kls.setKetQuaKhamCanLamSang(descResult);
-                }
-                khamLamSangRepository.save(kls);
-
-                dangKyKhamBenhRepository.findByMaPhieuKham(pcd.getMaPhieuKham()).ifPresent(dk -> {
-                    dk.setTrangThai("CHO_BAC_SI");
-                    dangKyKhamBenhRepository.save(dk);
+                    completeIfClsService(pk);
                 });
             });
         });
@@ -531,13 +572,6 @@ public class PhieuChiDinhServiceImpl implements PhieuChiDinhService {
         chiTietRepository.findById(detailId).ifPresent(detail -> {
             detail.setTrangThaiDv("CHUA_THUC_HIEN");
             chiTietRepository.save(detail);
-
-            repository.findById(detail.getMaPhieuChiDinh()).ifPresent(pcd -> {
-                dangKyKhamBenhRepository.findByMaPhieuKham(pcd.getMaPhieuKham()).ifPresent(dk -> {
-                    dk.setTrangThai("DA_KHAM_LAM_SANG");
-                    dangKyKhamBenhRepository.save(dk);
-                });
-            });
         });
     }
 }

@@ -26,6 +26,6 @@ public class PhongChucNang {
     @Column(name = "ma_chuyen_khoa")
     private Integer maChuyenKhoa;
 
-    @Column(name = "ma_chuc_vu")   // Liên kết với chuc_vu.id
+    @Column(name = "ma_chuc_vu")   
     private Integer maChucVu;
 }

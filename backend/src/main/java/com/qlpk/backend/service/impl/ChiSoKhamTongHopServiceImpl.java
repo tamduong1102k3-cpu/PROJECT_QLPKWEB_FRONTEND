@@ -91,6 +91,34 @@ public class ChiSoKhamTongHopServiceImpl implements ChiSoKhamTongHopService {
                     if (body.getDoLungLay() != null) existing.setDoLungLay(body.getDoLungLay());
                     if (body.getPhuHinhCu() != null) existing.setPhuHinhCu(body.getPhuHinhCu());
                     if (body.getBenhLyKhacRhm() != null) existing.setBenhLyKhacRhm(body.getBenhLyKhacRhm());
+                    // Tai Mũi Họng (TMH) fields
+                    if (body.getThinhLucTaiTrai() != null) existing.setThinhLucTaiTrai(body.getThinhLucTaiTrai());
+                    if (body.getThinhLucTaiPhai() != null) existing.setThinhLucTaiPhai(body.getThinhLucTaiPhai());
+                    if (body.getTinhTrangMui() != null) existing.setTinhTrangMui(body.getTinhTrangMui());
+                    if (body.getTinhTrangHong() != null) existing.setTinhTrangHong(body.getTinhTrangHong());
+                    if (body.getSoiTaiMuiHong() != null) existing.setSoiTaiMuiHong(body.getSoiTaiMuiHong());
+                    if (body.getOngTai() != null) existing.setOngTai(body.getOngTai());
+                    if (body.getMangNhiPhai() != null) existing.setMangNhiPhai(body.getMangNhiPhai());
+                    if (body.getMangNhiTrai() != null) existing.setMangNhiTrai(body.getMangNhiTrai());
+                    if (body.getVachNgan() != null) existing.setVachNgan(body.getVachNgan());
+                    if (body.getCuonMui() != null) existing.setCuonMui(body.getCuonMui());
+                    if (body.getKheMui() != null) existing.setKheMui(body.getKheMui());
+                    if (body.getAmidan() != null) existing.setAmidan(body.getAmidan());
+                    if (body.getThanhQuan() != null) existing.setThanhQuan(body.getThanhQuan());
+                    // Tim mạch fields
+                    if (body.getCholesterol() != null) existing.setCholesterol(body.getCholesterol());
+                    if (body.getHdlCholesterol() != null) existing.setHdlCholesterol(body.getHdlCholesterol());
+                    if (body.getLdlCholesterol() != null) existing.setLdlCholesterol(body.getLdlCholesterol());
+                    if (body.getTriglyceride() != null) existing.setTriglyceride(body.getTriglyceride());
+                    if (body.getDuongHuyet() != null) existing.setDuongHuyet(body.getDuongHuyet());
+                    if (body.getEcgKetQua() != null) existing.setEcgKetQua(body.getEcgKetQua());
+                    if (body.getSieuAmTim() != null) existing.setSieuAmTim(body.getSieuAmTim());
+                    // Nhi khoa fields
+                    if (body.getKhamTaiMuiHongNhi() != null) existing.setKhamTaiMuiHongNhi(body.getKhamTaiMuiHongNhi());
+                    if (body.getKhamHoHapNhi() != null) existing.setKhamHoHapNhi(body.getKhamHoHapNhi());
+                    if (body.getKhamDuNiemMacNhi() != null) existing.setKhamDuNiemMacNhi(body.getKhamDuNiemMacNhi());
+                    if (body.getCoQuanKhacNhi() != null) existing.setCoQuanKhacNhi(body.getCoQuanKhacNhi());
+                    if (body.getKhamDaNiemMacNhi() != null) existing.setKhamDaNiemMacNhi(body.getKhamDaNiemMacNhi());
                     if (body.getGhiChu() != null) existing.setGhiChu(body.getGhiChu());
                     if (body.getNgayTao() != null) existing.setNgayTao(body.getNgayTao());
 

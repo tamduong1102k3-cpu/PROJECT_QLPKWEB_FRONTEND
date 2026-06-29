@@ -38,7 +38,7 @@ public class ChiSoKhamTongHopController {
     @GetMapping("/phieu-kham/{maPhieuKham}")
     public ResponseEntity<?> getByPhieuKham(@PathVariable Integer maPhieuKham) {
         Optional<ChiSoKhamTongHop> data = service.findByMaPhieuKham(maPhieuKham);
-        // Trả về dữ liệu nếu có, hoặc null (200 OK) để frontend dễ xử lý khởi tạo form
+       
         return ResponseEntity.ok(data.orElse(null));
     }
 

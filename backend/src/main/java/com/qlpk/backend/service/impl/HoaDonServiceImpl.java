@@ -137,37 +137,20 @@ public class HoaDonServiceImpl implements HoaDonService {
         BigDecimal tongDichVu = BigDecimal.ZERO;
         BigDecimal tongThuoc = BigDecimal.ZERO;
 
-        // 1. Lấy dịch vụ khám chính
+        // 1. Lấy dịch vụ khám chính (nếu có maDichVu)
         PhieuKham pk = phieuKhamRepository.findById(maPhieuKham).orElse(null);
-        Integer maDichVuKham = null;
         if (pk != null && pk.getMaDichVu() != null) {
-            maDichVuKham = pk.getMaDichVu();
-        } else {
-            // Tìm trong DangKyKhamBenh.ghiChu (format: "[Dịch vụ ID: X]")
-            var dkOpt = dangKyRepository.findByMaPhieuKham(maPhieuKham);
-            if (dkOpt.isPresent() && dkOpt.get().getGhiChu() != null) {
-                String ghiChu = dkOpt.get().getGhiChu();
-                if (ghiChu.contains("[Dịch vụ ID:")) {
-                    try {
-                        String idStr = ghiChu.substring(ghiChu.indexOf("[Dịch vụ ID:") + 12, ghiChu.indexOf("]", ghiChu.indexOf("[Dịch vụ ID:")));
-                        maDichVuKham = Integer.parseInt(idStr.trim());
-                    } catch (Exception ignore) {}
-                }
-            }
-        }
-        if (maDichVuKham != null) {
-            DichVu dv = dichVuRepository.findById(maDichVuKham).orElse(null);
+            DichVu dv = dichVuRepository.findById(pk.getMaDichVu()).orElse(null);
             if (dv != null) {
                 BigDecimal donGia = dv.getDonGia() != null ? dv.getDonGia() : BigDecimal.ZERO;
-                int soLuong = 1;
-                BigDecimal thanhTien = donGia.multiply(BigDecimal.valueOf(soLuong));
+                BigDecimal thanhTien = donGia;
                 tongDichVu = tongDichVu.add(thanhTien);
 
                 Map<String, Object> item = new HashMap<>();
-                item.put("idGoc", maDichVuKham);
+                item.put("idGoc", pk.getMaDichVu());
                 item.put("noiDung", dv.getTenDichVu() + " (Khám)");
                 item.put("loaiMuc", "DICH_VU");
-                item.put("soLuong", soLuong);
+                item.put("soLuong", 1);
                 item.put("donGia", donGia);
                 item.put("thanhTien", thanhTien);
                 services.add(item);
@@ -175,16 +158,28 @@ public class HoaDonServiceImpl implements HoaDonService {
         }
 
         // 2. Lấy dịch vụ từ ChiTietChiDinh (cận lâm sàng, xét nghiệm, ...)
+        // Lưu ý: Bỏ qua dịch vụ khám chính đã được thêm ở bước 1 để tránh trùng lặp
+        Integer maDichVuKhamChinh = (pk != null) ? pk.getMaDichVu() : null;
         List<PhieuChiDinh> pcdList = phieuChiDinhRepository.findByMaPhieuKham(maPhieuKham);
         for (PhieuChiDinh pcd : pcdList) {
             List<ChiTietChiDinh> details = chiTietChiDinhRepository.findByMaPhieuChiDinh(pcd.getMaPhieuChiDinh());
             if (details == null) continue;
             for (ChiTietChiDinh ct : details) {
+                // Bỏ qua nếu đây là dịch vụ khám chính (đã thêm ở bước 1)
+                if (maDichVuKhamChinh != null && maDichVuKhamChinh.equals(ct.getMaDichVu())) {
+                    continue;
+                }
                 String tenDv = "Dịch vụ #" + ct.getMaDichVu();
                 DichVu dv = dichVuRepository.findById(ct.getMaDichVu()).orElse(null);
                 if (dv != null) tenDv = dv.getTenDichVu();
-                
-                BigDecimal donGia = ct.getDonGia() != null ? BigDecimal.valueOf(ct.getDonGia()) : BigDecimal.ZERO;
+
+                // Lấy donGia: ưu tiên từ ChiTietChiDinh, fallback từ catalog nếu = 0
+                BigDecimal donGia = BigDecimal.ZERO;
+                if (ct.getDonGia() != null && ct.getDonGia() > 0) {
+                    donGia = BigDecimal.valueOf(ct.getDonGia());
+                } else if (dv != null && dv.getDonGia() != null) {
+                    donGia = dv.getDonGia();
+                }
                 int soLuong = ct.getSoLuong() != null ? ct.getSoLuong() : 1;
                 BigDecimal thanhTien = donGia.multiply(BigDecimal.valueOf(soLuong));
                 tongDichVu = tongDichVu.add(thanhTien);
@@ -200,7 +195,7 @@ public class HoaDonServiceImpl implements HoaDonService {
             }
         }
 
-        // 2. Lấy thuốc từ ToaThuoc + ChiTietToaThuoc
+        // 3. Lấy thuốc từ ToaThuoc + ChiTietToaThuoc
         List<ToaThuoc> toaThuocList = toaThuocRepository.findByMaPhieuKham(maPhieuKham);
         for (ToaThuoc toa : toaThuocList) {
             List<ChiTietToaThuoc> details = chiTietToaThuocRepository.findByMaToaThuoc(toa.getMaToaThuoc());
@@ -214,7 +209,17 @@ public class HoaDonServiceImpl implements HoaDonService {
                     donGiaBan = thuoc.getDonGiaBan() != null ? thuoc.getDonGiaBan() : BigDecimal.ZERO;
                 }
 
-                int soLuong = 1; // Mặc định 1 đơn vị
+                // Tính số lượng thuốc dựa trên số ngày x tổng liều mỗi ngày
+                int soLuong = 1;
+                if (ct.getSoNgay() != null && ct.getSoNgay() > 0) {
+                    int lieuMoiNgay = 0;
+                    if (ct.getSang() != null && !ct.getSang().trim().isEmpty() && !ct.getSang().equals("0")) lieuMoiNgay++;
+                    if (ct.getTrua() != null && !ct.getTrua().trim().isEmpty() && !ct.getTrua().equals("0")) lieuMoiNgay++;
+                    if (ct.getChieu() != null && !ct.getChieu().trim().isEmpty() && !ct.getChieu().equals("0")) lieuMoiNgay++;
+                    if (ct.getToi() != null && !ct.getToi().trim().isEmpty() && !ct.getToi().equals("0")) lieuMoiNgay++;
+                    if (lieuMoiNgay == 0) lieuMoiNgay = 1;
+                    soLuong = lieuMoiNgay * ct.getSoNgay();
+                }
                 BigDecimal thanhTien = donGiaBan.multiply(BigDecimal.valueOf(soLuong));
                 tongThuoc = tongThuoc.add(thanhTien);
 
@@ -246,10 +251,6 @@ public class HoaDonServiceImpl implements HoaDonService {
         // Kiểm tra hóa đơn đã tồn tại chưa
         List<HoaDon> existing = repository.findByMaPhieuKham(maPhieuKham);
         if (existing != null && !existing.isEmpty()) {
-            // Trả về hóa đơn đầu tiên tìm thấy (dù chưa thanh toán hay đã thanh toán)
-            // Không tạo thêm hóa đơn mới trong DB, nhưng cũng không chặn — 
-            // nếu là "chua thanh toan" thì frontend hiện nút thanh toán, 
-            // nếu là "da thanh toan" thì frontend chỉ hiển thị thông tin
             return existing.get(0);
         }
 
@@ -268,14 +269,10 @@ public class HoaDonServiceImpl implements HoaDonService {
         hoaDon.setTongTien(tongCong);
         hoaDon.setNgayThanhToan(LocalDateTime.now());
         hoaDon.setTrangThai("chua thanh toan");
-        // Mặc định phương thức thanh toán là "chua_xac_dinh" khi mới tạo hóa đơn.
-        // Giá trị này sẽ được cập nhật khi khách hàng thực hiện thanh toán.
-        // Fix: Column 'phuong_thuc_thanh_toan' cannot be null trong DB
         hoaDon.setPhuongThucThanhToan("chua_xac_dinh");
         hoaDon = repository.save(hoaDon);
 
         // Tạo chi tiết hóa đơn
-        int stt = 0;
         for (Map<String, Object> item : services) {
             ChiTietHoaDon ct = new ChiTietHoaDon();
             ct.setMaHoaDon(hoaDon.getMaHoaDon());
@@ -286,7 +283,6 @@ public class HoaDonServiceImpl implements HoaDonService {
             ct.setDonGia((BigDecimal) item.get("donGia"));
             ct.setThanhTien((BigDecimal) item.get("thanhTien"));
             chiTietRepository.save(ct);
-            stt++;
         }
         for (Map<String, Object> item : medicines) {
             ChiTietHoaDon ct = new ChiTietHoaDon();
@@ -298,7 +294,6 @@ public class HoaDonServiceImpl implements HoaDonService {
             ct.setDonGia((BigDecimal) item.get("donGia"));
             ct.setThanhTien((BigDecimal) item.get("thanhTien"));
             chiTietRepository.save(ct);
-            stt++;
         }
 
         return hoaDon;

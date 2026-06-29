@@ -60,13 +60,19 @@ public class KetQuaCdhaController {
         return ResponseEntity.noContent().build();
     }
 
-    // 6. Lấy danh sách chờ duyệt trong ngày (Hàm bạn đã viết)
+    // 6. Lấy danh sách chờ duyệt trong ngày
     @GetMapping("/today")
     public ResponseEntity<List<Map<String, Object>>> getTodayResults() {
         return ResponseEntity.ok(service.getTodayResults());
     }
 
-    // 7. Bác sĩ duyệt kết quả (Hàm bạn đã viết)
+    // 7. Lấy danh sách kết quả CĐHA trong ngày theo bác sĩ thực hiện
+    @GetMapping("/today/doctor/{doctorId}")
+    public ResponseEntity<List<Map<String, Object>>> getTodayResultsByDoctorId(@PathVariable Integer doctorId) {
+        return ResponseEntity.ok(service.getTodayResultsByDoctorId(doctorId));
+    }
+
+    // 8. Bác sĩ duyệt kết quả 
     @PutMapping("/{id}/approve")
     public ResponseEntity<?> approveResult(@PathVariable Integer id) {
         KetQuaCdha updated = service.updateStatus(id, "DA_DUYET");

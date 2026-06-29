@@ -9,7 +9,7 @@ public class VaiTro {
     @Column(name = "ma_vai_tro", length = 100)
     private String maVaiTro;
 
-    @Column(name = "ten_bien_the", length = 50)  // Đúng với tên cột trong DB
+    @Column(name = "ten_bien_the", length = 50) 
     private String tenBienThe;
 
     // Getters and Setters

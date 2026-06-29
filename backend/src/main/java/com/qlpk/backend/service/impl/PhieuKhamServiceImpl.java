@@ -45,6 +45,9 @@ public class PhieuKhamServiceImpl implements PhieuKhamService {
     private KetQuaCdhaRepository ketQuaCdhaRepository;
 
     @Autowired
+    private TiepNhanClsRepository tiepNhanClsRepository;
+
+    @Autowired
     private WebSocketPublisher webSocketPublisher;
 
     @Override
@@ -74,32 +77,37 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
         if (entity.getTrangThai() == null) {
             entity.setTrangThai("CHO");
         }
+
+        // Kiểm tra trùng: không cho tạo PK mới nếu bệnh nhân đã có PK hôm nay với cùng chuyên khoa
+        // và PK đó chưa kết thúc (trạng thái != HOAN_THANH)
+        if (entity.getMaBenhNhan() != null && entity.getMaChuyenKhoa() != null) {
+            List<PhieuKham> existing = repository.findByMaBenhNhanAndMaChuyenKhoaAndNgayKhamBetween(
+                entity.getMaBenhNhan(),
+                entity.getMaChuyenKhoa(),
+                entity.getNgayKham().withHour(0).withMinute(0).withSecond(0),
+                entity.getNgayKham().withHour(23).withMinute(59).withSecond(59)
+            );
+            if (existing != null && !existing.isEmpty()) {
+                // Nếu tồn tại PK cũ chưa HOAN_THANH thì trả về PK cũ
+                PhieuKham unfinished = null;
+                for (PhieuKham pk : existing) {
+                    if (!"HOAN_THANH".equals(pk.getTrangThai())) {
+                        unfinished = pk;
+                        break;
+                    }
+                }
+                if (unfinished != null) {
+                    return unfinished;
+                }
+            }
+        }
+
         PhieuKham saved = repository.save(entity);
         webSocketPublisher.publishPhieuKhamChange("CREATED", saved);
 
-        // Tự động tạo PhieuChiDinh + ChiTietChiDinh khi có dịch vụ
-        // để KTV XN/CDHA có thể thấy bệnh nhân trong danh sách chờ
-        if (entity.getMaDichVu() != null) {
-            DichVu dv = dichVuRepository.findById(entity.getMaDichVu()).orElse(null);
-            if (dv != null) {
-                Double donGia = dv.getDonGia() != null ? dv.getDonGia().doubleValue() : 0.0;
-
-                PhieuChiDinh pcd = new PhieuChiDinh();
-                pcd.setMaPhieuKham(saved.getMaPhieuKham());
-                pcd.setMaNhanVienChiDinh(entity.getMaNhanVien());
-                pcd.setNgayChiDinh(LocalDateTime.now());
-                pcd.setTongTien(donGia);
-                pcd = phieuChiDinhRepository.saveAndFlush(pcd);
-
-                ChiTietChiDinh ct = new ChiTietChiDinh();
-                ct.setMaPhieuChiDinh(pcd.getMaPhieuChiDinh());
-                ct.setMaDichVu(entity.getMaDichVu());
-                ct.setSoLuong(1);
-                ct.setDonGia(donGia);
-                ct.setTrangThaiDv("CHUA_THUC_HIEN");
-                chiTietRepository.saveAndFlush(ct);
-            }
-        }
+        // KHÔNG tự động tạo PhieuChiDinh nữa
+        // Phiếu chỉ định chỉ được tạo khi bác sĩ CLS xác nhận thực hiện dịch vụ
+        // (xem method confirmClsService)
 
         return saved;
     }
@@ -153,61 +161,15 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
             }
         }
 
-        boolean canTaoPhieuKham = tenCK.contains("xét nghiệm") || tenCK.contains("hình ảnh");
-        PhieuKham pk = null;
-
-        if (canTaoPhieuKham) {
-            Integer doctorId = request.getMaNhanVienBacSi();
-            if (doctorId == null) {
-                throw new Exception("Vui lòng chọn bác sĩ chỉ định cho chuyên khoa kỹ thuật này");
-            }
-
-            pk = new PhieuKham();
-            pk.setMaBenhNhan(request.getMaBenhNhan());
-            pk.setMaNhanVien(doctorId);
-            pk.setMaChuyenKhoa(request.getMaChuyenKhoa());
-            pk.setNgayKham(LocalDateTime.now());
-            pk.setNgayTao(LocalDateTime.now());
-            pk.setTrangThai("CHO");
-            pk.setGhiChu(request.getGhiChu());
-            pk.setMaDichVu(request.getMaDichVu());
-            pk = repository.saveAndFlush(pk);
-            webSocketPublisher.publishPhieuKhamChange("CREATED", pk);
-
-            if (request.getMaDichVu() != null) {
-                Double donGia = 0.0;
-                DichVu dv = dichVuRepository.findById(request.getMaDichVu()).orElse(null);
-                if (dv != null && dv.getDonGia() != null) {
-                    donGia = dv.getDonGia().doubleValue();
-                }
-
-                PhieuChiDinh pcd = new PhieuChiDinh();
-                pcd.setMaPhieuKham(pk.getMaPhieuKham());
-                pcd.setMaNhanVienChiDinh(doctorId);
-                pcd.setNgayChiDinh(LocalDateTime.now());
-                pcd.setTongTien(donGia);
-                pcd = phieuChiDinhRepository.saveAndFlush(pcd);
-
-                ChiTietChiDinh ct = new ChiTietChiDinh();
-                ct.setMaPhieuChiDinh(pcd.getMaPhieuChiDinh());
-                ct.setMaDichVu(request.getMaDichVu());
-                ct.setSoLuong(1);
-                ct.setDonGia(donGia);
-                ct.setTrangThaiDv("CHUA_THUC_HIEN");
-                chiTietRepository.saveAndFlush(ct);
-            }
-        }
-
+        // Lễ tân CHỈ tạo DangKyKhamBenh, không tạo PhieuKham hay PhieuChiDinh
+        // PhieuKham sẽ do KTV (CLS) hoặc Trợ lý (khám thường) tạo sau
         DangKyKhamBenh dk = new DangKyKhamBenh();
         dk.setMaBenhNhan(request.getMaBenhNhan());
         dk.setMaNhanVien(request.getMaNhanVienLeTan());
         dk.setMaChuyenKhoa(request.getMaChuyenKhoa());
         dk.setThoiGianDangKy(LocalDateTime.now());
         dk.setTrangThai("CHO_KHAM");
-        
-        if (pk != null) {
-            dk.setMaPhieuKham(pk.getMaPhieuKham());
-        }
+        dk.setMaDichVu(request.getMaDichVu());
 
         String note = request.getGhiChu();
         if (request.getMaDichVu() != null) {
@@ -233,7 +195,7 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
         return Map.of(
             "message", "Tiếp đón thành công",
             "soThuTu", dk.getSoThuTu(),
-            "hasPhieuKham", pk != null
+            "hasPhieuKham", false
         );
     }
 
@@ -254,9 +216,13 @@ public List<Map<String, Object>> getAssistantHistory(Integer maChuyenKhoa) {
         pk.setMaNhanVien(assistantId != null ? assistantId : dk.getMaNhanVien()); 
         pk.setNgayKham(LocalDateTime.now());
         pk.setNgayTao(LocalDateTime.now());
-        pk.setTrangThai("CHO"); 
+        pk.setTrangThai("CHO");
+        pk.setMaDichVu(dk.getMaDichVu());
         pk = repository.saveAndFlush(pk);
         webSocketPublisher.publishPhieuKhamChange("CREATED", pk);
+
+        // KHÔNG tự động tạo PhieuChiDinh nữa
+        // Phiếu chỉ định (CLS) chỉ được tạo khi bác sĩ CLS xác nhận thực hiện dịch vụ
 
         dk.setMaPhieuKham(pk.getMaPhieuKham());
         dk.setTrangThai("DANG_KHAM");
@@ -296,6 +262,22 @@ public void updateToWaitingForDoctor(Integer maPhieuKham) throws Exception {
 
     @Override
     @Transactional
+    public void updateToChoCls(Integer maPhieuKham) throws Exception {
+        PhieuKham pk = repository.findById(maPhieuKham)
+                .orElseThrow(() -> new Exception("Không tìm thấy phiếu khám #" + maPhieuKham));
+        pk.setTrangThai("CHO_CLS");
+        repository.save(pk);
+        webSocketPublisher.publishPhieuKhamChange("UPDATED", pk);
+
+        dangKyRepository.findByMaPhieuKham(maPhieuKham).ifPresent(dk -> {
+            dk.setTrangThai("CHO_CLS");
+            dangKyRepository.save(dk);
+            webSocketPublisher.publishDangKyKhamChange("UPDATED", dk.getId(), dk.getTrangThai());
+        });
+    }
+
+    @Override
+    @Transactional
     public void finishConsultation(Integer maPhieuKham) throws Exception {
         PhieuKham pk = repository.findById(maPhieuKham).orElse(null);
         if (pk == null) throw new Exception("Không tìm thấy phiếu khám");
@@ -324,6 +306,166 @@ public void updateToWaitingForDoctor(Integer maPhieuKham) throws Exception {
     @Override
     public List<Map<String, Object>> getHistoryByChuyenKhoaAllDays(Integer maChuyenKhoa) {
         return repository.findHistoryByChuyenKhoaAllDays(maChuyenKhoa);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> acceptClsPatient(Integer registrationId, Integer technicianId) throws Exception {
+        DangKyKhamBenh dk = dangKyRepository.findById(registrationId).orElse(null);
+        if (dk == null) {
+            throw new Exception("Không tìm thấy hồ sơ đăng ký khám");
+        }
+        if (dk.getMaPhieuKham() != null) {
+            throw new Exception("Bệnh nhân này đã được tiếp nhận");
+        }
+
+        // Tạo PhieuKham cho bệnh nhân CLS
+        PhieuKham pk = new PhieuKham();
+        pk.setMaBenhNhan(dk.getMaBenhNhan());
+        pk.setMaChuyenKhoa(dk.getMaChuyenKhoa());
+        pk.setMaNhanVien(technicianId != null ? technicianId : dk.getMaNhanVien());
+        pk.setNgayKham(LocalDateTime.now());
+        pk.setNgayTao(LocalDateTime.now());
+        pk.setTrangThai("CHO");
+        pk.setMaDichVu(dk.getMaDichVu());
+        pk.setGhiChu(dk.getGhiChu());
+        pk = repository.saveAndFlush(pk);
+        webSocketPublisher.publishPhieuKhamChange("CREATED", pk);
+
+        // Cập nhật DangKyKhamBenh
+        dk.setMaPhieuKham(pk.getMaPhieuKham());
+        dk.setTrangThai("DANG_KHAM");
+        dangKyRepository.saveAndFlush(dk);
+        webSocketPublisher.publishDangKyKhamChange("UPDATED", dk.getId(), dk.getTrangThai());
+
+        return Map.of(
+            "message", "Đã tiếp nhận bệnh nhân CLS thành công",
+            "phieuKhamId", pk.getMaPhieuKham(),
+            "registration", dk
+        );
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> techConfirmClsService(Integer maPhieuKham, Integer technicianId, String lyDoDen, String thongTinSangLoc, String ghiChu) throws Exception {
+        PhieuKham pk = repository.findById(maPhieuKham)
+                .orElseThrow(() -> new Exception("Không tìm thấy phiếu khám #" + maPhieuKham));
+
+        if (pk.getMaDichVu() == null) {
+            throw new Exception("Phiếu khám này không có dịch vụ CLS");
+        }
+
+        // 1. Tạo TiepNhanCls
+        TiepNhanCls tiepNhan = new TiepNhanCls();
+        tiepNhan.setMaPhieuKham(maPhieuKham);
+        tiepNhan.setLyDoDen(lyDoDen);
+        tiepNhan.setThongTinSangLoc(thongTinSangLoc);
+        tiepNhan.setGhiChu(ghiChu);
+        tiepNhanClsRepository.save(tiepNhan);
+
+        // 2. Kiểm tra đã có PhieuChiDinh chưa
+        List<PhieuChiDinh> existingPcd = phieuChiDinhRepository.findByMaPhieuKham(maPhieuKham);
+        if (existingPcd != null && !existingPcd.isEmpty()) {
+            throw new Exception("Phiếu chỉ định đã được tạo trước đó cho phiếu khám này");
+        }
+
+        // 3. Tạo PhieuChiDinh với maNhanVienChiDinh = technicianId (KTV)
+        DichVu dv = dichVuRepository.findById(pk.getMaDichVu()).orElse(null);
+        Double donGia = (dv != null && dv.getDonGia() != null) ? dv.getDonGia().doubleValue() : 0.0;
+
+        PhieuChiDinh pcd = new PhieuChiDinh();
+        pcd.setMaPhieuKham(maPhieuKham);
+        pcd.setMaNhanVienChiDinh(technicianId);
+        pcd.setNgayChiDinh(LocalDateTime.now());
+        pcd.setTongTien(donGia);
+        pcd = phieuChiDinhRepository.saveAndFlush(pcd);
+
+        // 4. Tạo ChiTietChiDinh
+        ChiTietChiDinh ct = new ChiTietChiDinh();
+        ct.setMaPhieuChiDinh(pcd.getMaPhieuChiDinh());
+        ct.setMaDichVu(pk.getMaDichVu());
+        ct.setSoLuong(1);
+        ct.setDonGia(donGia);
+        ct.setTrangThaiDv("CHUA_THUC_HIEN");
+        chiTietRepository.saveAndFlush(ct);
+
+        // 5. Cập nhật trạng thái phiếu khám lên CHO_CLS
+        pk.setTrangThai("CHO_CLS");
+        repository.save(pk);
+        webSocketPublisher.publishPhieuKhamChange("UPDATED", pk);
+
+        // 6. Cập nhật DangKyKhamBenh
+        dangKyRepository.findByMaPhieuKham(maPhieuKham).ifPresent(dk -> {
+            dk.setTrangThai("CHO_CLS");
+            dangKyRepository.save(dk);
+            webSocketPublisher.publishDangKyKhamChange("UPDATED", dk.getId(), dk.getTrangThai());
+        });
+
+        return Map.of(
+            "message", "Đã tiếp nhận CLS và tạo phiếu chỉ định thành công",
+            "phieuChiDinhId", pcd.getMaPhieuChiDinh()
+        );
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> confirmClsService(Integer maPhieuKham, Integer doctorId) throws Exception {
+        PhieuKham pk = repository.findById(maPhieuKham)
+                .orElseThrow(() -> new Exception("Không tìm thấy phiếu khám #" + maPhieuKham));
+
+        if (pk.getMaDichVu() == null) {
+            throw new Exception("Phiếu khám này không có dịch vụ CLS để xác nhận");
+        }
+
+        // Kiểm tra đã có PhieuChiDinh chưa (tránh tạo trùng)
+        List<PhieuChiDinh> existingPcd = phieuChiDinhRepository.findByMaPhieuKham(maPhieuKham);
+        if (existingPcd != null && !existingPcd.isEmpty()) {
+            throw new Exception("Phiếu chỉ định đã được tạo trước đó cho phiếu khám này");
+        }
+
+        // Tạo PhieuChiDinh
+        DichVu dv = dichVuRepository.findById(pk.getMaDichVu()).orElse(null);
+        Double donGia = (dv != null && dv.getDonGia() != null) ? dv.getDonGia().doubleValue() : 0.0;
+
+        PhieuChiDinh pcd = new PhieuChiDinh();
+        pcd.setMaPhieuKham(maPhieuKham);
+        pcd.setMaNhanVienChiDinh(doctorId);
+        pcd.setNgayChiDinh(LocalDateTime.now());
+        pcd.setTongTien(donGia);
+        pcd = phieuChiDinhRepository.saveAndFlush(pcd);
+
+        // Tạo ChiTietChiDinh
+        ChiTietChiDinh ct = new ChiTietChiDinh();
+        ct.setMaPhieuChiDinh(pcd.getMaPhieuChiDinh());
+        ct.setMaDichVu(pk.getMaDichVu());
+        ct.setSoLuong(1);
+        ct.setDonGia(donGia);
+        ct.setTrangThaiDv("CHUA_THUC_HIEN");
+        chiTietRepository.saveAndFlush(ct);
+
+        // Cập nhật trạng thái phiếu khám
+        pk.setTrangThai("CHO_CLS");
+        repository.save(pk);
+        webSocketPublisher.publishPhieuKhamChange("UPDATED", pk);
+
+        // Cập nhật DangKyKhamBenh
+        dangKyRepository.findByMaPhieuKham(maPhieuKham).ifPresent(dk -> {
+            dk.setTrangThai("CHO_CLS");
+            dangKyRepository.save(dk);
+            webSocketPublisher.publishDangKyKhamChange("UPDATED", dk.getId(), dk.getTrangThai());
+        });
+
+        return Map.of(
+            "message", "Đã xác nhận thực hiện dịch vụ và tạo phiếu chỉ định thành công",
+            "phieuChiDinhId", pcd.getMaPhieuChiDinh()
+        );
+    }
+
+    @Override
+    public List<Map<String, Object>> getPendingClsConfirmation(Integer maChuyenKhoa) {
+        // Lấy danh sách bệnh nhân CLS đã có PhieuKham nhưng chưa có PhieuChiDinh
+        // và đang chờ bác sĩ CLS xác nhận
+        return repository.findPendingClsConfirmation(maChuyenKhoa);
     }
 
     @Override

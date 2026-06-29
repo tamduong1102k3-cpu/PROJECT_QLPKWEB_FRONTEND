@@ -15,5 +15,6 @@ public interface KetQuaCdhaService {
     KetQuaCdha update(Integer id, KetQuaCdha entity);
     void delete(Integer id);
     List<Map<String, Object>> getTodayResults();
+    List<Map<String, Object>> getTodayResultsByDoctorId(Integer maBacSi);
     KetQuaCdha updateStatus(Integer id, String status);
 }

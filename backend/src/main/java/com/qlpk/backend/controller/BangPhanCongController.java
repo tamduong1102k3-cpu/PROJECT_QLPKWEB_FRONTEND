@@ -30,11 +30,11 @@ public class BangPhanCongController {
         }
     }
 
-    // 2. Thêm mới ca làm việc (HÀM BẠN ĐANG THIẾU)
+
     @PostMapping
     public ResponseEntity<BangPhanCongCaLam> create(@RequestBody BangPhanCongCaLam entity) {
         try {
-            // Gọi hàm create đã định nghĩa trong Service
+       
             BangPhanCongCaLam created = service.create(entity);
             return ResponseEntity.ok(created);
         } catch (Exception e) {

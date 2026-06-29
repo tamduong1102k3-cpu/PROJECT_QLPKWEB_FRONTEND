@@ -19,7 +19,7 @@ public class KhamLamSang {
     @Column(name = "ma_phieu_kham")
     private Integer maPhieuKham;
 
-    @Transient // Không lưu vào bảng kham_lam_sang nếu bạn chỉ muốn lưu vào phieu_kham
+    @Transient 
     private Integer maBacSi;
 
     @Column(name = "ly_do_kham", columnDefinition = "TEXT")

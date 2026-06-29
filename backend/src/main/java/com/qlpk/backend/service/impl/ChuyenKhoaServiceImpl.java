@@ -32,6 +32,7 @@ public class ChuyenKhoaServiceImpl implements ChuyenKhoaService {
     @Override
     public ChuyenKhoa update(Integer id, ChuyenKhoa entity) {
         if (repository.existsById(id)) {
+            entity.setMaChuyenKhoa(id);
             return repository.save(entity);
         }
         return null;

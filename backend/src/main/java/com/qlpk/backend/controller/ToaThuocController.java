@@ -27,12 +27,13 @@ public class ToaThuocController {
     @Autowired
     private WebSocketPublisher webSocketPublisher;
 
+// tạo toa thuốc mới
     @PostMapping
     public ResponseEntity<?> create(@RequestBody PrescriptionRequest request) {
         try {
             ToaThuoc savedToa = toaThuocService.createPrescription(request);
             if (savedToa != null) {
-                // Publish WebSocket event khi tạo toa thuốc mới -> dược sĩ cập nhật realtime
+         
                 webSocketPublisher.publishToaThuocChange("CREATED", savedToa.getMaPhieuKham());
             }
             return ResponseEntity.ok(savedToa);
@@ -41,21 +42,22 @@ public class ToaThuocController {
         }
     }
 
+// lấy toa thuốc theo mã phiếu khám
     @GetMapping("/phieu-kham/{maPhieuKham}")
     public ResponseEntity<?> getByPhieuKham(@PathVariable Integer maPhieuKham) {
         return ResponseEntity.ok(toaThuocService.findByMaPhieuKham(maPhieuKham));
     }
 
+// lấy toa thuốc theo mã bệnh nhân
     @GetMapping("/benh-nhan/{maBenhNhan}")
     public ResponseEntity<?> getByBenhNhan(@PathVariable Integer maBenhNhan) {
         return ResponseEntity.ok(toaThuocService.findByMaBenhNhan(maBenhNhan));
     }
 
+// lấy chi tiết toa thuốc
     @GetMapping("/{id}/details")
     public ResponseEntity<?> getDetails(@PathVariable Integer id) {
-        // We didn't add findByMaToaThuoc to ChiTietToaThuocService yet.
-        // Actually, we can add it or just inject repository here. Let's add it to the Service in the next step or right here.
-        // Wait! Let me just add findByMaToaThuoc to ChiTietToaThuocService in a moment.
+
         return ResponseEntity.ok(chiTietService.findByMaToaThuoc(id));
     }
 }

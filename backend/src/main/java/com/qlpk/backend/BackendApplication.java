@@ -5,10 +5,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.context.annotation.ComponentScan; // THÊM DÒNG NÀY
+import org.springframework.context.annotation.ComponentScan; 
 
 @SpringBootApplication
-@ComponentScan(basePackages = "com.qlpk.backend") // Thêm dòng này để ép quét toàn bộ
+@ComponentScan(basePackages = "com.qlpk.backend") 
 public class BackendApplication implements CommandLineRunner {
 
 	@Autowired

@@ -208,11 +208,10 @@ public class DuocSiController {
                 khoThuocRepository.save(kho);
             }
 
-            // Publish kho update event
             webSocketPublisher.publishKhoUpdate();
 
             toaThuocRepository.updateTrangThaiDaCapThuoc(maToaThuoc);
-            // Publish WebSocket event để dược sĩ cập nhật realtime
+       
             webSocketPublisher.publishToaThuocChange("DA_CAP_THUOC", toa.getMaPhieuKham());
 
             return ResponseEntity.ok(Map.of(

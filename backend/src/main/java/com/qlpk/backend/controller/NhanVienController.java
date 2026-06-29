@@ -11,19 +11,19 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/nhan_vien")
-@CrossOrigin("*") // Mở CORS để Frontend React gọi được
+@CrossOrigin("*") 
 public class NhanVienController {
 
     @Autowired
     private NhanVienService nhanVienService;
 
-    // API 1: Lấy danh sách tất cả nhân viên (GET ALL)
+// lấy danh sách tất cả nhân viên
     @GetMapping
     public ResponseEntity<List<NhanVien>> getAllNhanVien() {
         return ResponseEntity.ok(nhanVienService.getAllNhanVien());
     }
 
-    // API 2: Thêm nhân viên mới qua Procedure
+// thêm nhân viên mới
     @PostMapping
     public ResponseEntity<?> addNhanVien(@RequestBody NhanVienRequestDTO dto) {
         try {
@@ -35,7 +35,7 @@ public class NhanVienController {
         }
     }
 
-    // API 3: Cập nhật nhân viên
+// cập nhật thông tin nhân viên
     @PutMapping("/{id}")
     public ResponseEntity<?> updateNhanVien(@PathVariable Integer id, @RequestBody NhanVienRequestDTO dto) {
         try {
@@ -47,7 +47,7 @@ public class NhanVienController {
         }
     }
 
-    // API 4: Xóa nhân viên
+// xóa nhân viên
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteNhanVien(@PathVariable Integer id) {
         try {

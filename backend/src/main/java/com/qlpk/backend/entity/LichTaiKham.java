@@ -36,7 +36,7 @@ public class LichTaiKham {
     private String ghiChu;
 
     @Column(name = "trang_thai")
-    private String trangThai; // CHUA_DEN, DA_DEN, HOAN
+    private String trangThai; 
 
     @Column(name = "da_gui_thong_bao")
     private Boolean daGuiThongBao;

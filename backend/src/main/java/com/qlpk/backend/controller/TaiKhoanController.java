@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/taikhoan")
-@CrossOrigin("*") // Cho phép frontend (React) gọi API mà không bị lỗi CORS
+@CrossOrigin("*")
 public class TaiKhoanController {
 
     @Autowired
@@ -92,7 +92,7 @@ public class TaiKhoanController {
             return ResponseEntity.badRequest().body(Map.of("message", "Vui lòng nhập đầy đủ Email/Username và Mật khẩu"));
         }
 
-        // Bước 1: Kiểm tra email/username có tồn tại không
+        //  Kiểm tra email/username có tồn tại không
         String identity = loginRequest.getIdentity();
         TaiKhoan account = taiKhoanService.findByEmail(identity);
         if (account == null) {
@@ -129,25 +129,25 @@ public class TaiKhoanController {
     public ResponseEntity<?> sendOtp(@RequestBody Map<String, String> request) {
         String email = request.get("email");
         
-        // BƯỚC 1: Kiểm tra email có trong Database hay không ở đây
+        //  Kiểm tra email có trong Database hay không ở đây
         TaiKhoan taiKhoan = taiKhoanService.findByEmail(email);
         if (taiKhoan == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Email không tồn tại trong hệ thống!"));
         }
 
-        // BƯỚC 2: Tạo OTP ngẫu nhiên (6 số)
+        //Tạo OTP ngẫu nhiên (6 số)
         StringBuilder code = new StringBuilder();
         for (int i = 0; i < 6; i++) {
             code.append((int) (Math.random() * 10));
         }
         String generatedOTP = code.toString();
-        // BƯỚC 3: Gửi email (Dùng lại code Java cũ của bạn)
+        //  Gửi email 
         try {
             final String username = "dvmtam1102003@gmail.com";
-            final String password = "rnpm neej fbfl yhbu"; // App Password
+            final String password = "rnpm neej fbfl yhbu"; 
             Properties props = new Properties();
             props.put("mail.smtp.auth", "true");
-            // Sửa port thành 465 (SSL) hoặc 587 (TLS) tuỳ config, thường dùng 587 với TLS
+          
             props.put("mail.smtp.starttls.enable", "true");
             props.put("mail.smtp.host", "smtp.gmail.com");
             props.put("mail.smtp.port", "587");
@@ -162,27 +162,26 @@ public class TaiKhoanController {
             message.setSubject("Mã xác nhận lấy lại mật khẩu - PHÒNG KHÁM");
             message.setText("Chào bạn,\n\nMã xác nhận của bạn là: " + generatedOTP);
             Transport.send(message);
-            // BƯỚC 4: Trả OTP về cho Frontend kiểm tra (Giữ nguyên logic cũ của bạn)
+            // Trả OTP về cho Frontend kiểm tra 
             Map<String, String> response = new HashMap<>();
             response.put("message", "Đã gửi mã xác nhận thành công");
-            response.put("otp", generatedOTP); // Frontend React sẽ hứng lấy mã này để so sánh
+            response.put("otp", generatedOTP); 
             return ResponseEntity.ok(response);
         } catch (MessagingException e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("message", "Lỗi khi gửi email: " + e.getMessage()));
         }
     }
-    // API 2: Đổi mật khẩu
+    //  Đổi mật khẩu
     @PostMapping("/forgot-password/reset")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
         String email = request.get("email");
         String newPassword = request.get("newPassword");
         try {
-            // Nếu bạn có dùng mã hóa mật khẩu, hãy bỏ comment dòng dưới và thay thế
-            // String hashedPassword = MODEL.PasswordEncoder.hashPassword(newPassword); 
-            String finalPassword = newPassword; // Hoặc hashedPassword nếu có
+          
+            String finalPassword = newPassword; 
             
-            // Gọi tầng Service để đổi mật khẩu trong Database:
+    
             boolean isSuccess = taiKhoanService.doiMatKhauTheoEmail(email, finalPassword);
             
             if (!isSuccess) {
@@ -195,7 +194,7 @@ public class TaiKhoanController {
         }
     }
 
-    // API: Đổi mật khẩu (có kiểm tra mật khẩu cũ)
+    //  Đổi mật khẩu (có kiểm tra mật khẩu cũ)
     @PutMapping("/{id}/change-password")
     public ResponseEntity<?> changePassword(@PathVariable Integer id, @RequestBody Map<String, String> request) {
         String oldPassword = request.get("oldPassword");

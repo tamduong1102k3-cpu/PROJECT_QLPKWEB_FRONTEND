@@ -21,7 +21,7 @@ public class DangKyKhamBenh {
     private Integer maBenhNhan;
 
     @Column(name = "ma_nhan_vien")
-    private Integer maNhanVien; // Mã lễ tân
+    private Integer maNhanVien; 
 
     @Column(name = "ma_chuyen_khoa")
     private Integer maChuyenKhoa;
@@ -33,7 +33,7 @@ public class DangKyKhamBenh {
     private LocalDateTime thoiGianDangKy;
 
     @Column(name = "trang_thai", length = 50)
-    private String trangThai; // CHO_KHAM, DA_KHAM, ...
+    private String trangThai; 
 
     @Column(name = "ghi_chu", columnDefinition = "TEXT")
     private String ghiChu;
@@ -41,6 +41,6 @@ public class DangKyKhamBenh {
     @Column(name = "ma_phieu_kham")
     private Integer maPhieuKham;
 
-    @Column(name = "ma_chi_tiet_chi_dinh")
-    private Integer maChiTietChiDinh;
+    @Column(name = "ma_dich_vu")
+    private Integer maDichVu;
 }

@@ -31,4 +31,9 @@ public interface PhieuChiDinhService {
     List<Map<String, Object>> getCdhaResultsByPhieuKham(Integer maPhieuKham);
     void approveCdhaResult(Integer detailId, Map<String, Object> body) throws Exception;
     void rejectCdhaResult(Integer detailId, Map<String, String> body) throws Exception;
+
+    /** Lấy danh sách kết quả chờ duyệt theo chuyên khoa (cho bác sĩ chẩn đoán/xét nghiệm) */
+    List<Map<String, Object>> getPendingApprovalList(Integer maChuyenKhoa);
+    /** Lấy danh sách kết quả đã duyệt theo chuyên khoa (cho bác sĩ chẩn đoán/xét nghiệm) */
+    List<Map<String, Object>> getApprovedList(Integer maChuyenKhoa);
 }

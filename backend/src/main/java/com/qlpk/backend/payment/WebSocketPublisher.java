@@ -23,7 +23,7 @@ public class WebSocketPublisher {
      */
     public void publishPhieuKhamChange(String action, PhieuKham phieuKham) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("action", action); // CREATED, UPDATED, DELETED
+        payload.put("action", action); 
         payload.put("maPhieuKham", phieuKham.getMaPhieuKham());
         payload.put("trangThai", phieuKham.getTrangThai());
         payload.put("maBenhNhan", phieuKham.getMaBenhNhan());

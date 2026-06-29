@@ -17,19 +17,19 @@ public class BenhNhanController {
 
     @Autowired private BenhNhanService service;
 
-    // ── 1. Danh sách tất cả bệnh nhân ────────────────────────────
+// lấy danh sách tất cả bệnh nhân
     @GetMapping
     public List<BenhNhan> getAll() {
         return service.getAll();
     }
 
-    // ── 2. Tìm kiếm bệnh nhân ─────────────────────────────────────
+// tìm kiếm bệnh nhân theo từ khóa
     @GetMapping("/search")
     public List<BenhNhan> search(@RequestParam String keyword) {
         return service.search(keyword);
     }
 
-    // ── 3. Chi tiết một bệnh nhân ─────────────────────────────────
+// lấy chi tiết bệnh nhân theo ID
     @GetMapping("/{id}")
     public ResponseEntity<BenhNhan> getById(@PathVariable Integer id) {
         BenhNhan result = service.getById(id);
@@ -37,13 +37,13 @@ public class BenhNhanController {
         return ResponseEntity.notFound().build();
     }
 
-    // ── 4. Hồ sơ bệnh nhân: lịch sử khám + hóa đơn ──────────────
+// lấy hồ sơ bệnh nhân (lịch sử khám + hóa đơn)
     @GetMapping("/{id}/ho-so")
     public List<HoSoBenhNhanDTO> getHoSo(@PathVariable Integer id) {
         return service.getHoSo(id);
     }
 
-    // ── 5. Thêm bệnh nhân mới ─────────────────────────────────────
+// thêm bệnh nhân mới
     @PostMapping
     public ResponseEntity<?> create(@RequestBody BenhNhan benhNhan) {
         try {
@@ -57,7 +57,7 @@ public class BenhNhanController {
         }
     }
 
-    // ── 6. Cập nhật bệnh nhân ─────────────────────────────────────
+// cập nhật thông tin bệnh nhân
     @PutMapping("/{id}")
     public ResponseEntity<BenhNhan> update(@PathVariable Integer id, @RequestBody BenhNhan body) {
         BenhNhan updated = service.update(id, body);
@@ -67,7 +67,7 @@ public class BenhNhanController {
         return ResponseEntity.notFound().build();
     }
 
-    // ── 7. Xóa bệnh nhân ──────────────────────────────────────────
+// xóa bệnh nhân
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         if (service.getById(id) == null) return ResponseEntity.notFound().build();

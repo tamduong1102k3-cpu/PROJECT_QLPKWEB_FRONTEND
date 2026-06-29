@@ -23,8 +23,9 @@ public interface DangKyKhamBenhRepository extends JpaRepository<DangKyKhamBenh, 
     List<DangKyKhamBenh> findTodayRegistrations(@Param("startOfDay") LocalDateTime startOfDay);
 
     @Query(value = "SELECT d.id as id, d.ma_benh_nhan as maBenhNhan, d.so_thu_tu as soThuTu, b.ho_ten as hoTen, " +
-                   "b.gioi_tinh as gioiTinh, b.ngay_sinh as ngaySinh, c.ten_chuyen_khoa as tenChuyenKhoa, " +
-                   "d.trang_thai as trangThai, d.thoi_gian_dang_ky as thoiGian, d.ghi_chu as ghiChu, d.ma_phieu_kham as maPhieuKham, d.ma_chuyen_khoa as maChuyenKhoa, " +
+                   "b.gioi_tinh as gioiTinh, b.ngay_sinh as ngaySinh, b.so_dien_thoai as soDienThoai, c.ten_chuyen_khoa as tenChuyenKhoa, " +
+                   "d.trang_thai as trangThai, d.thoi_gian_dang_ky as thoiGian, d.ghi_chu as ghiChu, d.ma_phieu_kham as maPhieuKham, " +
+                   "d.ma_chuyen_khoa as maChuyenKhoa, d.ma_dich_vu as maDichVu, " + // Thêm maDichVu
                    "b.cccd as cccd " +
                    "FROM dang_ky_kham_benh d " +
                    "JOIN benh_nhan b ON d.ma_benh_nhan = b.ma_benh_nhan " +
@@ -36,8 +37,9 @@ public interface DangKyKhamBenhRepository extends JpaRepository<DangKyKhamBenh, 
     Optional<DangKyKhamBenh> findByMaPhieuKham(Integer maPhieuKham);
 
     @Query(value = "SELECT d.id as id, d.ma_benh_nhan as maBenhNhan, d.so_thu_tu as soThuTu, b.ho_ten as hoTen, " +
-                   "b.gioi_tinh as gioiTinh, b.ngay_sinh as ngaySinh, c.ten_chuyen_khoa as tenChuyenKhoa, " +
-                   "d.trang_thai as trangThai, d.thoi_gian_dang_ky as thoiGian, d.ghi_chu as ghiChu, d.ma_phieu_kham as maPhieuKham, d.ma_chuyen_khoa as maChuyenKhoa, " +
+                   "b.gioi_tinh as gioiTinh, b.ngay_sinh as ngaySinh, b.so_dien_thoai as soDienThoai, c.ten_chuyen_khoa as tenChuyenKhoa, " +
+                   "d.trang_thai as trangThai, d.thoi_gian_dang_ky as thoiGian, d.ghi_chu as ghiChu, d.ma_phieu_kham as maPhieuKham, " +
+                   "d.ma_chuyen_khoa as maChuyenKhoa, d.ma_dich_vu as maDichVu, " + // Thêm maDichVu
                    "b.cccd as cccd " +
                    "FROM dang_ky_kham_benh d " +
                    "JOIN benh_nhan b ON d.ma_benh_nhan = b.ma_benh_nhan " +

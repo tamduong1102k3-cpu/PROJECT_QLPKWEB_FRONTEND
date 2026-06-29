@@ -20,10 +20,10 @@ public class BangPhanCongCaLam {
     @Column(name = "ma_nhan_vien")
     private Integer maNhanVien;
 
-    @Column(name = "thu", length = 20)   // 'Thứ 2', 'Thứ 3'... varchar(20)
+    @Column(name = "thu", length = 20)   
     private String thu;
 
-    @Column(name = "gio_lam")            // tên cột thực trong DB
+    @Column(name = "gio_lam")          
     private LocalTime gioLam;
 
     @Column(name = "gio_ket_thuc")

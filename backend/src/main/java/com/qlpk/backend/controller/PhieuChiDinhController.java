@@ -3,10 +3,12 @@ package com.qlpk.backend.controller;
 import com.qlpk.backend.dto.ReferralRequest;
 import com.qlpk.backend.entity.ChiTietChiDinh;
 import com.qlpk.backend.entity.PhieuChiDinh;
+import com.qlpk.backend.service.CloudinaryService;
 import com.qlpk.backend.service.PhieuChiDinhService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -19,16 +21,19 @@ public class PhieuChiDinhController {
     @Autowired
     private PhieuChiDinhService phieuChiDinhService;
 
+// lấy danh sách xét nghiệm/CĐHA đang chờ thực hiện
     @GetMapping("/pending-tests")
     public ResponseEntity<?> getPendingTests(@RequestParam(value = "maChuyenKhoa", required = false) Integer maChuyenKhoa) {
         return ResponseEntity.ok(phieuChiDinhService.getPendingTests(maChuyenKhoa));
     }
 
+// lấy danh sách xét nghiệm/CĐHA đã hoàn thành trong ngày
     @GetMapping("/completed-tests-today")
     public ResponseEntity<?> getCompletedTestsToday(@RequestParam(value = "maChuyenKhoa", required = false) Integer maChuyenKhoa) {
         return ResponseEntity.ok(phieuChiDinhService.getCompletedTestsToday(maChuyenKhoa));
     }
 
+// gửi/nhập kết quả xét nghiệm
     @PostMapping("/submit-result")
     public ResponseEntity<?> submitTestResult(@RequestBody Map<String, Object> body) {
         try {
@@ -43,6 +48,7 @@ public class PhieuChiDinhController {
         }
     }
 
+// tạo phiếu chỉ định mới
     @PostMapping
     public ResponseEntity<?> create(@RequestBody ReferralRequest request) {
         try {
@@ -53,21 +59,25 @@ public class PhieuChiDinhController {
         }
     }
 
+// lấy phiếu chỉ định theo mã phiếu khám
     @GetMapping("/phieu-kham/{maPhieuKham}")
     public ResponseEntity<?> getByPhieuKham(@PathVariable Integer maPhieuKham) {
         return ResponseEntity.ok(phieuChiDinhService.getByPhieuKham(maPhieuKham));
     }
 
+// lấy phiếu chỉ định theo mã bệnh nhân
     @GetMapping("/benh-nhan/{maBenhNhan}")
     public ResponseEntity<?> getByBenhNhan(@PathVariable Integer maBenhNhan) {
         return ResponseEntity.ok(phieuChiDinhService.getByBenhNhan(maBenhNhan));
     }
 
+// lấy chi tiết phiếu chỉ định
     @GetMapping("/{id}/details")
     public ResponseEntity<?> getDetails(@PathVariable Integer id) {
         return ResponseEntity.ok(phieuChiDinhService.getDetails(id));
     }
 
+// lấy kết quả CĐHA theo chi tiết chỉ định
     @GetMapping("/result-cdha/{detailId}")
     public ResponseEntity<?> getCdhaResult(@PathVariable Integer detailId) {
         Object result = phieuChiDinhService.getCdhaResult(detailId);
@@ -75,6 +85,7 @@ public class PhieuChiDinhController {
         return ResponseEntity.ok().build();
     }
 
+// lấy kết quả xét nghiệm theo chi tiết chỉ định
     @GetMapping("/result-xet-nghiem/{detailId}")
     public ResponseEntity<?> getXetNhiemResult(@PathVariable Integer detailId) {
         Object result = phieuChiDinhService.getXetNhiemResult(detailId);
@@ -82,11 +93,13 @@ public class PhieuChiDinhController {
         return ResponseEntity.ok().build();
     }
 
+// lấy danh sách kết quả xét nghiệm theo phiếu khám
     @GetMapping("/phieu-kham/{maPhieuKham}/result-xet-nghiem")
     public ResponseEntity<?> getXetNhiemResultsByPhieuKham(@PathVariable Integer maPhieuKham) {
         return ResponseEntity.ok(phieuChiDinhService.getXetNhiemResultsByPhieuKham(maPhieuKham));
     }
 
+// duyệt kết quả xét nghiệm
     @PostMapping("/approve-result/{id}")
     public ResponseEntity<?> approveTestResult(@PathVariable Integer id, @RequestBody Map<String, Object> body) {
         try {
@@ -99,36 +112,41 @@ public class PhieuChiDinhController {
         }
     }
 
+    @Autowired
+    private CloudinaryService cloudinaryService;
+
+// upload hình ảnh lên Cloudinary
     @PostMapping("/upload-image")
-    public ResponseEntity<?> uploadImage(@RequestParam("image") org.springframework.web.multipart.MultipartFile file) {
+    public ResponseEntity<?> uploadImage(@RequestParam("image") MultipartFile file) {
         try {
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("message", "File rỗng"));
             }
             
-            String uploadDir = "c:\\Users\\PC\\QLPK-WEB\\frontend\\public\\uploads\\";
-            java.io.File dir = new java.io.File(uploadDir);
-            if (!dir.exists()) {
-                dir.mkdirs();
-            }
-            
-            String originalFileName = file.getOriginalFilename();
-            String cleanFileName = System.currentTimeMillis() + "_" + (originalFileName != null ? originalFileName.replaceAll("[^a-zA-Z0-9\\.\\-_]", "") : "image.png");
-            
-            java.io.File destFile = new java.io.File(dir, cleanFileName);
-            file.transferTo(destFile);
-            
-            String relativePath = "/uploads/" + cleanFileName;
+            String url = cloudinaryService.uploadFile(file);
             return ResponseEntity.ok(Map.of(
-                "url", relativePath,
-                "fileName", cleanFileName
+                "url", url,
+                "message", "Upload ảnh lên Cloudinary thành công!"
             ));
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("message", "Lỗi upload ảnh: " + e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("message", "Lỗi upload ảnh lên Cloudinary: " + e.getMessage()));
         }
     }
 
+// lấy danh sách chờ duyệt kết quả
+    @GetMapping("/pending-approval")
+    public ResponseEntity<?> getPendingApprovalList(@RequestParam(value = "maChuyenKhoa", required = false) Integer maChuyenKhoa) {
+        return ResponseEntity.ok(phieuChiDinhService.getPendingApprovalList(maChuyenKhoa));
+    }
+
+// lấy danh sách đã duyệt kết quả
+    @GetMapping("/approved-list")
+    public ResponseEntity<?> getApprovedList(@RequestParam(value = "maChuyenKhoa", required = false) Integer maChuyenKhoa) {
+        return ResponseEntity.ok(phieuChiDinhService.getApprovedList(maChuyenKhoa));
+    }
+
+// lấy lịch sử duyệt kết quả theo bác sĩ
     @GetMapping("/approved-history")
     public ResponseEntity<?> getApprovedHistory(@RequestParam Integer maBacSi) {
         try {
@@ -138,7 +156,7 @@ public class PhieuChiDinhController {
             return ResponseEntity.status(500).body(Map.of("message", "Lỗi: " + e.getMessage()));
         }
     }
-
+// hàm từ chối kết quả xét nghiệm
     @PostMapping("/reject-result/{id}")
     public ResponseEntity<?> rejectTestResult(@PathVariable Integer id, @RequestBody Map<String, String> body) {
         try {
@@ -152,6 +170,7 @@ public class PhieuChiDinhController {
         }
     }
 
+// lấy danh sách kết quả CĐHA theo phiếu khám
     @GetMapping("/phieu-kham/{maPhieuKham}/result-cdha")
     public ResponseEntity<?> getCdhaResultsByPhieuKham(@PathVariable Integer maPhieuKham) {
         try {
@@ -162,6 +181,7 @@ public class PhieuChiDinhController {
         }
     }
 
+// duyệt kết quả CĐHA
     @PostMapping("/approve-cdha/{detailId}")
     public ResponseEntity<?> approveCdhaResult(@PathVariable Integer detailId, @RequestBody Map<String, Object> body) {
         try {
@@ -173,6 +193,7 @@ public class PhieuChiDinhController {
         }
     }
 
+// từ chối kết quả CĐHA
     @PostMapping("/reject-cdha/{detailId}")
     public ResponseEntity<?> rejectCdhaResult(@PathVariable Integer detailId, @RequestBody Map<String, String> body) {
         try {

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class KetQuaCdhaServiceImpl implements KetQuaCdhaService {
@@ -43,8 +44,13 @@ public class KetQuaCdhaServiceImpl implements KetQuaCdhaService {
     }
 
     @Override
-    public java.util.List<java.util.Map<String, Object>> getTodayResults() {
+    public List<Map<String, Object>> getTodayResults() {
         return repository.findResultsTodayWithPatientInfo();
+    }
+
+    @Override
+    public List<Map<String, Object>> getTodayResultsByDoctorId(Integer maBacSi) {
+        return repository.findResultsTodayWithPatientInfoByDoctorId(maBacSi);
     }
 
     @Override

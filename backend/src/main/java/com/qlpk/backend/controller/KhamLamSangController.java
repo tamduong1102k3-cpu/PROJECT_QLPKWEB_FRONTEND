@@ -16,6 +16,7 @@ public class KhamLamSangController {
     @Autowired
     private KhamLamSangService service;
 
+// lưu thông tin khám lâm sàng
     @PostMapping
     public ResponseEntity<?> save(@RequestBody KhamLamSang body) {
         try {
@@ -30,6 +31,7 @@ public class KhamLamSangController {
         }
     }
 
+// lưu khám lâm sàng kèm chỉ số sinh hiệu
     @PostMapping("/with-vitals")
     public ResponseEntity<?> saveWithVitals(@RequestBody com.qlpk.backend.dto.KhamLamSangAndVitalsDTO body) {
         try {
@@ -46,13 +48,15 @@ public class KhamLamSangController {
         }
     }
 
+// lấy khám lâm sàng theo mã phiếu khám
     @GetMapping("/phieu-kham/{maPhieuKham}")
     public ResponseEntity<?> getByPhieuKham(@PathVariable Integer maPhieuKham) {
         return service.findByMaPhieuKham(maPhieuKham)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.ok(null)); // Trả về 200 OK kèm null để tránh lỗi 404 console
+                .orElse(ResponseEntity.ok(null)); 
     }
 
+// lấy lịch sử khám lâm sàng theo mã bệnh nhân
     @GetMapping("/benh-nhan/{maBenhNhan}")
     public ResponseEntity<?> getByBenhNhan(@PathVariable Integer maBenhNhan) {
         return ResponseEntity.ok(service.findByMaBenhNhan(maBenhNhan));

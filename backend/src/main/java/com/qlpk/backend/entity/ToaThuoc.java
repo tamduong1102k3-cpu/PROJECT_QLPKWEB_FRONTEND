@@ -28,5 +28,5 @@ public class ToaThuoc {
     private LocalDateTime ngayTao;
 
     @Column(name = "trang_thai", length = 30)
-    private String trangThai; // CHO_THANH_TOAN, DA_THANH_TOAN
+    private String trangThai; 
 }

@@ -28,13 +28,13 @@ public class HoaDonController {
     @Autowired
     private ChiTietHoaDonRepository chiTietHoaDonRepository;
 
-    // Lấy tất cả hóa đơn
+// lấy tất cả hóa đơn
     @GetMapping
     public List<HoaDon> getAll() {
         return hoaDonService.getAll();
     }
 
-    // Lấy hóa đơn theo ID
+// lấy hóa đơn theo ID
     @GetMapping("/{id}")
     public ResponseEntity<HoaDon> getById(@PathVariable Integer id) {
         HoaDon hoaDon = hoaDonService.getById(id);
@@ -44,13 +44,13 @@ public class HoaDonController {
         return ResponseEntity.notFound().build();
     }
 
-    // Lấy chi tiết các mục trong hóa đơn
+// lấy chi tiết các mục trong hóa đơn
     @GetMapping("/{id}/chi-tiet")
     public List<ChiTietHoaDon> getChiTiet(@PathVariable Integer id) {
         return chiTietHoaDonService.findByMaHoaDon(id);
     }
 
-    // Lấy danh sách các mục cần thanh toán cho phiếu khám
+// lấy danh sách các mục cần thanh toán cho phiếu khám
     @GetMapping("/phieu-kham/{maPhieuKham}/billing-items")
     public ResponseEntity<?> getBillingItems(@PathVariable Integer maPhieuKham) {
         try {
@@ -61,7 +61,7 @@ public class HoaDonController {
         }
     }
 
-    // Tạo hóa đơn từ phiếu khám
+// tạo hóa đơn từ phiếu khám
     @PostMapping("/phieu-kham/{maPhieuKham}/create")
     public ResponseEntity<?> createInvoiceFromPhieuKham(@PathVariable Integer maPhieuKham, @RequestBody Map<String, Object> body) {
         try {
@@ -75,7 +75,7 @@ public class HoaDonController {
         }
     }
 
-    // Lấy danh sách hóa đơn đã thanh toán kèm thông tin bệnh nhân (cho dược sĩ)
+// lấy danh sách hóa đơn đã thanh toán (cho dược sĩ)
     @GetMapping("/paid-invoices")
     public ResponseEntity<?> getPaidInvoices() {
         try {
@@ -86,7 +86,7 @@ public class HoaDonController {
         }
     }
 
-    // Lấy danh sách hóa đơn đã thanh toán CÓ thuốc (chỉ hóa đơn có ct_hoa_don loai_muc = 'THUOC')
+// lấy hóa đơn đã thanh toán có thuốc
     @GetMapping("/paid-invoices-with-thuoc")
     public ResponseEntity<?> getPaidInvoicesWithThuoc() {
         try {
@@ -97,7 +97,7 @@ public class HoaDonController {
         }
     }
 
-    // Lấy danh sách hóa đơn đã thanh toán CÓ thuốc kèm trạng thái toa thuốc (cho dược sĩ 2 tab)
+// lấy hóa đơn đã thanh toán có thuốc kèm trạng thái toa thuốc
     @GetMapping("/paid-invoices-with-thuoc-status")
     public ResponseEntity<?> getPaidInvoicesWithThuocAndStatus() {
         try {
@@ -108,7 +108,7 @@ public class HoaDonController {
         }
     }
 
-    // Lấy danh sách hóa đơn đã thanh toán CÓ thuốc đã cấp (DA_CAP_THUOC) - cho lịch sử dược sĩ
+// lấy hóa đơn đã thanh toán đã cấp thuốc (cho lịch sử dược sĩ)
     @GetMapping("/paid-invoices-da-cap-thuoc")
     public ResponseEntity<?> getPaidInvoicesDaCapThuoc() {
         try {
@@ -119,7 +119,7 @@ public class HoaDonController {
         }
     }
 
-    // Lấy chi tiết hóa đơn chỉ gồm các mục thuốc (loaiMuc = 'THUOC')
+// lấy chi tiết hóa đơn chỉ gồm các mục thuốc
     @GetMapping("/{id}/chi-tiet-thuoc")
     public ResponseEntity<?> getChiTietThuoc(@PathVariable Integer id) {
         try {
@@ -130,7 +130,7 @@ public class HoaDonController {
         }
     }
 
-    // Thanh toán hóa đơn
+// thanh toán hóa đơn
     @PostMapping("/{id}/thanh-toan")
     public ResponseEntity<?> thanhToan(@PathVariable Integer id, @RequestBody Map<String, Object> body) {
         try {

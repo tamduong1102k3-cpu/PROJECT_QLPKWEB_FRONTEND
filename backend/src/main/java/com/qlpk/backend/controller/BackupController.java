@@ -1,13 +1,11 @@
 package com.qlpk.backend.controller;
 
 import com.qlpk.backend.service.DatabaseBackupService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -16,40 +14,34 @@ import java.util.Map;
 @CrossOrigin("*")
 public class BackupController {
 
+    private static final Logger logger = LoggerFactory.getLogger(BackupController.class);
+
     @Autowired
     private DatabaseBackupService backupService;
 
+// xuất dữ liệu backup
     @GetMapping("/export")
     public ResponseEntity<?> exportBackup() {
+        logger.info("API GET /api/backup/export được gọi");
         try {
-            Map<String, Object> backupResult = backupService.createBackup();
-            String filename = (String) backupResult.get("filename");
-            byte[] data = backupService.downloadBackup(filename);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            headers.setContentDispositionFormData("attachment", filename);
-            headers.setContentLength(data.length);
-
-            return new ResponseEntity<>(data, headers, HttpStatus.OK);
+            return ResponseEntity.ok(backupService.createBackup());
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            logger.error("Lỗi export backup: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
                     .body(Map.of("message", e.getMessage()));
         }
     }
 
-    @PostMapping("/import")
-    public ResponseEntity<Map<String, Object>> importBackup(@RequestParam("file") MultipartFile file) {
-        Map<String, Object> response = new java.util.HashMap<>();
+// khôi phục dữ liệu từ file backup
+    @PostMapping("/restore/{filename}")
+    public ResponseEntity<?> restoreBackup(@PathVariable String filename) {
+        logger.info("API POST /api/backup/restore/{} được gọi", filename);
         try {
-            backupService.restoreFromUpload(file);
-            response.put("success", true);
-            response.put("message", "Khôi phục dữ liệu thành công!");
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(backupService.restoreFromBackup(filename));
         } catch (RuntimeException e) {
-            response.put("success", false);
-            response.put("message", "Lỗi trong quá trình khôi phục: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            logger.error("Lỗi restore: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("message", e.getMessage()));
         }
     }
 }

@@ -42,6 +42,15 @@ public interface PhieuKhamRepository extends JpaRepository<PhieuKham, Integer> {
     List<PhieuKham> findByMaBenhNhan(@Param("maBenhNhan") Integer maBenhNhan);
 
     /** Lấy danh sách phiếu khám kèm tên bệnh nhân cho lịch sử */
+    /** Kiểm tra phiếu khám theo bệnh nhân + chuyên khoa trong ngày (chống trùng) */
+    @Query("SELECT p FROM PhieuKham p WHERE p.maBenhNhan = :maBenhNhan AND p.maChuyenKhoa = :maChuyenKhoa AND p.ngayKham >= :start AND p.ngayKham <= :end")
+    List<PhieuKham> findByMaBenhNhanAndMaChuyenKhoaAndNgayKhamBetween(
+        @Param("maBenhNhan") Integer maBenhNhan,
+        @Param("maChuyenKhoa") Integer maChuyenKhoa,
+        @Param("start") java.time.LocalDateTime start,
+        @Param("end") java.time.LocalDateTime end
+    );
+
     @Query(value = "SELECT p.ma_phieu_kham as maPhieuKham, p.ma_benh_nhan as maBenhNhan, b.ho_ten as hoTen, " +
                    "b.gioi_tinh as gioiTinh, b.ngay_sinh as ngaySinh, " +
                    "p.ngay_kham as ngayKham, p.trang_thai as trangThai, p.ghi_chu as ghiChu, p.ma_chuyen_khoa as maChuyenKhoa, " +
@@ -111,4 +120,19 @@ public interface PhieuKhamRepository extends JpaRepository<PhieuKham, Integer> {
                    "AND p.trang_thai = 'HOAN_THANH' " +
                    "ORDER BY p.ngay_kham DESC", nativeQuery = true)
     List<java.util.Map<String, Object>> findHistoryByChuyenKhoaAllDays(@Param("maChuyenKhoa") Integer maChuyenKhoa);
+
+    @Query(value = "SELECT p.ma_phieu_kham as maPhieuKham, p.ma_benh_nhan as maBenhNhan, b.ho_ten as hoTen, " +
+                   "b.gioi_tinh as gioiTinh, b.ngay_sinh as ngaySinh, b.so_dien_thoai as soDienThoai, b.cccd as cccd, " +
+                   "p.ngay_kham as ngayKham, p.trang_thai as trangThai, p.ghi_chu as ghiChu, " +
+                   "p.ma_chuyen_khoa as maChuyenKhoa, ck.ten_chuyen_khoa as tenChuyenKhoa, " +
+                   "dv.ten_dich_vu as tenDichVu, dv.ma_dich_vu as maDichVu, dv.don_gia as donGia " +
+                   "FROM phieu_kham p " +
+                   "JOIN benh_nhan b ON p.ma_benh_nhan = b.ma_benh_nhan " +
+                   "JOIN chuyen_khoa ck ON p.ma_chuyen_khoa = ck.ma_chuyen_khoa " +
+                   "LEFT JOIN dich_vu dv ON p.ma_dich_vu = dv.ma_dich_vu " +
+                   "WHERE p.ma_chuyen_khoa = :maChuyenKhoa " +
+                   "AND p.trang_thai = 'CHO_BAC_SI' " +
+                   "AND DATE(p.ngay_kham) = CURRENT_DATE " +
+                   "ORDER BY p.ngay_kham ASC", nativeQuery = true)
+    List<java.util.Map<String, Object>> findPendingClsConfirmation(@Param("maChuyenKhoa") Integer maChuyenKhoa);
 }
