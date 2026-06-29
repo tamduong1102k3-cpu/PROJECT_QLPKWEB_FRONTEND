@@ -30,6 +30,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patients, setPatients] = useState({ pending: [], completed: [], absent: [] });
   const [loadingQueue, setLoadingQueue] = useState(true);
+  const isInitialLoad = React.useRef(true);
   const [queueTab, setQueueTab] = useState('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [stats, setStats] = useState({ waitingToday: 0, processedToday: 0, absentToday: 0 });
@@ -46,9 +47,11 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
   
   const [initialFormTab, setInitialFormTab] = useState('vitals');
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (showLoading) => {
+    const shouldShowLoading = showLoading === true || isInitialLoad.current;
+    if (shouldShowLoading) setLoadingQueue(true);
+    isInitialLoad.current = false;
     try {
-      setLoadingQueue(true);
       const data = await _getTodayDangKy();
       if (data) {
         let filteredData = data;
@@ -66,12 +69,12 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
         const roomData = await _getCurrentRoomApi(user.maNhanVien);
         setCurrentRoom(roomData?.phong || "Chưa có lịch trực");
       }
-    } catch (error) { console.error(error); } finally { setLoadingQueue(false); }
+    } catch (error) { console.error(error); } finally { if (shouldShowLoading) setLoadingQueue(false); }
   }, [user]);
 
   useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 30000);
+    fetchStats(true);
+    const interval = setInterval(() => fetchStats(false), 30000);
     return () => clearInterval(interval);
   }, [fetchStats]);
 
@@ -196,7 +199,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 isRefreshing={loadingQueue}
-                onManualRefresh={fetchStats}
+        onManualRefresh={() => fetchStats(true)}
                 loading={loadingQueue}
               />
             ) : (

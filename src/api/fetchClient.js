@@ -80,6 +80,30 @@ const fetchClient = async (url, options = {}) => {
       throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     }
 
+    // Handle 403 - nếu backend trả về Forbidden (vd: Token hết hạn, hoặc không đủ quyền)
+    // Một số version Spring Security trả về 403 thay vì 401 khi token hết hạn
+    if (response.status === 403) {
+      // Kiểm tra nếu response body có message hợp lệ, nếu không thì auto-logout
+      try {
+        const cloned = response.clone();
+        const bodyText = await cloned.text();
+        let bodyJson = null;
+        try { bodyJson = JSON.parse(bodyText); } catch (e) {}
+        
+        // Nếu có message lỗi "không có quyền" rõ ràng thì chỉ throw, không logout
+        if (bodyJson && bodyJson.message && bodyJson.message.includes('quyền')) {
+          throw new Error(bodyJson.message);
+        }
+      } catch (e) {
+        // Nếu đã throw lỗi (vd: có quyền) thì throw tiếp
+        if (e.message && e.message.includes('quyền')) throw e;
+      }
+      
+      // Nếu không có message quyền rõ ràng, coi như token hết hạn -> logout
+      handleUnauthorized();
+      throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
     return response;
   } catch (error) {
     // Nếu đã là lỗi handleUnauthorized thì throw luôn

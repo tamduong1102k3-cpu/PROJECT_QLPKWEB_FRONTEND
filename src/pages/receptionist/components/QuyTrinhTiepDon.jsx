@@ -3,7 +3,6 @@ import { getAllApi as _getDichVuAll } from '../../../api/dichVuApi';
 import { getWorkingTodayApi as _getWorkingToday } from '../../../api/shiftApi';
 import { getAllApi as getBenhNhanAll, searchApi } from '../../../api/benhNhanApi';
 import { createApi as createDangKyApi } from '../../../api/dangKyKhamBenhApi';
-import { createApi as createPhieuKhamApi } from '../../../api/phieuKhamApi';
 import { getAllChuyenKhoaApi as _getChuyenKhoaAll } from '../../../api/danhMucApi';
 import { useNotification } from '../../../components/NotificationContext';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -127,7 +126,7 @@ const QuyTrinhTiepDon = ({
         setCheckInData(prev => ({ 
           ...prev, 
           maDichVu: firstService.maDichVu.toString(), 
-          tenDichVuDisplay: `${firstService.tenDichVu} - ${new Intl.NumberFormat('vi-VN').format(firstService.donGia)}đ` 
+          tenDichVuDisplay: `#${firstService.maDichVu} ${firstService.tenDichVu} - ${new Intl.NumberFormat('vi-VN').format(firstService.donGia)}đ` 
         }));
       } else {
         setCheckInData(prev => ({ ...prev, maDichVu: '', tenDichVuDisplay: '' }));
@@ -210,6 +209,7 @@ const QuyTrinhTiepDon = ({
         maBenhNhan: selectedPatient.maBenhNhan,
         maNhanVien: maLeTan,
         maChuyenKhoa: parseInt(checkInData.maChuyenKhoa),
+        maDichVu: checkInData.maDichVu ? parseInt(checkInData.maDichVu) : null,
         ghiChu: checkInData.ghiChu || ''
       };
       console.log("Request body:", JSON.stringify(dangKyData));
@@ -218,18 +218,6 @@ const QuyTrinhTiepDon = ({
       const soThuTu = dangKyResult.soThuTu;
       const dangKyId = dangKyResult.id;
 
-      // Bước 2: Nếu có dịch vụ, tạo phiếu khám riêng (PhieuKham)
-      if (checkInData.maDichVu) {
-        const phieuKhamData = {
-          maBenhNhan: selectedPatient.maBenhNhan,
-          maNhanVien: checkInData.maNhanVien ? parseInt(checkInData.maNhanVien) : maLeTan,
-          maChuyenKhoa: parseInt(checkInData.maChuyenKhoa),
-          maDichVu: parseInt(checkInData.maDichVu),
-          ghiChu: checkInData.ghiChu,
-          trangThai: "CHO"
-        };
-        await createPhieuKhamApi(phieuKhamData);
-      }
 
       setPrintData({
         soThuTu,
@@ -344,14 +332,22 @@ const QuyTrinhTiepDon = ({
                         required
                         placeholder="-- Gõ tên dịch vụ hoặc chọn --"
                         className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold"
+                        style={{ color: checkInData.maDichVu ? 'transparent' : 'inherit' }}
                         value={checkInData.tenDichVuDisplay || ''}
                         onChange={e => {
                           const val = e.target.value;
-                          setCheckInData(prev => ({ ...prev, maDichVu: '', tenDichVuDisplay: val }));
+                          const match = val.match(/^#(\d+)\s*/);
+                          const maDichVu = match ? match[1] : '';
+                          setCheckInData(prev => ({ ...prev, maDichVu, tenDichVuDisplay: val }));
                         }}
                         onFocus={() => setShowServiceDropdown(true)}
                         onBlur={() => setTimeout(() => setShowServiceDropdown(false), 200)}
                       />
+                      {checkInData.maDichVu && (
+                        <div className="absolute left-5 top-[calc(50%+8px)] -translate-y-1/2 pointer-events-none font-bold text-gray-800">
+                          {checkInData.tenDichVuDisplay.replace(/^#\d+\s*/, '')}
+                        </div>
+                      )}
                       {checkInData.maDichVu && (
                         <span className="absolute right-4 top-[calc(50%+8px)] -translate-y-1/2 text-emerald-600">
                           <span className="material-symbols-outlined text-sm">check_circle</span>
@@ -360,13 +356,16 @@ const QuyTrinhTiepDon = ({
                       {showServiceDropdown && (
                         <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto">
                           {availableServices
-                            .filter(s => !checkInData.tenDichVuDisplay || removeVietnameseTones(s.tenDichVu.toLowerCase()).includes(removeVietnameseTones(checkInData.tenDichVuDisplay.toLowerCase())))
+                            .filter(s => {
+                              const searchVal = checkInData.tenDichVuDisplay ? checkInData.tenDichVuDisplay.replace(/^#\d+\s*/, '') : '';
+                              return !searchVal || removeVietnameseTones(s.tenDichVu.toLowerCase()).includes(removeVietnameseTones(searchVal.toLowerCase()));
+                            })
                             .map(s => (
                               <div
                                 key={s.maDichVu}
                                 className={`px-5 py-3.5 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0 hover:bg-indigo-50 transition-colors ${checkInData.maDichVu === s.maDichVu.toString() ? 'bg-indigo-50' : ''}`}
                                 onMouseDown={() => {
-                                  setCheckInData(prev => ({ ...prev, maDichVu: s.maDichVu.toString(), tenDichVuDisplay: `${s.tenDichVu} - ${new Intl.NumberFormat('vi-VN').format(s.donGia)}đ` }));
+                                  setCheckInData(prev => ({ ...prev, maDichVu: s.maDichVu.toString(), tenDichVuDisplay: `#${s.maDichVu} ${s.tenDichVu} - ${new Intl.NumberFormat('vi-VN').format(s.donGia)}đ` }));
                                   setShowServiceDropdown(false);
                                 }}
                               >
@@ -377,7 +376,10 @@ const QuyTrinhTiepDon = ({
                                 <span className="text-sm font-bold text-indigo-600">{new Intl.NumberFormat('vi-VN').format(s.donGia)}đ</span>
                               </div>
                             ))}
-                          {availableServices.filter(s => !checkInData.tenDichVuDisplay || removeVietnameseTones(s.tenDichVu.toLowerCase()).includes(removeVietnameseTones(checkInData.tenDichVuDisplay.toLowerCase()))).length === 0 && (
+                          {availableServices.filter(s => {
+                            const searchVal = checkInData.tenDichVuDisplay ? checkInData.tenDichVuDisplay.replace(/^#\d+\s*/, '') : '';
+                            return !searchVal || removeVietnameseTones(s.tenDichVu.toLowerCase()).includes(removeVietnameseTones(searchVal.toLowerCase()));
+                          }).length === 0 && (
                             <div className="px-5 py-8 text-center text-gray-400 italic text-sm">Không tìm thấy dịch vụ phù hợp</div>
                           )}
                         </div>

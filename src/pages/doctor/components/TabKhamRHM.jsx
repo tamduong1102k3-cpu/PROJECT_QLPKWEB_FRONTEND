@@ -89,7 +89,7 @@ const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-7 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border">
             <div>
               <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Sâu răng</label>
               <input type="text" value={examData.sauRang || ''} onChange={(e) => setExamData({...examData, sauRang: e.target.value})} className="w-full p-2 border border-gray-300 rounded-lg text-sm" placeholder="Vị trí..." />
@@ -111,6 +111,35 @@ const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
                 <option value="Nhẹ">Nhẹ</option>
                 <option value="Nặng">Nặng</option>
               </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Độ lung lay</label>
+              <select value={examData.doLungLay || ''} onChange={(e) => setExamData({...examData, doLungLay: e.target.value})} className="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                <option value="">-- Chọn --</option>
+                <option value="Độ 0">Độ 0 (Không lung lay)</option>
+                <option value="Độ 1">Độ 1 (Lung lay nhẹ)</option>
+                <option value="Độ 2">Độ 2 (Lung lay vừa)</option>
+                <option value="Độ 3">Độ 3 (Lung lay nặng)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border">
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Khớp cắn</label>
+              <select value={examData.khopCan || ''} onChange={(e) => setExamData({...examData, khopCan: e.target.value})} className="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                <option value="">-- Chọn --</option>
+                <option value="Bình thường">Bình thường</option>
+                <option value="Hở khớp cắn">Hở khớp cắn</option>
+                <option value="Khớp cắn sâu">Khớp cắn sâu</option>
+                <option value="Khớp cắn chéo">Khớp cắn chéo</option>
+                <option value="Khớp cắn ngược">Khớp cắn ngược</option>
+                <option value="Mòn khớp cắn">Mòn khớp cắn</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Bệnh lý khác RHM</label>
+              <input type="text" value={examData.benhLyKhacRhm || ''} onChange={(e) => setExamData({...examData, benhLyKhacRhm: e.target.value})} className="w-full p-2 border border-gray-300 rounded-lg text-sm" placeholder="Mô tả..." />
             </div>
           </div>
 

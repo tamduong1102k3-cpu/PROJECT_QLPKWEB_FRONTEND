@@ -7,13 +7,18 @@ const VitalSignsForm = forwardRef(({
   phieuKhamId,
   assistantId,
   initialGhiChu = '',
-  showSaveOnly = false
+  showSaveOnly = false,
+  vitalsFields,
+  setVitalsFields
 }, ref) => {
   const { showSuccess, showError } = useNotification();
-  const [vitals, setVitals] = useState({
+  const [internalVitals, setInternalVitals] = useState({
     nhietDo: '', nhipTim: '', huyetApThu: '', huyetApTruong: '',
     nhipTho: '', canNang: '', chieuCao: '', spo2: '', vongDau: '', ghiChu: initialGhiChu
   });
+
+  const vitals = vitalsFields || internalVitals;
+  const setVitals = setVitalsFields || setInternalVitals;
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
 

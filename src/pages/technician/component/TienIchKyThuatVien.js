@@ -64,39 +64,40 @@ export const LAB_TEMPLATES = {
 };
 
 export const IMAGING_TEMPLATES = {
-  ULTRASOUND: {
-    key: 'ULTRASOUND',
-    title: 'Kết quả Siêu Âm Ổ Bụng Tổng Quát',
+  GENERIC: {
+    key: 'CDHA_GENERIC',
+    title: 'Kết quả Chẩn Đoán Hình Ảnh',
     fields: [
-      { key: 'gan', label: 'Gan', type: 'textarea', defaultValue: 'Kích thước bình thường.' },
-      { key: 'than', label: 'Hai thận', type: 'textarea', defaultValue: 'Vị trí bình thường.' }
-    ]
-  },
-  XRAY: {
-    key: 'XRAY',
-    title: 'Kết quả Chụp X-Quang Phổi',
-    fields: [
-      { key: 'bong_tim', label: 'Bóng tim', type: 'textarea', defaultValue: 'Bình thường.' },
-      { key: 'phe_truong', label: 'Phế trường', type: 'textarea', defaultValue: 'Sáng đều.' }
+      { key: 'mo_ta', label: 'Mô tả hình ảnh', type: 'textarea', defaultValue: 'Không phát hiện bất thường.' }
     ]
   }
 };
 
-export const getTemplateForService = serviceName => {
+export const getTemplateForService = (serviceName, isImaging) => {
   if (!serviceName) return null;
   const nameLower = removeVietnameseTones(serviceName.toLowerCase());
-  if (nameLower.includes('sieu am')) return IMAGING_TEMPLATES.ULTRASOUND;
-  if (nameLower.includes('x quang')) return IMAGING_TEMPLATES.XRAY;
+  
+  if (isImaging || nameLower.includes('sieu am') || nameLower.includes('x quang') || nameLower.includes('ct') || nameLower.includes('mri') || nameLower.includes('noi soi')) {
+    return {
+      key: 'CDHA_GENERIC',
+      title: serviceName,
+      fields: [
+        { key: 'mo_ta', label: 'Mô tả hình ảnh', type: 'textarea', defaultValue: 'Không phát hiện bất thường.' }
+      ]
+    };
+  }
+  
   if (nameLower.includes('mau') || nameLower.includes('sinh hoa')) return LAB_TEMPLATES.BIOCHEMISTRY;
   if (nameLower.includes('nuoc tieu')) return LAB_TEMPLATES.URINALYSIS;
   return null;
 };
 
-export const generateTextFromTemplate = (template, values) => {
+export const generateTextFromTemplate = (template, values, serviceName) => {
   if (!template) return '';
-  const isImaging = ['ULTRASOUND', 'XRAY'].includes(template.key);
+  const isImaging = ['ULTRASOUND', 'XRAY', 'CDHA_GENERIC'].includes(template.key);
   let text = isImaging ? `=== PHIẾU BÁO CÁO KẾT QUẢ CHẨN ĐOÁN HÌNH ẢNH ===\n\n` : `=== PHIẾU BÁO CÁO XÉT NGHIỆM LÂM SÀNG ===\n\n`;
-  text += `Dịch vụ thực hiện: ${template.title.toUpperCase()}\n--------------------------------------------------------\n`;
+  const title = serviceName || template.title;
+  text += `Dịch vụ thực hiện: ${title.toUpperCase()}\n--------------------------------------------------------\n`;
   template.fields.forEach(f => {
     const val = values[f.key] !== undefined ? values[f.key] : f.defaultValue || '';
     if (isImaging) text += `+ ${f.label}:\n  ${val}\n\n`;

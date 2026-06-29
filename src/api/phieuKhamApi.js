@@ -319,6 +319,98 @@ export const getAvailableClsResultsApi = async id => {
 /**
  * GET /specialty-history
  */
+/**
+ * POST /accept-cls-patient/{registrationId}
+ * KTV tiếp nhận bệnh nhân CLS: tạo PhieuKham
+ */
+export const acceptClsPatientApi = async (registrationId, technicianId) => {
+  try {
+    const response = await fetchClient(`${API_URL}/accept-cls-patient/${registrationId}?technicianId=${technicianId}`, {
+      method: 'POST'
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Lỗi: ${response.status}`);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in acceptClsPatientApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * POST /{maPhieuKham}/tech-confirm-cls
+ * Kỹ thuật viên xác nhận dịch vụ CLS: tạo TiepNhanCls + PhieuChiDinh + ChiTietChiDinh
+ */
+export const techConfirmClsApi = async (maPhieuKham, technicianId, data) => {
+  try {
+    const response = await fetchClient(`${API_URL}/${maPhieuKham}/tech-confirm-cls?technicianId=${technicianId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Lỗi: ${response.status}`);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in techConfirmClsApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * POST /{maPhieuKham}/confirm-cls
+ * Bác sĩ CLS xác nhận thực hiện dịch vụ: tạo PhieuChiDinh
+ */
+export const confirmClsServiceApi = async (maPhieuKham, doctorId) => {
+  try {
+    const response = await fetchClient(`${API_URL}/${maPhieuKham}/confirm-cls?doctorId=${doctorId}`, {
+      method: 'POST'
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Lỗi: ${response.status}`);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in confirmClsServiceApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * GET /pending-cls-confirmation
+ * Lấy danh sách bệnh nhân CLS chờ bác sĩ xác nhận
+ */
+export const getPendingClsConfirmationApi = async (maChuyenKhoa) => {
+  try {
+    const response = await fetchClient(`${API_URL}/pending-cls-confirmation?maChuyenKhoa=${maChuyenKhoa}`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : [];
+  } catch (error) {
+    console.error("Error in getPendingClsConfirmationApi:", error);
+    throw error;
+  }
+};
+
 export const getSpecialtyHistoryApi = async maChuyenKhoa => {
   try {
     const response = await fetchClient(`${API_URL}/specialty-history?maChuyenKhoa=${maChuyenKhoa}`, {

@@ -4,6 +4,7 @@ import { updateToWaitingForDoctorApi } from '../api/phieuKhamApi';
 import { useNotification } from './NotificationContext';
 import VitalSignsForm from './VitalSignsForm';
 import ConfirmDialog from './ConfirmDialog';
+import { validateVitals } from '../utils/vitalsValidation';
 
 /**
  * Layout dùng chung cho mọi trợ lý chuyên khoa.
@@ -102,12 +103,23 @@ const AssistantLayout = ({
   const handleFinishAssistant = async () => {
     if (!selectedPatient?.maPhieuKham) return;
 
-    // Validate specialty exam data if validation function is provided
+    // 1. Validate vital signs if vitalsFields is provided
+    if (vitalsFields) {
+      const vitalsErrors = validateVitals(vitalsFields);
+      if (vitalsErrors && vitalsErrors.length > 0) {
+        showError('⚠️ THIẾU CHỈ SỐ SINH HIỆU:\n' + vitalsErrors.join('\n'));
+        // Switch to vitals tab so user can see the form
+        setExamSubTab('vitals');
+        return;
+      }
+    }
+
+    // 2. Validate specialty exam data if validation function is provided
     // Always validate, regardless of which tab the user is currently on
     if (validateExamData && examData) {
       const validationErrors = validateExamData(examData);
       if (validationErrors && validationErrors.length > 0) {
-        showError('⚠️ THIẾU THÔNG TIN: ' + validationErrors.join('. '));
+        showError('⚠️ THIẾU THÔNG TIN CHUYÊN KHOA:\n' + validationErrors.join('. '));
         // Switch to specialty tab so user can see the form
         setExamSubTab('specialty');
         return;
@@ -202,7 +214,15 @@ const AssistantLayout = ({
       {/* Content */}
       <div className="flex-1 overflow-y-auto min-h-0 px-6 pt-4 pb-4">
         {examSubTab === 'vitals' && (
-          <VitalSignsForm ref={vitalsRef} phieuKhamId={selectedPatient.maPhieuKham} assistantId={user?.maNhanVien || user?.id} initialGhiChu={selectedPatient?.ghiChu} showSaveOnly />
+          <VitalSignsForm
+            ref={vitalsRef}
+            phieuKhamId={selectedPatient.maPhieuKham}
+            assistantId={user?.maNhanVien || user?.id}
+            initialGhiChu={selectedPatient?.ghiChu}
+            showSaveOnly
+            vitalsFields={vitalsFields}
+            setVitalsFields={setVitalsFields}
+          />
         )}
         {examSubTab !== 'vitals' && specialtyForm}
       </div>

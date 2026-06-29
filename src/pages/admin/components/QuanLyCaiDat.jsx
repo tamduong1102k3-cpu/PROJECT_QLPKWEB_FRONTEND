@@ -1,13 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   createBackupApi,
-  deleteBackupApi,
-  downloadBackupApi,
   getDatabaseInfoApi,
   listBackupsApi,
-  restoreBackupApi,
-  restoreUploadApi
+  restoreBackupApi
 } from '../../../api/databaseApi';
+import fetchClient from '../../../api/fetchClient';
 
 const formatSize = (bytes) => {
   if (bytes == null) return '—';
@@ -25,6 +23,7 @@ const QuanLyCaiDat = () => {
   const [dbInfo, setDbInfo] = useState(null);
   const [backups, setBackups] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -41,7 +40,7 @@ const QuanLyCaiDat = () => {
       setDbInfo(info);
       setBackups(backupList || []);
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Không thể tải dữ liệu cài đặt' });
+      setMessage({ type: 'error', text: err.message || 'Không thể tải dữ liệu' });
     } finally {
       setIsLoading(false);
     }
@@ -52,31 +51,31 @@ const QuanLyCaiDat = () => {
   }, []);
 
   const handleCreateBackup = async () => {
-    // Aiven tự động backup hàng ngày, chỉ cần thông báo
-    setMessage({ type: 'info', text: 'Aiven tự động backup database hàng ngày. Danh sách backup sẽ được cập nhật.' });
-    await loadData();
-  };
-
-  const handleDownload = async (backupId) => {
+    setIsBackingUp(true);
+    setMessage({ type: '', text: '' });
     try {
-      await downloadBackupApi(backupId);
+      const result = await createBackupApi();
+      setMessage({ type: 'success', text: result.message || 'Tạo backup thành công!' });
+      await loadData();
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Tải file thất bại' });
+      setMessage({ type: 'error', text: err.message || 'Tạo backup thất bại' });
+    } finally {
+      setIsBackingUp(false);
     }
   };
 
-  const handleRestoreFromList = async (backupId) => {
+  const handleRestore = async (filename) => {
     const confirmed = window.confirm(
-      `Bạn có chắc muốn phục hồi database từ backup "${backupId}"?\n\n` +
-      'Toàn bộ dữ liệu hiện tại sẽ bị ghi đè.'
+      `Phục hồi database từ "${filename}"?\n\nToàn bộ dữ liệu hiện tại sẽ bị ghi đè.`
     );
     if (!confirmed) return;
 
     setIsRestoring(true);
     setMessage({ type: '', text: '' });
     try {
-      const result = await restoreBackupApi(backupId);
-      setMessage({ type: 'success', text: result.message || 'Đã gửi yêu cầu phục hồi. Vui lòng đợi vài phút.' });
+      const result = await restoreBackupApi(filename);
+      setMessage({ type: 'success', text: result.message || 'Phục hồi thành công!' });
+      await loadData();
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Phục hồi thất bại' });
     } finally {
@@ -84,17 +83,32 @@ const QuanLyCaiDat = () => {
     }
   };
 
-  const handleRestoreUpload = async () => {
-    setMessage({ type: 'info', text: 'Aiven không hỗ trợ restore từ file upload. Chỉ có thể restore từ backup snapshot trên cloud.' });
-    setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  const handleFileRestore = async () => {
+    if (!selectedFile) {
+      setMessage({ type: 'error', text: 'Vui lòng chọn file .sql' });
+      return;
+    }
+    // Upload file to server via restore API - using FormData
+    const formData = new FormData();
+    formData.append('file', selectedFile);
 
-  const handleDelete = async (filename) => {
+    setIsRestoring(true);
+    setMessage({ type: '', text: '' });
     try {
-      await deleteBackupApi(filename);
+      const response = await fetchClient(
+        'https://qlpk-backend-spring-boot.onrender.com/api/database/restore/upload',
+        { method: 'POST', body: formData, skipLoading: false }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Upload thất bại');
+      setMessage({ type: 'success', text: data.message || 'Phục hồi thành công!' });
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      await loadData();
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Xóa file thất bại' });
+      setMessage({ type: 'error', text: err.message || 'Phục hồi thất bại' });
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -104,8 +118,6 @@ const QuanLyCaiDat = () => {
         <div className={`p-4 rounded-xl border text-sm font-medium ${
           message.type === 'success'
             ? 'bg-green-50 text-green-700 border-green-200'
-            : message.type === 'info'
-            ? 'bg-blue-50 text-blue-700 border-blue-200'
             : 'bg-red-50 text-red-700 border-red-200'
         }`}>
           {message.text}
@@ -115,12 +127,12 @@ const QuanLyCaiDat = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-start gap-4 mb-6">
           <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-            <span className="material-symbols-outlined text-blue-600">cloud</span>
+            <span className="material-symbols-outlined text-blue-600">database</span>
           </div>
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Sao Lưu & Phục Hồi Database (Aiven Cloud)</h2>
+            <h2 className="text-lg font-bold text-gray-800">Thông Tin Database</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Database được lưu trữ trên Aiven Cloud. Backup tự động hàng ngày, quản lý qua Aiven Console.
+              Fork service không khả dụng với free tier Aiven nên tính năng backup/restore qua cloud không hoạt động.
             </p>
           </div>
         </div>
@@ -131,59 +143,34 @@ const QuanLyCaiDat = () => {
             <span>Đang tải thông tin...</span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="rounded-lg bg-gray-50 border border-gray-100 p-4">
               <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Service</p>
               <p className="text-lg font-bold text-gray-800 mt-1">{dbInfo?.serviceName || '—'}</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 border border-gray-100 p-4">
+              <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Database</p>
+              <p className="text-lg font-bold text-gray-800 mt-1 font-mono text-primary">{dbInfo?.databaseName || '—'}</p>
             </div>
             <div className="rounded-lg bg-gray-50 border border-gray-100 p-4">
               <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Trạng thái</p>
               <p className="text-lg font-bold text-gray-800 mt-1">{dbInfo?.state || '—'}</p>
             </div>
             <div className="rounded-lg bg-gray-50 border border-gray-100 p-4">
-              <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Công cụ</p>
-              <p className="text-sm font-semibold text-gray-800 mt-1">{dbInfo?.backupTool || 'Aiven Cloud'}</p>
+              <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Host</p>
+              <p className="text-sm font-semibold text-gray-800 mt-1">Aiven MySQL</p>
             </div>
           </div>
         )}
 
-        {dbInfo?.plan && (
-          <p className="text-xs text-gray-400 mb-4">
-            Plan: {dbInfo.plan} | Backup hour: {dbInfo.backupHour !== undefined ? `${dbInfo.backupHour}:00 UTC` : 'Auto'}
-          </p>
-        )}
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleCreateBackup}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-lg font-semibold text-sm hover:opacity-90"
-          >
-            <span className="material-symbols-outlined text-[18px]">cloud_sync</span>
-            Làm mới danh sách backup
-          </button>
-          <button
-            onClick={loadData}
-            disabled={isLoading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-50 disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-[18px]">refresh</span>
-            Làm mới
-          </button>
-        </div>
-        <p className="text-xs text-gray-400 mt-3">
-          Aiven tự động backup database mỗi ngày. Để xem và quản lý backup chi tiết, truy cập{' '}
-          <a href="https://console.aiven.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-            Aiven Console
-          </a>.
-        </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 opacity-60 pointer-events-none">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center gap-3 mb-4">
           <span className="material-symbols-outlined text-orange-500">upload_file</span>
           <div>
             <h3 className="text-lg font-bold text-gray-800">Phục Hồi Từ File Upload</h3>
-            <p className="text-sm text-gray-500">Tải lên file .sql từ máy tính để phục hồi database</p>
+            <p className="text-sm text-gray-500">Tải lên file .sql từ máy tính</p>
           </div>
         </div>
 
@@ -196,82 +183,51 @@ const QuanLyCaiDat = () => {
             className="block w-full md:max-w-md text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-semibold hover:file:bg-blue-100"
           />
           <button
-            onClick={handleRestoreUpload}
-            disabled={!selectedFile || isRestoring}
+            onClick={handleFileRestore}
+            disabled={!selectedFile || isRestoring || isBackingUp}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white rounded-lg font-semibold text-sm hover:bg-orange-600 disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[18px]">restore</span>
             {isRestoring ? 'Đang phục hồi...' : 'Phục hồi từ file'}
           </button>
         </div>
-        <p className="text-xs text-orange-500 mt-3 font-medium">
-          Aiven không hỗ trợ restore từ file upload. Chỉ có thể restore từ backup snapshot trên cloud.
+        <p className="text-xs text-red-500 mt-3 font-medium">
+          Cảnh báo: Phục hồi sẽ ghi đè toàn bộ dữ liệu hiện tại.
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+      {backups.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center gap-3 mb-4">
             <span className="material-symbols-outlined text-green-600">folder_open</span>
             <div>
-              <h3 className="text-lg font-bold text-gray-800">Danh Sách Backup Từ Aiven Cloud</h3>
-              <p className="text-sm text-gray-500">{backups.length} bản backup trên hệ thống</p>
+              <h3 className="text-lg font-bold text-gray-800">Danh Sách Bản Sao Lưu</h3>
+              <p className="text-sm text-gray-500">{backups.length} bản sao lưu tự động từ cloud</p>
             </div>
           </div>
-        </div>
-
-        {isLoading ? (
-          <div className="text-center py-8 text-gray-400">Đang tải...</div>
-        ) : backups.length === 0 ? (
-          <div className="text-center py-10 text-gray-400">
-            <span className="material-symbols-outlined text-5xl mb-2 opacity-40">inventory_2</span>
-            <p>Chưa có bản sao lưu nào. Aiven sẽ tự động backup vào giờ đã cấu hình.</p>
-          </div>
-        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="pb-3 font-medium">Backup ID</th>
+                  <th className="pb-3 font-medium">Tên file</th>
                   <th className="pb-3 font-medium">Kích thước</th>
-                  <th className="pb-3 font-medium">Ngày</th>
-                  <th className="pb-3 font-medium">Giờ</th>
-                  <th className="pb-3 font-medium text-right">Thao tác</th>
+                  <th className="pb-3 font-medium">Thời gian</th>
+                  <th className="pb-3 font-medium">Trạng thái</th>
                 </tr>
               </thead>
               <tbody>
                 {backups.map((item, index) => {
-                  const backupId = item.backup_id || item.backup_name || `backup_${index}`;
-                  // Parse thời gian từ backupId (vd: "2026-06-21T15:23:00.913365+00:00Z_xxx")
-                  let datePart = '—';
-                  let timePart = '—';
-                  const timeMatch = backupId.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
-                  if (timeMatch) {
-                    datePart = timeMatch[1];
-                    timePart = timeMatch[2];
-                  } else if (item.start_time || item.createdAt) {
-                    const ts = item.start_time || item.createdAt;
-                    datePart = new Date(ts).toLocaleDateString('vi-VN');
-                    timePart = new Date(ts).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                  }
+                  const filename = item.backup_id || item.backup_location || `Backup ${index + 1}`;
+                  const rowKey = item.backup_id || `backup-${index}`;
                   return (
-                    <tr key={backupId} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
+                    <tr key={rowKey} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
                       <td className="py-3 pr-4">
-                        <span className="text-sm font-semibold text-gray-800">{backupId}</span>
+                        <span className="text-sm font-semibold text-gray-800">{filename}</span>
                       </td>
                       <td className="py-3 text-sm text-gray-600">{formatSize(item.data_size || item.size)}</td>
-                      <td className="py-3 text-sm text-gray-600">{datePart}</td>
-                      <td className="py-3 text-sm text-gray-600">{timePart}</td>
+                      <td className="py-3 text-sm text-gray-600">{formatDate(item.start_time || item.createdAt)}</td>
                       <td className="py-3">
-                        <div className="flex justify-end gap-2 flex-wrap">
-                          <button
-                            onClick={() => handleRestoreFromList(backupId)}
-                            disabled={isRestoring}
-                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 disabled:opacity-50"
-                          >
-                            Phục hồi
-                          </button>
-                        </div>
+                        <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded">Cloud Aiven</span>
                       </td>
                     </tr>
                   );
@@ -279,8 +235,9 @@ const QuanLyCaiDat = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+          <p className="text-xs text-gray-400 mt-3 italic">Đây là bản sao lưu tự động từ Aiven cloud, không thể phục hồi qua JDBC.</p>
+        </div>
+      )}
     </div>
   );
 };

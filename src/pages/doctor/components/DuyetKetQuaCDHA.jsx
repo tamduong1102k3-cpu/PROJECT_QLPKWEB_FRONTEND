@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  getCdhaResultsByPhieuKhamApi, 
-  approveCdhaResultApi, 
-  rejectCdhaResultApi 
+import {
+  getCdhaResultsByPhieuKhamApi,
+  approveCdhaResultApi,
+  rejectCdhaResultApi
 } from "../../../api/phieuChiDinhApi";
+import { getTiepNhanClsByPhieuKhamApi } from "../../../api/tiepNhanClsApi";
 import { useNotification } from '../../../components/NotificationContext';
 import PrintButton from '../../../components/PrintButton';
 
@@ -17,13 +18,17 @@ const DuyetKetQuaCDHA = ({
   const [results, setResults] = useState([]);
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [tiepNhanCls, setTiepNhanCls] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [activeImageKey, setActiveImageKey] = useState('duongDanAnh1');
 
   const fetchCdhaResults = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getCdhaResultsByPhieuKhamApi(patient.maPhieuKham);
+      const [data, tiepNhanData] = await Promise.all([
+        getCdhaResultsByPhieuKhamApi(patient.maPhieuKham),
+        getTiepNhanClsByPhieuKhamApi(patient.maPhieuKham)
+      ]);
       if (data) {
         setResults(data.map(item => ({
           ...item,
@@ -33,6 +38,9 @@ const DuyetKetQuaCDHA = ({
           duongDanAnh1: item.duongDanAnh1 || '',
           duongDanAnh2: item.duongDanAnh2 || ''
         })));
+      }
+      if (tiepNhanData && tiepNhanData.length > 0) {
+        setTiepNhanCls(tiepNhanData[0]);
       }
     } catch (e) {
       console.error("Lỗi khi tải kết quả CĐHA:", e);
@@ -161,6 +169,32 @@ const DuyetKetQuaCDHA = ({
         </button>
       </div>
 
+      {/* ── Thông tin tiếp nhận CLS ── */}
+      {tiepNhanCls && patient.loaiDichVu && (
+        <div className="bg-white rounded-2xl border border-violet-100 shadow-sm overflow-hidden">
+          <div className="px-6 py-3 bg-violet-50 border-b border-violet-100 flex items-center gap-2">
+            <span className="material-symbols-outlined text-violet-600 text-lg">assignment</span>
+            <span className="font-bold text-sm text-violet-700 uppercase tracking-wide">Thông tin tiếp nhận CLS</span>
+          </div>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <span className="text-xs font-bold text-gray-400 uppercase block mb-1">Lý do đến</span>
+              <span className="font-semibold text-gray-800">{tiepNhanCls.lyDoDen}</span>
+            </div>
+            <div>
+              <span className="text-xs font-bold text-gray-400 uppercase block mb-1">Thông tin sàng lọc</span>
+              <span className="font-medium text-gray-700">{tiepNhanCls.thongTinSangLoc}</span>
+            </div>
+            {tiepNhanCls.ghiChu && (
+              <div>
+                <span className="text-xs font-bold text-gray-400 uppercase block mb-1">Ghi chú</span>
+                <span className="font-medium text-gray-700">{tiepNhanCls.ghiChu}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {results.length === 0 ? (
         <div className="bg-white p-12 text-center rounded-2xl shadow-sm border border-gray-100 text-gray-400 italic">
           Bệnh nhân này chưa có kết quả chỉ định chẩn đoán hình ảnh nào được tải lên.
@@ -175,8 +209,8 @@ const DuyetKetQuaCDHA = ({
                 <div>
                   <h3 className="text-base font-bold text-gray-700">PHIẾU KẾT QUẢ CHẨN ĐOÁN HÌNH ẢNH</h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Mã BN: #{patient.maBenhNhan} | Mã PK: #{patient.maPhieuKham} | 
-                    Giới: {patient.gioiTinh ? 'Nam' : 'Nữ'} | 
+                    Mã BN: #{patient.maBenhNhan} | Mã PK: #{patient.maPhieuKham} |
+                    Giới: {patient.gioiTinh ? 'Nam' : 'Nữ'} |
                     Năm sinh: {patient.ngaySinh ? new Date(patient.ngaySinh).getFullYear() : ''}
                   </p>
                 </div>
@@ -190,11 +224,10 @@ const DuyetKetQuaCDHA = ({
                             setSelectedResultIndex(index);
                             setActiveImageKey('duongDanAnh1');
                           }}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                            selectedResultIndex === index
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedResultIndex === index
                               ? 'bg-indigo-600 text-white shadow-md'
                               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
+                            }`}
                         >
                           {res.tenDichVu}
                         </button>
@@ -328,9 +361,8 @@ const DuyetKetQuaCDHA = ({
               <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Dịch vụ</h4>
               <p className="text-sm font-bold text-gray-800">{currentResult?.tenDichVu || 'CĐHA'}</p>
               <div className="mt-3 pt-3 border-t border-gray-100">
-                <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${
-                  isApproved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                }`}>
+                <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${isApproved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
                   {isApproved ? '✓ ĐÃ DUYỆT' : '⏳ CHỜ DUYỆT'}
                 </span>
               </div>
@@ -373,11 +405,10 @@ const DuyetKetQuaCDHA = ({
               {currentResult?.duongDanAnh1 && (
                 <button
                   onClick={() => setActiveImageKey('duongDanAnh1')}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-lg ${
-                    activeImageKey === 'duongDanAnh1'
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg ${activeImageKey === 'duongDanAnh1'
                       ? 'bg-indigo-600 text-white'
                       : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   Ảnh 1
                 </button>
@@ -385,11 +416,10 @@ const DuyetKetQuaCDHA = ({
               {currentResult?.duongDanAnh2 && (
                 <button
                   onClick={() => setActiveImageKey('duongDanAnh2')}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-lg ${
-                    activeImageKey === 'duongDanAnh2'
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg ${activeImageKey === 'duongDanAnh2'
                       ? 'bg-indigo-600 text-white'
                       : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  }`}
+                    }`}
                 >
                   Ảnh 2
                 </button>

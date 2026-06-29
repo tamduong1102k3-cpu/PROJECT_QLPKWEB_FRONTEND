@@ -16,27 +16,38 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
   // State quản lý ảnh phóng to
   const [lightboxUrl, setLightboxUrl] = useState(null);
 
-  const selectedTemplate = getTemplateForService(test.tenDichVu);
+  const selectedTemplate = getTemplateForService(test.tenDichVu, isImaging);
 
   useEffect(() => {
-    if (isImaging) {
-      getCdhaResultApi(test.id).then(data => {
-        if (data?.duongDanAnh1) setDuongDanAnh1(data.duongDanAnh1);
-        if (data?.duongDanAnh2) setDuongDanAnh2(data.duongDanAnh2);
-      });
-    }
+    let initialValues = {};
     if (selectedTemplate) {
-      const initialValues = {};
       selectedTemplate.fields.forEach(f => initialValues[f.key] = f.defaultValue || '');
       setTemplateValues(initialValues);
-      setTestResultText(generateTextFromTemplate(selectedTemplate, initialValues));
+      setTestResultText(generateTextFromTemplate(selectedTemplate, initialValues, test.tenDichVu));
     }
-  }, [test.id, isImaging]);
+
+    if (isImaging) {
+      getCdhaResultApi(test.id).then(data => {
+        if (data) {
+          if (data.duongDanAnh1) setDuongDanAnh1(data.duongDanAnh1);
+          if (data.duongDanAnh2) setDuongDanAnh2(data.duongDanAnh2);
+          
+          if (selectedTemplate && selectedTemplate.key === 'CDHA_GENERIC') {
+            const vals = {
+              mo_ta: data.moTaHinhAnh || initialValues.mo_ta || ''
+            };
+            setTemplateValues(vals);
+            setTestResultText(generateTextFromTemplate(selectedTemplate, vals, test.tenDichVu));
+          }
+        }
+      });
+    }
+  }, [test.id, isImaging, test.tenDichVu]);
 
   const handleTemplateValueChange = (key, value) => {
     const updated = { ...templateValues, [key]: value };
     setTemplateValues(updated);
-    setTestResultText(generateTextFromTemplate(selectedTemplate, updated));
+    setTestResultText(generateTextFromTemplate(selectedTemplate, updated, test.tenDichVu));
   };
 
   const handleImageUpload = async (e, idx) => {
@@ -83,7 +94,7 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6 transition-all duration-300">
-      <div className="bg-white rounded-[2rem] w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-300 border border-slate-200/50">
+      <div className="bg-white rounded-[2rem] w-full max-w-7xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden animate-in fade-in zoom-in-95 duration-300 border border-slate-200/50">
 
         <div className="p-6 sm:p-8 bg-white border-b border-slate-100 flex items-center justify-between z-10 shadow-sm relative">
           <div className="flex items-center gap-5">
@@ -103,107 +114,96 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col md:flex-row bg-slate-50/50">
-          <div className="w-full md:w-[55%] border-r border-slate-200/60 p-6 sm:p-8 overflow-y-auto space-y-6">
-            {selectedTemplate && (
-              <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200/60 shadow-sm transition-all hover:shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><span className="material-symbols-outlined text-sm">tune</span></div>
-                  <span className="text-sm font-bold text-slate-700">Sử dụng form chuẩn</span>
+        <div className="flex-1 overflow-y-auto flex flex-col bg-white">
+          {/* Form template - thu gọn phía trên */}
+          {selectedTemplate && (
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
+                  <span className="material-symbols-outlined text-sm">tune</span>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={useTemplate} onChange={e => setUseTemplate(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
-                </label>
+                <span className="text-sm font-bold text-slate-700">Sử dụng form chuẩn</span>
               </div>
-            )}
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={useTemplate} onChange={e => setUseTemplate(e.target.checked)} className="sr-only peer" />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+              </label>
+            </div>
+          )}
 
-            {useTemplate && selectedTemplate ? (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{selectedTemplate.title}</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  {selectedTemplate.fields.map(f => (
-                    <div key={f.key} className={`bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm focus-within:ring-2 focus-within:ring-indigo-100 focus-within:border-indigo-300 transition-all ${f.type === 'textarea' ? 'sm:col-span-2' : ''}`}>
-                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block mb-3">{f.label}</label>
-                      {f.type === 'textarea' ? (
-                        <textarea className="w-full bg-slate-50 focus:bg-white border-0 ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-400 rounded-xl p-3.5 text-sm font-medium text-slate-700 outline-none transition-all resize-y min-h-[100px]" placeholder="Nhập kết quả..." value={templateValues[f.key] || ''} onChange={e => handleTemplateValueChange(f.key, e.target.value)} />
+          {useTemplate && selectedTemplate && (
+            <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/30">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">{selectedTemplate.title}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {selectedTemplate.fields.map(f => (
+                  <div key={f.key} className={`bg-white p-4 rounded-xl border border-slate-200/60 focus-within:ring-2 focus-within:ring-indigo-100 ${f.type === 'textarea' ? 'sm:col-span-2 lg:col-span-4' : ''}`}>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-2">{f.label}</label>
+                    {f.type === 'textarea' ? (
+                      <textarea className="w-full bg-slate-50 border-0 ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-400 rounded-lg p-3 text-sm font-medium text-slate-700 outline-none transition-all resize-y min-h-[80px]" placeholder="Nhập kết quả..." value={templateValues[f.key] || ''} onChange={e => handleTemplateValueChange(f.key, e.target.value)} />
+                    ) : (
+                      <div className="relative flex items-center">
+                        <input className="w-full bg-slate-50 border-0 ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-400 rounded-lg p-3 text-sm font-bold text-slate-800 outline-none transition-all" type="text" placeholder="0.0" value={templateValues[f.key] || ''} onChange={e => handleTemplateValueChange(f.key, e.target.value)} />
+                        {f.unit && <span className="absolute right-3 text-xs font-bold text-slate-400 bg-white px-1.5 py-0.5 rounded">{f.unit}</span>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isImaging && (
+            <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/30">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Hình ảnh đính kèm</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[1, 2].map(idx => {
+                  const imgUrl = idx === 1 ? duongDanAnh1 : duongDanAnh2;
+                  return (
+                    <div key={idx} className="relative group rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/50 transition-all flex flex-col items-center justify-center h-24 sm:h-28 overflow-hidden">
+                      {imgUrl ? (
+                        <>
+                          <img src={imgUrl} alt={`Uploaded ${idx}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setLightboxUrl(imgUrl); }} className="w-8 h-8 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-all">
+                              <span className="material-symbols-outlined text-lg">zoom_in</span>
+                            </button>
+                            <div className="relative w-8 h-8 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-all">
+                              <span className="material-symbols-outlined text-lg">swap_horiz</span>
+                              <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleImageUpload(e, idx)} disabled={isUploading !== null} />
+                            </div>
+                          </div>
+                        </>
                       ) : (
-                        <div className="relative flex items-center">
-                          <input className="w-full bg-slate-50 focus:bg-white border-0 ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-400 rounded-xl p-3.5 text-sm font-bold text-slate-800 outline-none transition-all placeholder:font-normal placeholder:text-slate-400" type="text" placeholder="0.0" value={templateValues[f.key] || ''} onChange={e => handleTemplateValueChange(f.key, e.target.value)} />
-                          {f.unit && <span className="absolute right-4 text-xs font-bold text-slate-400 bg-white/80 backdrop-blur-sm px-1.5 py-0.5 rounded">{f.unit}</span>}
+                        <>
+                          <span className="material-symbols-outlined text-slate-400 group-hover:text-indigo-500 transition-colors text-2xl mb-1">add_photo_alternate</span>
+                          <span className="text-[10px] font-bold text-slate-500 group-hover:text-indigo-600 uppercase tracking-wider">Tải ảnh</span>
+                          <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={e => handleImageUpload(e, idx)} disabled={isUploading !== null} />
+                        </>
+                      )}
+                      {isUploading === idx && (
+                        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
+                          <span className="material-symbols-outlined animate-spin text-indigo-500 text-2xl">refresh</span>
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-300"><span className="material-symbols-outlined text-3xl">edit_document</span></div>
-                <div>
-                  <h4 className="font-bold text-slate-600 mb-1">Chế độ tự do</h4>
-                  <p className="text-xs font-medium text-slate-400">Bạn đang nhập kết quả trực tiếp vào biên bản y khoa.</p>
-                </div>
-              </div>
-            )}
-
-            {isImaging && (
-              <div className="mt-6 space-y-4 border-t border-slate-200/60 pt-6">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">Hình ảnh đính kèm (Tối đa 2)</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {[1, 2].map(idx => {
-                    const imgUrl = idx === 1 ? duongDanAnh1 : duongDanAnh2;
-                    return (
-                      <div key={idx} className="relative group rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/50 transition-all flex flex-col items-center justify-center h-32 overflow-hidden">
-                        {imgUrl ? (
-                          <>
-                            <img src={imgUrl} alt={`Uploaded ${idx}`} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/60 flex flex-row items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setLightboxUrl(imgUrl); }}
-                                className="w-10 h-10 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-all backdrop-blur-sm"
-                                title="Phóng to"
-                              >
-                                <span className="material-symbols-outlined text-xl">zoom_in</span>
-                              </button>
-                              <div className="relative w-10 h-10 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-all backdrop-blur-sm">
-                                <span className="material-symbols-outlined text-xl">swap_horiz</span>
-                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleImageUpload(e, idx)} disabled={isUploading !== null} />
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-slate-400 group-hover:text-indigo-500 transition-colors text-3xl mb-2">add_photo_alternate</span>
-                            <span className="text-[11px] font-bold text-slate-500 group-hover:text-indigo-600 uppercase tracking-wider">Tải ảnh lên</span>
-                            <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={e => handleImageUpload(e, idx)} disabled={isUploading !== null} />
-                          </>
-                        )}
-                        {isUploading === idx && (
-                          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
-                            <span className="material-symbols-outlined animate-spin text-indigo-500 text-3xl">refresh</span>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="w-full md:w-[45%] p-6 sm:p-8 flex flex-col gap-6 bg-white">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-slate-400 text-lg">description</span>
-              <h4 className="font-bold text-sm text-slate-700">Biên bản y khoa</h4>
             </div>
-            <textarea className="flex-1 w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 rounded-2xl p-6 text-sm font-mono outline-none transition-all leading-relaxed text-slate-700 resize-none shadow-inner" placeholder="Nội dung biên bản y khoa sẽ hiển thị tại đây..." value={testResultText} onChange={e => setTestResultText(e.target.value)} />
+          )}
 
-            <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 rounded-2xl flex items-start gap-3">
-              <span className="material-symbols-outlined text-amber-500 mt-0.5">info</span>
-              <p className="text-[11px] font-medium text-amber-800 leading-relaxed">
-                <strong className="block font-bold text-amber-900 mb-0.5">Lưu ý quan trọng</strong>
+          {/* Biên bản y khoa - dọc từ trên xuống như trang giấy */}
+          <div className="flex-1 p-6 sm:p-8 lg:p-10 flex flex-col bg-white">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined text-slate-400">description</span>
+              <h4 className="font-bold text-base text-slate-700">Biên bản y khoa</h4>
+            </div>
+            <textarea className="flex-1 w-full bg-white border border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 rounded-2xl p-6 sm:p-8 lg:p-10 text-base font-mono outline-none transition-all leading-relaxed text-slate-700 resize-none shadow-sm min-h-[350px]" placeholder="Nhập nội dung biên bản y khoa tại đây..." value={testResultText} onChange={e => setTestResultText(e.target.value)} />
+
+            <div className="mt-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 rounded-xl flex items-start gap-3">
+              <span className="material-symbols-outlined text-amber-500 mt-0.5 text-sm">info</span>
+              <p className="text-[10px] font-medium text-amber-800 leading-relaxed">
+                <strong className="font-bold text-amber-900">Lưu ý quan trọng:</strong>
                 Văn bản trên sẽ được lưu trực tiếp vào hồ sơ y tế điện tử của bệnh nhân.
               </p>
             </div>

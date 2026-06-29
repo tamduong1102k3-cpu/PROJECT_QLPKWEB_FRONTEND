@@ -10,6 +10,7 @@ const ModalKhamSinhHieu = ({ patient, user, onClose, onComplete }) => {
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     const loadVitals = async () => {
@@ -42,9 +43,42 @@ const ModalKhamSinhHieu = ({ patient, user, onClose, onComplete }) => {
     loadVitals();
   }, [patient.maPhieuKham]);
 
+  // Validation: kiểm tra tất cả chỉ số sinh hiệu bắt buộc đã được nhập đầy đủ
+  const validateVitalsRequired = () => {
+    const errors = {};
+    const requiredFields = [
+      { key: 'nhietDo', label: 'Nhiệt độ' },
+      { key: 'nhipTim', label: 'Nhịp tim' },
+      { key: 'huyetApThu', label: 'HA tâm thu' },
+      { key: 'huyetApTruong', label: 'HA tâm trương' },
+      { key: 'nhipTho', label: 'Nhịp thở' },
+      { key: 'spo2', label: 'SpO2' },
+      { key: 'canNang', label: 'Cân nặng' },
+      { key: 'chieuCao', label: 'Chiều cao' }
+    ];
+
+    let isValid = true;
+    requiredFields.forEach(field => {
+      const value = vitals[field.key];
+      if (!value || value.toString().trim() === '') {
+        errors[field.key] = `${field.label} không được để trống`;
+        isValid = false;
+      }
+    });
+
+    setFieldErrors(errors);
+    return isValid;
+  };
+
   const handleSave = async () => {
     if (!patient?.maPhieuKham) {
-      showError("Chua co ma phieu kham!");
+      showError("Chưa có mã phiếu khám!");
+      return;
+    }
+
+    // Kiểm tra tất cả chỉ số sinh hiệu bắt buộc phải được nhập đầy đủ
+    if (!validateVitalsRequired()) {
+      showError("⚠️ Vui lòng nhập đầy đủ tất cả chỉ số sinh hiệu trước khi tiếp tục!");
       return;
     }
 
@@ -52,26 +86,26 @@ const ModalKhamSinhHieu = ({ patient, user, onClose, onComplete }) => {
     try {
       const payload = {
         maPhieuKham: patient.maPhieuKham,
-        nhietDo: parseFloat(vitals.nhietDo) || null,
-        nhipTim: parseInt(vitals.nhipTim) || null,
-        nhipTho: parseInt(vitals.nhipTho) || null,
-        huyetApTamThu: parseInt(vitals.huyetApThu) || null,
-        huyetApTamTruong: parseInt(vitals.huyetApTruong) || null,
-        canNang: parseFloat(vitals.canNang) || null,
-        chieuCao: parseFloat(vitals.chieuCao) || null,
-        spo2: parseFloat(vitals.spo2) || null,
+        nhietDo: parseFloat(vitals.nhietDo),
+        nhipTim: parseInt(vitals.nhipTim),
+        nhipTho: parseInt(vitals.nhipTho),
+        huyetApTamThu: parseInt(vitals.huyetApThu),
+        huyetApTamTruong: parseInt(vitals.huyetApTruong),
+        canNang: parseFloat(vitals.canNang),
+        chieuCao: parseFloat(vitals.chieuCao),
+        spo2: parseFloat(vitals.spo2),
         ghiChu: vitals.ghiChu || null,
         maNhanVienNhap: user?.maNhanVien || ''
       };
 
       await saveAndUpdateApi(payload);
-      showSuccess("Da luu chi so sinh hieu!");
+      showSuccess("Đã lưu chỉ số sinh hiệu thành công!");
       
       if (onComplete) {
         onComplete(patient);
       }
     } catch (error) {
-      showError("Loi: " + error.message);
+      showError("Lỗi: " + error.message);
     } finally {
       setSaving(false);
     }
@@ -87,7 +121,7 @@ const ModalKhamSinhHieu = ({ patient, user, onClose, onComplete }) => {
               <span className="material-symbols-outlined text-[28px]">monitor_heart</span>
             </div>
             <div>
-              <h3 className="font-black text-xl text-slate-800 tracking-tight">Kham Sinh Hieu</h3>
+              <h3 className="font-black text-xl text-slate-800 tracking-tight">Khám Sinh Hiệu</h3>
               <div className="flex items-center gap-2 mt-1">
                 <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-wider rounded border border-slate-200/60">
                   {patient.hoTen}
@@ -106,7 +140,7 @@ const ModalKhamSinhHieu = ({ patient, user, onClose, onComplete }) => {
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-              <span className="ml-3 text-slate-400 italic">Dang tai...</span>
+              <span className="ml-3 text-slate-400 italic">Đang tải...</span>
             </div>
           ) : (
             <>
@@ -116,49 +150,73 @@ const ModalKhamSinhHieu = ({ patient, user, onClose, onComplete }) => {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-5">
                 {/* Cot trai */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700">Nhiet do (C)</label>
-                    <input type="number" step="0.1" className="w-32 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-right" value={vitals.nhietDo} onChange={e => setVitals({...vitals, nhietDo: e.target.value})} placeholder="36.5" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700">Huyet ap tam thu (mmHg)</label>
-                    <input type="number" className="w-32 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right" value={vitals.huyetApThu} onChange={e => setVitals({...vitals, huyetApThu: e.target.value})} placeholder="120" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700">Nhip tho (l/ph)</label>
-                    <input type="number" className="w-32 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right" value={vitals.nhipTho} onChange={e => setVitals({...vitals, nhipTho: e.target.value})} placeholder="16" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700">Chieu cao (cm)</label>
-                    <input type="number" className="w-32 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right" value={vitals.chieuCao} onChange={e => setVitals({...vitals, chieuCao: e.target.value})} placeholder="165" />
-                  </div>
-                </div>
-                {/* Cot phai */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700">Nhip tim (l/ph)</label>
-                    <input type="number" className="w-32 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right" value={vitals.nhipTim} onChange={e => setVitals({...vitals, nhipTim: e.target.value})} placeholder="80" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700">Huyet ap tam truong (mmHg)</label>
-                    <input type="number" className="w-32 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right" value={vitals.huyetApTruong} onChange={e => setVitals({...vitals, huyetApTruong: e.target.value})} placeholder="80" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700">Can nang (kg)</label>
-                    <input type="number" step="0.1" className="w-32 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right" value={vitals.canNang} onChange={e => setVitals({...vitals, canNang: e.target.value})} placeholder="60" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold text-slate-700">SpO2 (%)</label>
-                    <input type="number" className="w-32 p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right" value={vitals.spo2} onChange={e => setVitals({...vitals, spo2: e.target.value})} placeholder="98" />
-                  </div>
-                </div>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-slate-700">Nhiệt độ (°C) <span className="text-red-500">*</span></label>
+                        <div className="flex flex-col items-end">
+                          <input type="number" step="0.1" className={`w-32 p-2.5 border ${fieldErrors.nhietDo ? 'border-red-400 bg-red-50' : 'border-slate-200'} rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-right`} value={vitals.nhietDo} onChange={e => { setVitals({...vitals, nhietDo: e.target.value}); if (fieldErrors.nhietDo) setFieldErrors(prev => ({...prev, nhietDo: ''})); }} placeholder="36.5" />
+                          {fieldErrors.nhietDo && <span className="text-[10px] text-red-500 font-bold mt-1">{fieldErrors.nhietDo}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-slate-700">Huyết áp tâm thu (mmHg) <span className="text-red-500">*</span></label>
+                        <div className="flex flex-col items-end">
+                          <input type="number" className={`w-32 p-2.5 border ${fieldErrors.huyetApThu ? 'border-red-400 bg-red-50' : 'border-slate-200'} rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right`} value={vitals.huyetApThu} onChange={e => { setVitals({...vitals, huyetApThu: e.target.value}); if (fieldErrors.huyetApThu) setFieldErrors(prev => ({...prev, huyetApThu: ''})); }} placeholder="120" />
+                          {fieldErrors.huyetApThu && <span className="text-[10px] text-red-500 font-bold mt-1">{fieldErrors.huyetApThu}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-slate-700">Nhịp thở (lần/ph) <span className="text-red-500">*</span></label>
+                        <div className="flex flex-col items-end">
+                          <input type="number" className={`w-32 p-2.5 border ${fieldErrors.nhipTho ? 'border-red-400 bg-red-50' : 'border-slate-200'} rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right`} value={vitals.nhipTho} onChange={e => { setVitals({...vitals, nhipTho: e.target.value}); if (fieldErrors.nhipTho) setFieldErrors(prev => ({...prev, nhipTho: ''})); }} placeholder="16" />
+                          {fieldErrors.nhipTho && <span className="text-[10px] text-red-500 font-bold mt-1">{fieldErrors.nhipTho}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-slate-700">Chiều cao (cm) <span className="text-red-500">*</span></label>
+                        <div className="flex flex-col items-end">
+                          <input type="number" className={`w-32 p-2.5 border ${fieldErrors.chieuCao ? 'border-red-400 bg-red-50' : 'border-slate-200'} rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right`} value={vitals.chieuCao} onChange={e => { setVitals({...vitals, chieuCao: e.target.value}); if (fieldErrors.chieuCao) setFieldErrors(prev => ({...prev, chieuCao: ''})); }} placeholder="165" />
+                          {fieldErrors.chieuCao && <span className="text-[10px] text-red-500 font-bold mt-1">{fieldErrors.chieuCao}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Cot phai */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-slate-700">Nhịp tim (lần/ph) <span className="text-red-500">*</span></label>
+                        <div className="flex flex-col items-end">
+                          <input type="number" className={`w-32 p-2.5 border ${fieldErrors.nhipTim ? 'border-red-400 bg-red-50' : 'border-slate-200'} rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right`} value={vitals.nhipTim} onChange={e => { setVitals({...vitals, nhipTim: e.target.value}); if (fieldErrors.nhipTim) setFieldErrors(prev => ({...prev, nhipTim: ''})); }} placeholder="80" />
+                          {fieldErrors.nhipTim && <span className="text-[10px] text-red-500 font-bold mt-1">{fieldErrors.nhipTim}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-slate-700">Huyết áp tâm trương (mmHg) <span className="text-red-500">*</span></label>
+                        <div className="flex flex-col items-end">
+                          <input type="number" className={`w-32 p-2.5 border ${fieldErrors.huyetApTruong ? 'border-red-400 bg-red-50' : 'border-slate-200'} rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right`} value={vitals.huyetApTruong} onChange={e => { setVitals({...vitals, huyetApTruong: e.target.value}); if (fieldErrors.huyetApTruong) setFieldErrors(prev => ({...prev, huyetApTruong: ''})); }} placeholder="80" />
+                          {fieldErrors.huyetApTruong && <span className="text-[10px] text-red-500 font-bold mt-1">{fieldErrors.huyetApTruong}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-slate-700">Cân nặng (kg) <span className="text-red-500">*</span></label>
+                        <div className="flex flex-col items-end">
+                          <input type="number" step="0.1" className={`w-32 p-2.5 border ${fieldErrors.canNang ? 'border-red-400 bg-red-50' : 'border-slate-200'} rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right`} value={vitals.canNang} onChange={e => { setVitals({...vitals, canNang: e.target.value}); if (fieldErrors.canNang) setFieldErrors(prev => ({...prev, canNang: ''})); }} placeholder="60" />
+                          {fieldErrors.canNang && <span className="text-[10px] text-red-500 font-bold mt-1">{fieldErrors.canNang}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-slate-700">SpO2 (%) <span className="text-red-500">*</span></label>
+                        <div className="flex flex-col items-end">
+                          <input type="number" className={`w-32 p-2.5 border ${fieldErrors.spo2 ? 'border-red-400 bg-red-50' : 'border-slate-200'} rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-right`} value={vitals.spo2} onChange={e => { setVitals({...vitals, spo2: e.target.value}); if (fieldErrors.spo2) setFieldErrors(prev => ({...prev, spo2: ''})); }} placeholder="98" />
+                          {fieldErrors.spo2 && <span className="text-[10px] text-red-500 font-bold mt-1">{fieldErrors.spo2}</span>}
+                        </div>
+                      </div>
+                    </div>
               </div>
 
               {/* Ghi chu */}
               <div className="mt-6 pt-4 border-t border-slate-100">
-                <label className="text-sm font-bold text-slate-700 block mb-2">Ghi chu</label>
-                <textarea className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none" rows="2" value={vitals.ghiChu} onChange={e => setVitals({...vitals, ghiChu: e.target.value})} placeholder="Nhap ghi chu (neu co)..." />
+                <label className="text-sm font-bold text-slate-700 block mb-2">Ghi chú</label>
+                <textarea className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none" rows="2" value={vitals.ghiChu} onChange={e => setVitals({...vitals, ghiChu: e.target.value})} placeholder="Nhập ghi chú (nếu có)..." />
               </div>
             </>
           )}
@@ -167,13 +225,13 @@ const ModalKhamSinhHieu = ({ patient, user, onClose, onComplete }) => {
         {/* Footer */}
         <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-end gap-4">
           <button onClick={onClose} className="px-6 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-sm rounded-xl transition-colors ring-1 ring-slate-200/60">
-            HUY BO
+            HỦY BỎ
           </button>
           <button onClick={handleSave} disabled={saving || loading} className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/30 transform active:scale-95 transition-all text-sm flex items-center gap-2">
             {saving ? (
-              <><span className="material-symbols-outlined animate-spin">refresh</span> DANG LUU...</>
+              <><span className="material-symbols-outlined animate-spin">refresh</span> ĐANG LƯU...</>
             ) : (
-              <><span className="material-symbols-outlined">check_circle</span> LUU & TIEP TUC</>
+              <><span className="material-symbols-outlined">check_circle</span> LƯU & TIẾP TỤC</>
             )}
           </button>
         </div>

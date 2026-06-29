@@ -1,18 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getPendingTestsApi, getCompletedTestsTodayApi } from '../../api/phieuChiDinhApi';
+import { getTodayApi as getTodayDangKyApi } from '../../api/dangKyKhamBenhApi';
+import { acceptClsPatientApi, updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
 import { getByPhieuKhamApi } from '../../api/chiSoKhamTongHopApi';
+import { getAllApi as getAllServicesApi } from '../../api/dichVuApi'; // API lấy danh mục dịch vụ
 import { removeVietnameseTones } from './component/TienIchKyThuatVien';
 import BangDanhSachCongViec from './component/BangDanhSachCongViec';
 import ModalNhapKetQua from './component/ModalNhapKetQua';
 import ModalXemKetQua from './component/ModalXemKetQua';
 import ModalKhamSinhHieu from './component/ModalKhamSinhHieu';
+import ModalNhapTiepNhanCls from './component/ModalNhapTiepNhanCls';
 
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import UserMenu from '../../components/UserMenu';
 import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
+import { useNotification } from '../../components/NotificationContext';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
+  const { showWarning } = useNotification();
   const isImaging = user?.vaiTro?.includes('CHAN_DOAN_HINH_ANH') || user?.vaiTro?.includes('CDHA');
   const deptName = isImaging ? 'Chẩn Đoán Hình Ảnh' : 'Xét Nghiệm';
   const [activeTab, setActiveTab] = useState('worklist');
@@ -21,37 +28,55 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   const [pendingTests, setPendingTests] = useState([]);
   const [completedTests, setCompletedTests] = useState([]);
   const [absentTests, setAbsentTests] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [pendingRegistrations, setPendingRegistrations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const isInitialLoad = React.useRef(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
   const [viewingResult, setViewingResult] = useState(null);
   // Vitals states
   const [vitalsPatient, setVitalsPatient] = useState(null);
+  // Modal tiếp nhận CLS
+  const [tiepNhanClsPatient, setTiepNhanClsPatient] = useState(null);
   // Map lưu trạng thái sinh hiệu {maPhieuKham: true/false}
   const [vitalsMap, setVitalsMap] = useState({});
   // Map lưu dữ liệu sinh hiệu {maPhieuKham: data}
   const [vitalsDataMap, setVitalsDataMap] = useState({});
+  // Danh sách toàn bộ dịch vụ để tra cứu loại dịch vụ
+  const [servicesList, setServicesList] = useState([]);
+  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, type: 'primary', icon: '' });
 
   // Fetch danh sách và kiểm tra sinh hiệu cho từng bệnh nhân
-  const fetchWorklist = useCallback(async (showIndicator = true) => {
-    if (showIndicator) setLoading(true);
+  const fetchWorklist = useCallback(async (showIndicator) => {
+    const shouldShowLoading = showIndicator === true || isInitialLoad.current;
+    if (shouldShowLoading) setLoading(true);
+    isInitialLoad.current = false;
     try {
       const maChuyenKhoa = user?.maChuyenKhoa || '';
-      const [pending, completed] = await Promise.all([
+      const [pending, completed, registrations] = await Promise.all([
         getPendingTestsApi({ maChuyenKhoa }),
-        getCompletedTestsTodayApi({ maChuyenKhoa })
+        getCompletedTestsTodayApi({ maChuyenKhoa }),
+        getTodayDangKyApi()
       ]);
       setPendingTests(pending || []);
       setCompletedTests(completed || []);
 
+      // Lọc đăng ký mới (CHO_KHAM, chưa có maPhieuKham) theo chuyên khoa của KTV
+      const newRegistrations = (registrations || []).filter(r =>
+        r.trangThai === 'CHO_KHAM' &&
+        !r.maPhieuKham &&
+        Number(r.maChuyenKhoa) === Number(maChuyenKhoa)
+      );
+      setPendingRegistrations(newRegistrations);
+
       // Kiểm tra sinh hiệu cho tất cả bệnh nhân đang chờ
       const allItems = [...(pending || []), ...(completed || [])];
       const maPhieuKhams = [...new Set(allItems.map(i => i.maPhieuKham).filter(Boolean))];
-      
+
       const newVitalsMap = {};
       const newVitalsDataMap = {};
-      
+
       await Promise.all(maPhieuKhams.map(async (maPK) => {
         try {
           const data = await getByPhieuKhamApi(maPK);
@@ -65,17 +90,39 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
           newVitalsMap[maPK] = false;
         }
       }));
-      
-      setVitalsMap(prev => ({...prev, ...newVitalsMap}));
-      setVitalsDataMap(prev => ({...prev, ...newVitalsDataMap}));
-    } finally { setLoading(false); }
+
+      setVitalsMap(prev => ({ ...prev, ...newVitalsMap }));
+      setVitalsDataMap(prev => ({ ...prev, ...newVitalsDataMap }));
+    } finally { if (shouldShowLoading) setLoading(false); }
   }, [user]);
 
   useEffect(() => {
-    fetchWorklist();
+    fetchWorklist(true);
     const interval = setInterval(() => fetchWorklist(false), 30000);
     return () => clearInterval(interval);
   }, [fetchWorklist]);
+
+  // Tải danh mục dịch vụ khi component mount
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const services = await getAllServicesApi();
+        setServicesList(services || []);
+      } catch (error) {
+        console.error("Lỗi khi tải danh mục dịch vụ:", error);
+      }
+    };
+    fetchServices();
+  }, []);
+
+  // Kiểm tra mã dịch vụ có phải là CLS hay không
+  const isDirectClsService = (maDichVu) => {
+    if (!maDichVu) return false;
+    const service = servicesList.find(s => Number(s.maDichVu) === Number(maDichVu));
+    if (!service) return false;
+    const loai = service.loaiDichVu;
+    return loai === 'CLS_XET_NGHIEM' || loai === 'CLS_CHAN_DOAN_HINH_ANH';
+  };
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -85,8 +132,8 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
 
   const filterList = list => {
     const q = removeVietnameseTones(searchQuery.toLowerCase());
-    return list.filter(item => 
-      removeVietnameseTones(item.hoTen || '').toLowerCase().includes(q) || 
+    return list.filter(item =>
+      removeVietnameseTones(item.hoTen || '').toLowerCase().includes(q) ||
       (item.maPhieuKham || '').toString().includes(q)
     );
   };
@@ -98,16 +145,32 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
 
   // Mở modal khám sinh hiệu (cả thêm mới và sửa)
   const handleOpenVitals = (item) => {
+    // Kiểm tra nếu bệnh nhân chưa có sinh hiệu thì hiển thị thông báo
+    if (!vitalsMap[item.maPhieuKham]) {
+      showWarning(`⚠️ Bệnh nhân ${item.hoTen} chưa có chỉ số sinh hiệu. Vui lòng nhập sinh hiệu trước khi nhập kết quả chuyên môn.`);
+    }
     setVitalsPatient(item);
   };
 
-  // Sau khi lưu sinh hiệu xong, cập nhật lại vitalsMap + tự động mở kết quả chuyên môn
-  const handleVitalsComplete = (item) => {
+  // Sau khi lưu sinh hiệu xong, mở modal tiếp nhận CLS để KTV nhập lý do đến, sàng lọc, ghi chú
+  const handleVitalsComplete = async (item) => {
     setVitalsPatient(null);
     // Cập nhật trạng thái sinh hiệu
-    setVitalsMap(prev => ({...prev, [item.maPhieuKham]: true}));
-    // Mở modal nhập kết quả
-    setSelectedTest(item);
+    setVitalsMap(prev => ({ ...prev, [item.maPhieuKham]: true }));
+
+    // Sau khi đo sinh hiệu xong, mở modal tiếp nhận CLS cho KTV nhập thông tin
+    setTiepNhanClsPatient(item);
+  };
+
+  // Khi KTV hoàn tất tiếp nhận CLS
+  const handleTiepNhanClsComplete = async (item) => {
+    setTiepNhanClsPatient(null);
+    fetchWorklist();
+  };
+
+  // Đóng modal tiếp nhận CLS (không lưu)
+  const handleTiepNhanClsClose = () => {
+    setTiepNhanClsPatient(null);
   };
 
   // Đóng modal sinh hiệu (không lưu)
@@ -123,6 +186,25 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   const handleMarkPresent = (item) => {
     setAbsentTests(prev => prev.filter(t => t.id !== item.id));
     setPendingTests(prev => [...prev, item]);
+  };
+
+  // KTV nhấn KHÁM - gộp: tạo Phiếu khám + mở đo sinh hiệu
+  const handleAcceptPatient = async (registration) => {
+    try {
+      const techId = user?.maNhanVien || '';
+      const result = await acceptClsPatientApi(registration.id, techId);
+      // Tự động mở modal đo sinh hiệu
+      const acceptedPatient = {
+        ...registration,
+        maPhieuKham: result.phieuKhamId,
+        trangThai: 'DANG_KHAM',
+        isDirectAcceptance: true // Đánh dấu là tiếp nhận trực tiếp từ lễ tân
+      };
+      setVitalsPatient(acceptedPatient);
+      fetchWorklist();
+    } catch (error) {
+      showWarning('Lỗi: ' + error.message);
+    }
   };
 
   // Enrich items with vitals status
@@ -154,9 +236,9 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
         <nav className="flex-1 py-6 px-4">
           <ul className="space-y-2">
             {[
-              {id:'worklist', label: deptName, icon: isImaging ? 'image' : 'science'},
-              {id:'history', label: 'Lịch Sử Khoa', icon: 'history'},
-              {id:'patients', label: 'Hồ Sơ', icon:'person_search'}
+              { id: 'worklist', label: deptName, icon: isImaging ? 'image' : 'science' },
+              { id: 'history', label: 'Lịch Sử Khoa', icon: 'history' },
+              { id: 'patients', label: 'Hồ Sơ', icon: 'person_search' }
             ].map(i => (
               <li key={i.id}>
                 <button onClick={() => setActiveTab(i.id)} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200" style={{ backgroundColor: activeTab === i.id ? '#eef2ff' : 'transparent', color: activeTab === i.id ? '#4338ca' : '#64748b' }}>
@@ -201,18 +283,25 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
             })} />
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <TheThongKe title="Chờ tiếp nhận" value={pendingRegistrations.length} icon="person_add" color="from-sky-400 to-blue-500" shadowColor="shadow-blue-500/20" />
                 <TheThongKe title="Chờ thực hiện" value={pendingTests.length} icon="pending_actions" color="from-amber-400 to-orange-500" shadowColor="shadow-orange-500/20" />
                 <TheThongKe title="Đã hoàn thành" value={completedTests.length} icon="task_alt" color="from-emerald-400 to-teal-500" shadowColor="shadow-teal-500/20" />
-                <TheThongKe title="Tổng tiếp nhận" value={pendingTests.length + completedTests.length} icon="assignment" color="from-indigo-400 to-purple-500" shadowColor="shadow-indigo-500/20" />
+                <TheThongKe title="Tổng" value={pendingTests.length + completedTests.length} icon="assignment" color="from-indigo-400 to-purple-500" shadowColor="shadow-indigo-500/20" />
               </div>
 
-              <BangDanhSachCongViec 
-                list={{ 
-                  data: enrichItems(filterList(worklistTab === 'pending' ? pendingTests : worklistTab === 'completed' ? completedTests : absentTests)), 
-                  pendingCount: pendingTests.length, 
+              <BangDanhSachCongViec
+                list={{
+                  data: enrichItems(filterList(
+                    worklistTab === 'reception' ? pendingRegistrations :
+                      worklistTab === 'pending' ? pendingTests :
+                        worklistTab === 'completed' ? completedTests :
+                          absentTests
+                  )),
+                  pendingCount: pendingTests.length,
                   completedCount: completedTests.length,
-                  absentCount: absentTests.length
+                  absentCount: absentTests.length,
+                  receptionCount: pendingRegistrations.length
                 }}
                 worklistTab={worklistTab} setWorklistTab={setWorklistTab}
                 isImaging={isImaging} loading={loading} isRefreshing={isRefreshing}
@@ -223,6 +312,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
                 onManualRefresh={handleManualRefresh}
                 onMarkAbsent={handleMarkAbsent}
                 onMarkPresent={handleMarkPresent}
+                onAcceptPatient={handleAcceptPatient}
               />
             </div>
           )}
@@ -231,19 +321,40 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
 
       {/* Modal nhập kết quả chuyên môn */}
       {selectedTest && <ModalNhapKetQua test={selectedTest} user={user} isImaging={isImaging} onClose={() => setSelectedTest(null)} onSuccess={() => { setSelectedTest(null); fetchWorklist(); }} />}
-      
+
       {/* Modal xem kết quả */}
       {viewingResult && <ModalXemKetQua viewingResult={viewingResult} user={user} isImaging={isImaging} onClose={() => setViewingResult(null)} />}
-      
+
       {/* Modal khám sinh hiệu */}
       {vitalsPatient && (
-        <ModalKhamSinhHieu 
-          patient={vitalsPatient} 
-          user={user} 
-          onClose={handleVitalsClose} 
-          onComplete={handleVitalsComplete} 
+        <ModalKhamSinhHieu
+          patient={vitalsPatient}
+          user={user}
+          onClose={handleVitalsClose}
+          onComplete={handleVitalsComplete}
         />
       )}
+
+      {/* Modal tiếp nhận CLS - KTV nhập lý do đến, sàng lọc, ghi chú */}
+      {tiepNhanClsPatient && (
+        <ModalNhapTiepNhanCls
+          patient={tiepNhanClsPatient}
+          user={user}
+          onClose={handleTiepNhanClsClose}
+          onSuccess={handleTiepNhanClsComplete}
+        />
+      )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        icon={confirmState.icon}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

@@ -5,6 +5,8 @@ const PaymentResult = () => {
     status: '',
     maHoaDon: '',
     message: '',
+    transactionNo: '',
+    payDate: '',
   });
 
   useEffect(() => {
@@ -13,8 +15,25 @@ const PaymentResult = () => {
       status: searchParams.get('status') || '',
       maHoaDon: searchParams.get('maHoaDon') || '',
       message: searchParams.get('message') || '',
+      transactionNo: searchParams.get('transactionNo') || '',
+      payDate: searchParams.get('payDate') || '',
     });
   }, []);
+
+  const formatPayDate = (dateStr) => {
+    if (!dateStr || dateStr.length !== 14) return dateStr || '—';
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    const hour = parseInt(dateStr.substring(8, 10), 10);
+    const minute = dateStr.substring(10, 12);
+    const second = dateStr.substring(12, 14);
+
+    const period = hour >= 12 ? 'CH' : 'SA';
+    const formattedHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+
+    return `${day}/${month}/${year} ${formattedHour}:${minute}:${second} ${period}`;
+  };
 
   const handleBack = () => {
     // Redirect back to main cashier page
@@ -50,10 +69,15 @@ const PaymentResult = () => {
         </div>
 
         {/* Status Text */}
-        <div className="text-center">
+        <div className="text-center px-4">
           <h2 className="font-black text-gray-800 text-2xl mb-2">
             {isSuccess ? 'Thanh Toán Thành Công' : isFail ? 'Thanh Toán Thất Bại' : 'Có Lỗi Xảy Ra'}
           </h2>
+          {(isFail || params.status === 'error') && params.message && (
+            <p className="text-sm text-rose-500 font-semibold mb-3 max-w-[320px] mx-auto leading-relaxed animate-fade-in">
+              {params.message}
+            </p>
+          )}
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
             Cổng Thanh Toán VNPay Sandbox
           </p>
@@ -76,14 +100,30 @@ const PaymentResult = () => {
             </span>
           </div>
 
+          {params.transactionNo && (
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-400 font-bold uppercase tracking-wider">Mã tra cứu</span>
+              <span className="font-extrabold text-slate-800 bg-white border border-slate-100 px-3 py-1 rounded-lg">
+                {params.transactionNo}
+              </span>
+            </div>
+          )}
+
+          {params.payDate && (
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-400 font-bold uppercase tracking-wider">Thời gian</span>
+              <span className="font-extrabold text-slate-800">
+                {formatPayDate(params.payDate)}
+              </span>
+            </div>
+          )}
+
           <div className="flex justify-between items-start text-xs pt-3 border-t border-dashed border-slate-200">
             <span className="text-slate-400 font-bold uppercase tracking-wider">Trạng thái</span>
-            <span className={`font-black text-right ${isSuccess ? 'text-emerald-600' : 'text-rose-500'}`}>
+            <span className={`font-black text-right ${isSuccess ? 'text-emerald-600' : 'text-rose-500'} max-w-[180px] break-words`}>
               {isSuccess 
                 ? 'Đã ghi nhận thanh toán' 
-                : isFail 
-                ? 'Giao dịch không thành công'
-                : params.message || 'Lỗi hệ thống'}
+                : params.message || 'Giao dịch không thành công'}
             </span>
           </div>
         </div>

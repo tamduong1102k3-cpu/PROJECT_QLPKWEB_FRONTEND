@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   getXetNhiemResultsByPhieuKhamApi, 
   approveTestResultApi, 
   rejectTestResultApi 
 } from "../../../api/phieuChiDinhApi";
+import { getTiepNhanClsByPhieuKhamApi } from "../../../api/tiepNhanClsApi";
 import { useNotification } from '../../../components/NotificationContext';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import PrintButton from '../../../components/PrintButton';
@@ -16,18 +17,22 @@ const DuyetKetQuaXetNghiem = ({
   const { showSuccess, showError, showWarning } = useNotification();
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState([]);
+  const [tiepNhanCls, setTiepNhanCls] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
   const [promptState, setPromptState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, value: '' });
 
   useEffect(() => {
-    fetchResults();
+    fetchData();
   }, [patient.maPhieuKham]);
 
-  const fetchResults = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const data = await getXetNhiemResultsByPhieuKhamApi(patient.maPhieuKham);
+      const [data, tiepNhanData] = await Promise.all([
+        getXetNhiemResultsByPhieuKhamApi(patient.maPhieuKham),
+        getTiepNhanClsByPhieuKhamApi(patient.maPhieuKham)
+      ]);
       if (data) {
         setResults(data.map(item => ({
           ...item,
@@ -38,8 +43,12 @@ const DuyetKetQuaXetNghiem = ({
           chiSoList: item.chiSoList || []
         })));
       }
+      // Lấy bản ghi đầu tiên nếu có
+      if (tiepNhanData && tiepNhanData.length > 0) {
+        setTiepNhanCls(tiepNhanData[0]);
+      }
     } catch (e) {
-      console.error("Lỗi khi tải kết quả xét nghiệm:", e);
+      console.error("Lỗi khi tải dữ liệu:", e);
     } finally {
       setLoading(false);
     }
@@ -78,7 +87,7 @@ const DuyetKetQuaXetNghiem = ({
       };
       await approveTestResultApi(result.id, payload);
       showSuccess("Đã ký duyệt kết quả xét nghiệm thành công!");
-      fetchResults();
+      fetchData();
     } catch (e) {
       console.error(e);
       showError("Lỗi khi duyệt kết quả: " + e.message);
@@ -138,6 +147,32 @@ const DuyetKetQuaXetNghiem = ({
           QUAY LẠI HÀNG ĐỢI
         </button>
       </div>
+
+      {/* ── Thông tin tiếp nhận CLS ── */}
+      {tiepNhanCls && patient.loaiDichVu && (
+        <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+          <div className="px-6 py-3 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2">
+            <span className="material-symbols-outlined text-indigo-600 text-lg">assignment</span>
+            <span className="font-bold text-sm text-indigo-700 uppercase tracking-wide">Thông tin tiếp nhận CLS</span>
+          </div>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <span className="text-xs font-bold text-gray-400 uppercase block mb-1">Lý do đến</span>
+              <span className="font-semibold text-gray-800">{tiepNhanCls.lyDoDen}</span>
+            </div>
+            <div>
+              <span className="text-xs font-bold text-gray-400 uppercase block mb-1">Thông tin sàng lọc</span>
+              <span className="font-medium text-gray-700">{tiepNhanCls.thongTinSangLoc}</span>
+            </div>
+            {tiepNhanCls.ghiChu && (
+              <div>
+                <span className="text-xs font-bold text-gray-400 uppercase block mb-1">Ghi chú</span>
+                <span className="font-medium text-gray-700">{tiepNhanCls.ghiChu}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {results.length === 0 ? <div className="bg-white p-12 text-center rounded-2xl shadow-sm border border-gray-100 text-gray-400 italic">
           Chưa có kết quả xét nghiệm nào được kỹ thuật viên nhập cho lượt khám này.
