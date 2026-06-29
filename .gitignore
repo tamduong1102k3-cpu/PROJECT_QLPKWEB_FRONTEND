@@ -21,3 +21,10 @@ backend/target/
 *.rar
 *.zip
 *.tar.gz
+
+# Chỉ ignore các file rác ở thư mục gốc (ngoài frontend/)
+.kilo/
+.vite/
+package-lock.json
+package.json
+task_plan.md
