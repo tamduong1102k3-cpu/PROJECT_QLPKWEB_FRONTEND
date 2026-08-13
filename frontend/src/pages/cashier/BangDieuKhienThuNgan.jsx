@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getAllApi } from '../../api/hoaDonApi';
 import { getTodayApi } from '../../api/phieuKhamApi';
-import { apiClient } from '../../api/apiClient';
+import fetchClient from '../../api/fetchClient';
 import UserMenu from '../../components/UserMenu';
+import LichLamViecTab from '../../components/LichLamViecTab';
 import ThanhToan from './components/ThanhToan';
 import LichSuThanhToan from './components/LichSuThanhToan';
 import useWebSocket from '../../hooks/useWebSocket';
@@ -58,15 +59,126 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
     }
   }, []);
 
+  // Fetch tất cả thông báo có referenceType = "HOA_DON" từ bảng thong_bao
+  const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
+  const fetchAllHoaDonNotifications = useCallback(async () => {
+    try {
+      const response = await fetchClient(`${baseUrl}/api/thong-bao/reference-type/HOA_DON`);
+      const result = await response.json();
+      if (result?.success && Array.isArray(result.data)) {
+        setNotifications(prev => {
+          const existingIds = new Set(prev.map(n => n.id));
+          const newNotifs = result.data
+            .filter(tb => !existingIds.has(tb.id))
+            .map(tb => ({
+              id: tb.id,
+              title: tb.tieuDe || 'Thông báo hóa đơn',
+              message: tb.noiDung || '',
+              type: 'success',
+              createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
+              read: tb.daDoc || false
+            }));
+          return [...newNotifs, ...prev];
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching HOA_DON notifications:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
   }, [fetchStats]);
 
+  // Load tất cả thông báo HOA_DON khi component mount
+  useEffect(() => {
+    fetchAllHoaDonNotifications();
+  }, [fetchAllHoaDonNotifications]);
+
+  // Load lại thông báo HOA_DON mỗi khi có refresh trigger (có thanh toán mới)
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      fetchAllHoaDonNotifications();
+    }
+  }, [refreshTrigger, fetchAllHoaDonNotifications]);
+
+  // Sau khi thanh toán thành công: cập nhật thống kê + tải lại thông báo HOA_DON cho icon chuông
+  const handlePaymentSuccess = useCallback(() => {
+    fetchStats();
+    fetchAllHoaDonNotifications();
+  }, [fetchStats, fetchAllHoaDonNotifications]);
+
+  // Fetch thong_bao từ backend cho thu ngân
+  // Gọi API thật từ bảng thong_bao, không dùng local notification
+  const fetchPaymentNotifications = useCallback(async () => {
+    try {
+      // Lấy mã nhân viên từ token
+      const token = localStorage.getItem('token');
+      let maNhanVien = null;
+      if (token) {
+        try {
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const payload = JSON.parse(window.atob(base64));
+          maNhanVien = payload.maNhanVien || payload.userId;
+        } catch (e) { console.error('Error decoding token:', e); }
+      }
+
+      if (!maNhanVien) return;
+
+      // Gọi API lấy thông báo chưa đọc cho thu ngân (loaiNguoiNhan = "BENH_NHAN" vì thu ngân dùng chung)
+      const response = await fetchClient(`${baseUrl}/api/thong-bao/${maNhanVien}/BENH_NHAN?chiChuaDoc=true`);
+      const result = await response.json();
+
+      if (result?.success && Array.isArray(result.data)) {
+        setNotifications(prev => {
+          const existingIds = new Set(prev.map(n => n.id));
+          const newNotifs = result.data
+            .filter(tb => !existingIds.has(tb.id))
+            .map(tb => ({
+              id: tb.id,
+              title: tb.tieuDe,
+              message: tb.noiDung,
+              type: 'success',
+              createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
+              read: tb.daDoc || false
+            }));
+          return [...newNotifs, ...prev];
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching notification from API:', error);
+    }
+  }, []);
+
+  // Lấy mã nhân viên từ token để subscribe WebSocket topic thông báo
+  const [maNhanVien, setMaNhanVien] = useState(null);
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(window.atob(base64));
+        setMaNhanVien(payload.maNhanVien || payload.userId);
+      } catch (e) { console.error('Error decoding token:', e); }
+    }
+  }, []);
+
+  // Build danh sách topics WebSocket, bao gồm topic thông báo riêng cho thu ngân
+  const wsTopics = [
+    '/topic/payment',
+    '/topic/hoa-don',
+    '/topic/phieu-kham',
+    '/topic/dang-ky-kham',
+    ...(maNhanVien ? [`/topic/thong-bao/${maNhanVien}`] : [])
+  ];
+
   // WebSocket subscription for realtime payment notifications and invoice updates
   useWebSocket({
-    topics: ['/topic/payment', '/topic/hoa-don', '/topic/phieu-kham', '/topic/dang-ky-kham'],
+    topics: wsTopics,
     onMessage: (topic, data) => {
       if (topic === '/topic/payment') {
         const now = Date.now();
@@ -79,21 +191,27 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
         }
         lastHandledRef.current = { maHoaDon: data.maHoaDon, ts: now };
 
-        const newNotif = {
-          id: Date.now() + Math.random(),
-          title: 'Thanh toán thành công',
-          message: `Hóa đơn #${data.maHoaDon} đã thanh toán thành công qua VNPay.`,
-          type: 'success',
-          createdAt: new Date(),
-          read: false
-        };
-
-        setNotifications(prev => [newNotif, ...prev]);
+        // Fetch thông báo thanh toán từ API thay vì hardcode
+        fetchPaymentNotifications();
         fetchStats();
         setRefreshTrigger(prev => prev + 1);
       } else if (topic === '/topic/hoa-don' || topic === '/topic/phieu-kham' || topic === '/topic/dang-ky-kham') {
         fetchStats();
         setRefreshTrigger(prev => prev + 1);
+      } else if (topic.startsWith('/topic/thong-bao/') && data) {
+        // Nhận thông báo realtime từ WebSocket
+        setNotifications(prev => {
+          const existingIds = new Set(prev.map(n => n.id));
+          if (existingIds.has(data.id)) return prev;
+          return [{
+            id: data.id,
+            title: data.tieuDe || 'Thông báo',
+            message: data.noiDung || '',
+            type: 'success',
+            createdAt: new Date(),
+            read: false
+          }, ...prev];
+        });
       }
     }
   });
@@ -115,6 +233,7 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
   const navItems = [
     { id: 'payment', label: 'Thanh Toán', icon: 'payments' },
     { id: 'history', label: 'Lịch Sử', icon: 'receipt_long' },
+    { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: 'calendar_month' },
   ];
 
   const formatCurrency = (amount) => {
@@ -128,9 +247,8 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
     <div className="flex h-screen bg-[#f3f4f6] font-body-md text-on-background overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20`}
+        className={`${isSidebarOpen ? 'w-64' : 'w-20'
+          } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20`}
       >
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
           <div className="flex items-center gap-2">
@@ -153,11 +271,10 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
               <li key={item.id}>
                 <button
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all ${
-                    activeTab === item.id
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all ${activeTab === item.id
                       ? 'bg-emerald-50 text-emerald-700 font-bold translate-x-1 border border-emerald-200'
                       : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
+                    }`}
                 >
                   <span className="material-symbols-outlined">
                     {item.icon}
@@ -192,7 +309,7 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10 shadow-sm">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 relative z-50 shadow-sm">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -223,10 +340,10 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
 
         <main className="flex-1 overflow-y-auto p-6 bg-[#f8f9fa] scroll-smooth">
           {activeTab === 'payment' && (
-            <ThanhToan 
-              user={user} 
-              onPaymentSuccess={fetchStats} 
-              refreshTrigger={refreshTrigger} 
+            <ThanhToan
+              user={user}
+              onPaymentSuccess={handlePaymentSuccess}
+              refreshTrigger={refreshTrigger}
             />
           )}
 
@@ -234,6 +351,10 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
             <LichSuThanhToan
               formatCurrency={formatCurrency}
             />
+          )}
+
+          {activeTab === 'lichlamviec' && (
+            <LichLamViecTab user={user} />
           )}
         </main>
       </div>

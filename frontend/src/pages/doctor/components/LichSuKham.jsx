@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getApprovedHistoryApi } from '../../../api/phieuChiDinhApi';
 import { getHistoryApi } from '../../../api/phieuKhamApi';
+import { getByPhieuKhamApi } from '../../../api/khamLamSangApi';
+import { ModalContent } from '../../../components/ChiTietKhamModal';
 
 const LichSuKham = ({
   user,
@@ -8,6 +10,8 @@ const LichSuKham = ({
 }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [detailData, setDetailData] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const isXetNghiemDoc = user?.maChuyenKhoa === 7 || user?.tenChuyenKhoa?.toLowerCase()?.includes('xét nghiệm') || user?.tenChuyenKhoa?.toLowerCase()?.includes('xact nghiem') || user?.tenChuyenKhoa?.toLowerCase()?.includes('xact nghi?m');
   
   const fetchHistory = useCallback(async () => {
@@ -31,6 +35,28 @@ const LichSuKham = ({
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
+
+  const handleViewDetail = async (item) => {
+    setDetailLoading(true);
+    setDetailData(null);
+    try {
+      const data = await getByPhieuKhamApi(item.maPhieuKham);
+      if (data) {
+        setDetailData({
+          ...data,
+          maPhieuKham: item.maPhieuKham,
+          hoTen: item.hoTen,
+          ngayKham: item.ngayKham,
+          tenChuyenKhoa: item.tenChuyenKhoa,
+          tenNhanVien: item.tenNhanVien,
+        });
+      }
+    } catch (error) {
+      console.error("Lỗi tải chi tiết khám lâm sàng:", error);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   return <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -68,16 +94,40 @@ const LichSuKham = ({
                   </td>
                   <td className="px-6 py-4 text-gray-600 italic text-sm">{item.chanDoan || 'Đang cập nhật...'}</td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => onSelectPatient(item)} className="text-indigo-600 hover:text-indigo-800 font-bold text-sm flex items-center gap-1 ml-auto">
-                      <span className="material-symbols-outlined text-sm">edit</span>
-                      Sửa / Xem
-                    </button>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => onSelectPatient(item)} className="text-indigo-600 hover:text-indigo-800 font-bold text-sm flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        Sửa / Xem
+                      </button>
+                      <button onClick={() => handleViewDetail(item)} className="px-3 py-1.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-all text-xs flex items-center gap-1 shadow-sm">
+                        <span className="material-symbols-outlined text-xs">visibility</span>
+                        Chi tiết
+                      </button>
+                    </div>
                   </td>
                 </tr>)}
           </tbody>
         </table>
       </div>
-    </div>;
+    </div>
+    
+    {/* Loading detail */}
+    {detailLoading && (
+      <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-xs flex items-center justify-center">
+        <div className="bg-white p-6 rounded-2xl shadow-xl border flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+          <span className="text-xs font-bold text-gray-600">Đang tải chi tiết...</span>
+        </div>
+      </div>
+    )}
+
+    {/* Detail Modal */}
+    {detailData && (
+      <ModalContent
+        data={detailData}
+        onClose={() => setDetailData(null)}
+      />
+    )}
 };
 
 export default LichSuKham;

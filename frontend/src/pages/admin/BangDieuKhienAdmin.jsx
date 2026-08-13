@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import UserMenu from '../../components/UserMenu';
 import QuanLyNhanVien from './components/QuanLyNhanVien';
 import QuanLyTaiKhoan from './components/QuanLyTaiKhoan';
-import QuanLyHoaDon from './components/QuanLyHoaDon';
 import QuanLyNhaThuoc from './components/QuanLyNhaThuoc';
 import QuanLyCaLamViec from './components/QuanLyCaLamViec';
 import QuanLyThongKe from './components/QuanLyThongKe';
@@ -23,7 +22,7 @@ const BangDieuKhienAdmin = ({
   const [sapHetLoading, setSapHetLoading] = useState(true);
   const [summary, setSummary] = useState({
     tongBenhNhan: 0,
-    lichHenHomNay: 0,
+    lichKhamHomNay: 0,
     doanhThuThang: 0,
     doanhThu7Ngay: [],
     luotKhamTuan: 0,
@@ -38,7 +37,16 @@ const BangDieuKhienAdmin = ({
 
     // Fetch dashboard summary
     apiClient('https://qlpk-backend-spring-boot.onrender.com/api/thong-ke/dashboard-summary').then(res => res.ok ? res.json() : null).then(data => {
-      if (data) setSummary(data);
+      if (data) {
+        setSummary({
+          tongBenhNhan: data.tongBenhNhan ?? 0,
+          lichKhamHomNay: data.lichKhamHomNay ?? 0,
+          doanhThuThang: data.doanhThuThang ?? 0,
+          doanhThu7Ngay: data.doanhThu7Ngay ?? [],
+          luotKhamTuan: data.luotKhamTuan ?? 0,
+          topDichVu: data.topDichVu ?? []
+        });
+      }
     }).catch(err => console.error("Error fetching dashboard summary:", err));
   }, []);
 
@@ -51,7 +59,7 @@ const BangDieuKhienAdmin = ({
     trend: ''
   }, {
     title: 'Lịch Hẹn Hôm Nay',
-    value: summary.lichHenHomNay.toLocaleString(),
+    value: summary.lichKhamHomNay.toLocaleString(),
     icon: 'event',
     color: 'bg-green-500',
     trend: ''
@@ -96,16 +104,12 @@ const BangDieuKhienAdmin = ({
     icon: 'dashboard'
   }, {
     id: 'patients',
-    label: 'Bệnh Nhân',
+    label: 'Thông Tin Bệnh Nhân',
     icon: 'patient_list'
   }, {
     id: 'employees',
     label: 'Nhân Viên',
     icon: 'badge'
-  }, {
-    id: 'invoices',
-    label: 'Hóa Đơn',
-    icon: 'receipt_long'
   }, {
     id: 'pharmacy',
     label: 'Kho Thuốc',
@@ -168,7 +172,7 @@ const BangDieuKhienAdmin = ({
       <div className="flex-1 flex flex-col overflow-hidden">
         
         {/* Top Header */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 relative z-50">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-500 hover:text-gray-900 focus:outline-none p-1 rounded-md hover:bg-gray-100">
               <span className="material-symbols-outlined">menu</span>
@@ -365,7 +369,7 @@ const BangDieuKhienAdmin = ({
                     </table>
                   </div>}
               </div>
-            </div> : activeTab === 'patients' ? <QuanLyBenhNhan /> : activeTab === 'employees' ? <QuanLyNhanVien /> : activeTab === 'accounts' ? <QuanLyTaiKhoan /> : activeTab === 'invoices' ? <QuanLyHoaDon /> : activeTab === 'pharmacy' ? <QuanLyNhaThuoc /> : activeTab === 'shifts' ? <QuanLyCaLamViec /> : activeTab === 'statistics' ? <QuanLyThongKe /> : activeTab === 'rooms' ? <QuanLyPhong /> : activeTab === 'services' ? <QuanLyDichVu /> : activeTab === 'specialties' ? <QuanLyChuyenKhoa /> : activeTab === 'settings' ? <QuanLyCaiDat /> :
+      </div> : activeTab === 'patients' ? <QuanLyBenhNhan title="Thông Tin Bệnh Nhân" /> : activeTab === 'employees' ? <QuanLyNhanVien /> : activeTab === 'accounts' ? <QuanLyTaiKhoan /> : activeTab === 'pharmacy' ? <QuanLyNhaThuoc /> : activeTab === 'shifts' ? <QuanLyCaLamViec /> : activeTab === 'statistics' ? <QuanLyThongKe /> : activeTab === 'rooms' ? <QuanLyPhong /> : activeTab === 'services' ? <QuanLyDichVu /> : activeTab === 'specialties' ? <QuanLyChuyenKhoa /> : activeTab === 'settings' ? <QuanLyCaiDat /> :
         // Placeholder for other tabs
         <div className="flex flex-col items-center justify-center h-full text-gray-400 animate-fade-in">
               <span className="material-symbols-outlined text-6xl mb-4 opacity-50">

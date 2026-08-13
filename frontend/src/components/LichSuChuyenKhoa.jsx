@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { getSpecialtyHistoryApi, getAvailableClsResultsApi } from '../api/phieuKhamApi';
 import { getByPhieuKhamApi as _getToaThuocByPhieuKhamApi, getDetailsApi as _getToaThuocDetailsApi } from '../api/toaThuocApi';
+import { getByPhieuKhamApi } from '../api/khamLamSangApi';
 import { useNotification } from '../components/NotificationContext';
-import { sqlLikeMatch } from '../utils/searchUtils';
+import Modal from './Modal';
+import usePagination from '../hooks/usePagination';
+import Pagination from './Pagination';
 
-const LichSuChuyenKhoa = ({ user, onReview }) => {
+const PAGE_SIZE = 8;
+
+const LichSuChuyenKhoa = ({ user }) => {
   const { showError } = useNotification();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,16 +35,27 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
   }, [maChuyenKhoa]);
 
   useEffect(() => {
-    fetchHistory();
+    fetchHistory(); // eslint-disable-line react-hooks/set-state-in-effect
   }, [fetchHistory]);
 
-  const filteredHistory = history.filter(item => {
-    if (!searchTerm) return true;
-    return (
-      sqlLikeMatch(item.hoTen, searchTerm) ||
-      sqlLikeMatch(item.maPhieuKham, searchTerm) ||
-      sqlLikeMatch(item.chanDoan, searchTerm)
-    );
+  const {
+    paginatedData: paginatedHistory,
+    filteredData: filteredHistory,
+    totalItems: filteredCount,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    safeCurrentPage,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+    pageError,
+  } = usePagination({
+    data: history,
+    pageSize: PAGE_SIZE,
+    searchKeys: ['hoTen', 'maPhieuKham', 'chanDoan'],
+    searchTerm,
   });
 
   const handleViewDetail = async (historyItem) => {
@@ -46,6 +63,23 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
     setDetailLoading(true);
     setDetailData(null);
     try {
+      // 0. Fetch KhamLamSang details by maPhieuKham
+      try {
+        const khamLamSangData = await getByPhieuKhamApi(historyItem.maPhieuKham);
+        if (khamLamSangData) {
+          historyItem = {
+            ...historyItem,
+            lyDoKham: khamLamSangData.lyDoKham || historyItem.lyDoKham,
+            khamLamSang: khamLamSangData.khamLamSang || historyItem.khamLamSang,
+            chanDoanSoBo: khamLamSangData.chanDoanSoBo || historyItem.chanDoanSoBo,
+            loiDanBacSi: khamLamSangData.loiDanBacSi || historyItem.loiDanBacSi,
+          };
+          setSelectedHistoryItem(historyItem);
+        }
+      } catch (err) {
+        console.error("Lỗi lấy khám lâm sàng lịch sử:", err);
+      }
+
       // 1. Fetch CLS results
       let clsResults = [];
       try {
@@ -99,7 +133,7 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
           </h3>
           <p className="text-xs text-slate-400 font-medium">Chuyên khoa: {user?.tenChuyenKhoa || 'Mọi chuyên khoa'}</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <div className="relative">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
@@ -131,6 +165,14 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
         </div>
       </div>
 
+      {/* IN-LIST WARNING */}
+      {pageError && (
+        <div className="px-6 py-3 bg-rose-50 border-b border-rose-100 text-rose-600 text-xs font-bold flex items-center gap-2">
+          <span className="material-symbols-outlined text-sm">error</span>
+          {pageError}
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -138,6 +180,8 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Mã Phiếu</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Bệnh Nhân</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Ngày Khám</th>
+              <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Bác Sĩ</th>
+              <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Dịch Vụ</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Chẩn Đoán</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider text-right">Thao Tác</th>
             </tr>
@@ -159,7 +203,7 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
                 </td>
               </tr>
             ) : (
-              filteredHistory.map(item => (
+              paginatedHistory.map(item => (
                 <tr key={item.maPhieuKham} className="hover:bg-indigo-50/20 transition-colors group">
                   <td className="px-6 py-4 font-bold text-xs text-indigo-600">
                     #{item.maPhieuKham}
@@ -176,24 +220,18 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-500 font-medium">
-                    {item.ngayKham ? new Date(item.ngayKham).toLocaleString('vi-VN', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    }) : '—'}
+                    {item.ngayKham ? new Date(item.ngayKham).toLocaleDateString('vi-VN') : '--'}
                   </td>
-                  <td className="px-6 py-4 text-xs text-slate-600 font-medium italic max-w-xs truncate">
-                    {item.chanDoan || 'Không có ghi nhận chẩn đoán'}
-                  </td>
+                  <td className="px-6 py-4 text-xs text-slate-600 font-medium">{item.tenNhanVien || '--'}</td>
+                  <td className="px-6 py-4 text-xs text-slate-600">{item.tenDichVu || '--'}</td>
+                  <td className="px-6 py-4 text-xs text-slate-600 max-w-[200px] truncate">{item.chanDoan || '--'}</td>
                   <td className="px-6 py-4 text-right">
                     <button
                       onClick={() => handleViewDetail(item)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-600 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
                     >
                       <span className="material-symbols-outlined text-[14px]">visibility</span>
-                      Xem chi tiết
+                      Chi tiết
                     </button>
                   </td>
                 </tr>
@@ -203,20 +241,42 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
         </table>
       </div>
 
-      {/* COMPREHENSIVE DETAIL MODAL - same as TabLichSuKhamChiTiet */}
+      {/* PAGINATION UI */}
+      {!loading && filteredHistory.length > 0 && (
+        <div className="px-6 py-4 border-t border-slate-100">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredCount}
+            label="phiếu"
+            visiblePages={visiblePages}
+            onPageChange={setCurrentPage}
+            jumpPage={jumpPage}
+            onJumpPage={handleJumpPage}
+            onJumpBlur={handleJumpPageBlur}
+            activeClass="bg-indigo-600 text-white shadow-md shadow-indigo-100"
+            hoverClass="hover:bg-indigo-50 hover:text-indigo-600"
+            ringClass="focus:ring-2 focus:ring-indigo-200"
+          />
+        </div>
+      )}
+
+      {/* COMPREHENSIVE DETAIL MODAL */}
       {selectedHistoryItem && detailData && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-gray-100 overflow-hidden animate-scale-up flex flex-col max-h-[90vh]">
+        <Modal isOpen={true} onClose={() => { setSelectedHistoryItem(null); setDetailData(null); }} maxWidth="900px" zIndex={9999} unstyled={true}>
+          <div className="bg-white rounded-3xl max-w-4xl w-full mx-auto shadow-2xl border border-gray-100 overflow-hidden animate-scale-up flex flex-col max-h-[90vh]">
             {/* Modal Header */}
             <div className="bg-indigo-950 px-6 py-4 flex items-center justify-between text-white flex-shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-2xl text-indigo-400">history_edu</span>
                 <div>
-                  <span className="font-black text-base block">Chi tiết lịch sử phiên khám</span>
-                  <span className="text-xs text-indigo-300 font-semibold">Mã phiếu khám: #{selectedHistoryItem.maPhieuKham}</span>
+                  <span className="font-bold text-base block">Chi tiết lịch sử phiên khám</span>
+                  <span className="text-xs text-indigo-300 font-semibold">
+                    #{selectedHistoryItem.maPhieuKham} — {selectedHistoryItem.tenChuyenKhoa} {selectedHistoryItem.tenDichVu ? ` — ${selectedHistoryItem.tenDichVu}` : ''} — BS. {selectedHistoryItem.tenNhanVien}
+                  </span>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => { setSelectedHistoryItem(null); setDetailData(null); }}
                 className="p-1 hover:bg-white/10 text-white/80 hover:text-white rounded-full transition-all"
               >
@@ -228,20 +288,20 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* SECTION 1: KHÁM LÂM SÀNG & SINH HIỆU */}
               <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4">
-                <h4 className="text-xs font-black text-indigo-800 uppercase tracking-wider flex items-center gap-2 border-b border-gray-200 pb-2">
+                <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider flex items-center gap-2 border-b border-gray-200 pb-2">
                   <span className="material-symbols-outlined text-sm text-indigo-600">clinical_notes</span>
                   1. Khám Lâm Sàng
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div>
-                      <span className="text-[10px] font-black text-gray-400 uppercase block mb-0.5">Lý do khám</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase block mb-0.5">Lý do khám</span>
                       <p className="text-sm text-gray-700 bg-white p-3 rounded-xl border border-gray-100 font-medium">
                         {selectedHistoryItem.lyDoKham || 'N/A'}
                       </p>
                     </div>
                     <div>
-                      <span className="text-[10px] font-black text-gray-400 uppercase block mb-0.5">Khám lâm sàng</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase block mb-0.5">Khám lâm sàng</span>
                       <p className="text-sm text-gray-700 bg-white p-3 rounded-xl border border-gray-100 whitespace-pre-wrap">
                         {selectedHistoryItem.khamLamSang || 'N/A'}
                       </p>
@@ -249,13 +309,13 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <span className="text-[10px] font-black text-gray-400 uppercase block mb-0.5">Chẩn đoán sơ bộ</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase block mb-0.5">Chẩn đoán sơ bộ</span>
                       <p className="text-sm font-bold text-emerald-900 bg-emerald-50 p-3 rounded-xl border border-emerald-100">
                         {selectedHistoryItem.chanDoanSoBo || 'N/A'}
                       </p>
                     </div>
                     <div>
-                      <span className="text-[10px] font-black text-gray-400 uppercase block mb-0.5">Lời dặn bác sĩ</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase block mb-0.5">Lời dặn bác sĩ</span>
                       <p className="text-sm text-amber-900 bg-amber-50 p-3 rounded-xl border border-amber-100 italic">
                         {selectedHistoryItem.loiDanBacSi || 'N/A'}
                       </p>
@@ -266,7 +326,7 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
 
               {/* SECTION 2: KẾT QUẢ CẬN LÂM SÀNG */}
               <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4">
-                <h4 className="text-xs font-black text-indigo-800 uppercase tracking-wider flex items-center gap-2 border-b border-gray-200 pb-2">
+                <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider flex items-center gap-2 border-b border-gray-200 pb-2">
                   <span className="material-symbols-outlined text-sm text-indigo-600">biotech</span>
                   2. Kết Quả Cận Lâm Sàng ({detailData.clsResults.length})
                 </h4>
@@ -281,7 +341,7 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
                             </span>
                             {cls.tenDichVu}
                           </span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-black uppercase ${
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
                             cls.loai === 'XET_NGHIEM' ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'
                           }`}>
                             {cls.loai === 'XET_NGHIEM' ? 'Xét nghiệm' : 'CĐHA'}
@@ -311,7 +371,7 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
 
               {/* SECTION 3: ĐƠN THUỐC ĐÃ KÊ */}
               <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4">
-                <h4 className="text-xs font-black text-indigo-800 uppercase tracking-wider flex items-center gap-2 border-b border-gray-200 pb-2">
+                <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider flex items-center gap-2 border-b border-gray-200 pb-2">
                   <span className="material-symbols-outlined text-sm text-indigo-600">medication</span>
                   3. Đơn Thuốc Đã Kê ({detailData.meds.length} thuốc)
                 </h4>
@@ -368,17 +428,18 @@ const LichSuChuyenKhoa = ({ user, onReview }) => {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* DETAILED LOADER SPINNER */}
-      {detailLoading && (
-        <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-xs flex items-center justify-center">
+      {detailLoading && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-xs flex items-center justify-center" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
           <div className="bg-white p-6 rounded-2xl shadow-xl border flex items-center gap-3">
             <div className="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
             <span className="text-xs font-bold text-gray-600">Đang tải toàn bộ dữ liệu lịch sử phiên khám...</span>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

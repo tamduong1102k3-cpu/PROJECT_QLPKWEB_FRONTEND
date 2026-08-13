@@ -95,3 +95,22 @@ export const getCurrentRoomApi = async (maNhanVien) => {
     throw error;
   }
 };
+
+/**
+ * Lấy lịch làm việc (các thứ trong tuần) của một nhân viên theo mã nhân viên
+ * Endpoint: GET /api/phan-cong/by-nhan-vien/{maNhanVien}
+ */
+export const getShiftsByNhanVienApi = async (maNhanVien) => {
+  try {
+    const response = await fetchClient(`${API_URL}/by-nhan-vien/${maNhanVien}`, {
+      method: 'GET',
+    });
+    if (!response.ok) {
+      throw new Error(`Lỗi: ${response.status} - Không thể lấy lịch làm việc của nhân viên`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error in getShiftsByNhanVienApi:", error);
+    throw error;
+  }
+};

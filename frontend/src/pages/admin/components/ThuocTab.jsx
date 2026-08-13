@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { deleteThuocApi as _deleteThuocApi } from '../../../api/khoThuocApi';
 import { apiClient } from "../../../api/apiClient";
 import { card, th, td, formatCurrency } from './styles';
+import usePagination from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 
 const API = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
 
@@ -9,6 +11,23 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const {
+    paginatedData: pagedItems,
+    totalItems,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+  } = usePagination({
+    data: items,
+    pageSize: 10,
+    searchKeys: ['tenThuoc', 'hoatChat'],
+    searchTerm: search,
+  });
 
   const handleDelete = async id => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa thuốc này?')) return;
@@ -40,11 +59,6 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
     } catch (e) { alert(e.message); }
     finally { setLoading(false); }
   };
-
-  const filtered = items.filter(i =>
-    !search || i.tenThuoc.toLowerCase().includes(search.toLowerCase())
-    || i.hoatChat?.toLowerCase().includes(search.toLowerCase())
-  );
 
   return <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
     <div style={{ ...card, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -78,7 +92,7 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
           </tr>
         </thead>
         <tbody>
-          {filtered.map(i => <tr key={i.maThuoc}>
+          {pagedItems.map(i => <tr key={i.maThuoc}>
             <td style={td}>
               <div style={{ fontWeight: 600 }}>{i.tenThuoc}</div>
               <div style={{ fontSize: '12px', color: '#6b7280' }}>{i.hoatChat} - {i.hamLuong}</div>
@@ -107,8 +121,26 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
                   </div>}
             </td>
           </tr>)}
+          {pagedItems.length === 0 && (
+            <tr><td colSpan="6" style={{ ...td, textAlign: 'center', padding: '48px', color: '#9ca3af' }}>Không có dữ liệu.</td></tr>
+          )}
         </tbody>
       </table>
+
+      {totalItems > 0 && (
+        <Pagination
+          mode="inline"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          label="thuốc"
+          visiblePages={visiblePages}
+          onPageChange={setCurrentPage}
+          jumpPage={jumpPage}
+          onJumpPage={handleJumpPage}
+          onJumpBlur={handleJumpPageBlur}
+        />
+      )}
     </div>
 
     {editing && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>

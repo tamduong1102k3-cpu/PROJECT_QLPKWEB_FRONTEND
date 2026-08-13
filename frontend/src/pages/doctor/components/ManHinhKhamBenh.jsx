@@ -24,7 +24,8 @@ import {
 import { getByPhieuKhamApi as _getChiSoKhamByPhieuKhamApi } from '../../../api/chiSoKhamTongHopApi';
 import { 
   finishConsultationApi as _finishKhamApi,
-  updateToClsApi as _updateToClsApi
+  updateToClsApi as _updateToClsApi,
+  getPatientHistoryApi as _getPatientHistoryApi
 } from '../../../api/phieuKhamApi';
 import { saveAndUpdateApi as _saveChiSoKhamTongHopApi } from '../../../api/chiSoKhamTongHopApi';
 
@@ -150,7 +151,9 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
                         maDichVu: d.maDichVu,
                         tenDichVu: catalogService?.tenDichVu || d.tenDichVu || `Dịch vụ #${d.maDichVu}`,
                         donGia: d.donGia,
-                        soLuong: d.soLuong
+                        soLuong: d.soLuong,
+                        trangThaiDv: d.trangThaiDv || 'CHUA_THUC_HIEN',
+                        id: d.id
                       });
                     }
                   }
@@ -297,7 +300,8 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     }
     setSelectedServices([...selectedServices, {
       ...service,
-      soLuong: 1
+      soLuong: 1,
+      trangThaiDv: 'CHUA_THUC_HIEN'
     }]);
     setShowServiceList(false);
     setServiceSearch('');
@@ -393,7 +397,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const fetchExamHistory = useCallback(async () => {
     if (!selectedPatient?.maBenhNhan) return;
     try {
-      const data = await _getKhamLamSangByBenhNhanApi(selectedPatient.maBenhNhan);
+      const data = await _getPatientHistoryApi(selectedPatient.maBenhNhan);
       if (data) setExamHistory(data);
     } catch (error) {
       console.error("Lỗi khi tải lịch sử khám:", error);
@@ -494,6 +498,38 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
 
   const handleUpdateMedField = (maThuoc, field, value) => {
     setSelectedMeds(prev => prev.map(m => m.maThuoc === maThuoc ? { ...m, [field]: value } : m));
+  };
+
+  // Sao chép toa thuốc cũ vào toa đang kê (từ lịch sử khám), rồi chuyển sang tab Kê đơn
+  const handleCopyPrescription = (meds) => {
+    if (!meds || meds.length === 0) {
+      showWarning("Toa cũ không có thuốc để sao chép.");
+      return;
+    }
+    const copiedMeds = meds.map(m => {
+      const catalogMed = allMeds.find(x => x.maThuoc === m.maThuoc);
+      return {
+        maThuoc: m.maThuoc,
+        tenThuoc: catalogMed?.tenThuoc || m.tenThuoc || `Thuốc #${m.maThuoc}`,
+        hoatChat: catalogMed?.hoatChat || m.hoatChat || '',
+        donViTinh: catalogMed?.donViTinh || m.donViTinh || '',
+        sang: m.sang || '1',
+        trua: m.trua || '0',
+        chieu: m.chieu || '0',
+        toi: m.toi || '1',
+        soNgay: m.soNgay || 3,
+        cachDung: m.cachDung || 'Uống sau ăn',
+        thoiDiemDung: m.thoiDiemDung || 'Sáng, Tối',
+        lieuDung: m.lieuDung || 'Ngày uống 2 lần',
+        tonKho: catalogMed?.tonKho ?? (m.tonKho ?? 0),
+        trangThaiKho: catalogMed?.trangThaiKho || (m.trangThaiKho || 'BÌNH_THƯỜNG')
+      };
+    });
+    // Thay thế danh sách thuốc đang kê bằng toa cũ
+    setSelectedMeds(copiedMeds);
+    handleSavePrescription(true, copiedMeds);
+    setExamSubTab('prescription');
+    showSuccess(`Đã sao chép ${copiedMeds.length} thuốc từ toa cũ vào đơn kê. Bạn có thể chỉnh sửa trước khi lưu.`);
   };
 
   const handleTabChange = async (newTabId) => {
@@ -718,10 +754,19 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
               handleSaveReferral={handleSaveReferral} 
               selectedServices={selectedServices} 
               setSelectedServices={setSelectedServices} 
+              selectedPatient={selectedPatient}
+              user={user}
             />
           )}
 
-          {examSubTab === 'history' && <TabLichSuKhamChiTiet examHistory={examHistory} allMeds={allMeds} />}
+          {examSubTab === 'history' && (
+            <TabLichSuKhamChiTiet
+              examHistory={examHistory}
+              allMeds={allMeds}
+              user={user}
+              onCopyPrescription={handleCopyPrescription}
+            />
+          )}
 
           {examSubTab === 'prescription' && (
             <TabKeDonThuoc 

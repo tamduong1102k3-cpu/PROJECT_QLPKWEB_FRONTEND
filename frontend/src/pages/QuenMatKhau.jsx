@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { sendOtpApi, resetPasswordApi } from '../api/accountApi';
+import { sendOtpApi, verifyOtpApi, resetPasswordApi } from '../api/accountApi';
 
 const QuenMatKhau = ({ onBackToLogin }) => {
     const [step, setStep] = useState(1);
     const [email, setEmail] = useState('');
     const [otpInput, setOtpInput] = useState('');
-    const [generatedOtp, setGeneratedOtp] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -23,20 +22,9 @@ const QuenMatKhau = ({ onBackToLogin }) => {
 
         setLoading(true);
 
-        // Lưu ý: Trong thực tế, việc tạo OTP và gửi email PHẢI được thực hiện ở Backend (Spring Boot/Node.js).
-        // Frontend chỉ gọi API gửi email, không tự gửi mail bằng SMTP như Java Swing.
-        // Dưới đây là code giả lập gọi API backend gửi OTP.
         try {
-            // Gọi API thật lên Backend
-            const response = await sendOtpApi(email);
-            
-            // Nếu Backend trả về OTP trong response (giống logic cũ) để frontend tự check:
-            // Bạn có thể lưu vào state setGeneratedOtp(response.otp) nếu backend trả về như vậy.
-            // Tạm thời, tôi sẽ mặc định Backend gửi OTP đi và trả về success. 
-            // Nếu Backend trả về OTP, hãy sửa lại đoạn lấy OTP:
-            if (response && response.otp) {
-                setGeneratedOtp(response.otp.toString());
-            }
+            // Gọi API lên Backend
+            await sendOtpApi(email);
 
             setMessage({ type: 'success', text: `Đã gửi mã xác nhận đến: ${email}` });
             setStep(2);
@@ -48,15 +36,25 @@ const QuenMatKhau = ({ onBackToLogin }) => {
         }
     };
 
-    // Step 2: Handle Verify OTP
-    const handleVerifyOtp = (e) => {
+    // Step 2: Handle Verify OTP (gọi API backend xác thực)
+    const handleVerifyOtp = async (e) => {
         e.preventDefault();
         setMessage({ type: '', text: '' });
 
-        if (otpInput === generatedOtp) {
+        if (!otpInput || otpInput.length !== 6) {
+            setMessage({ type: 'error', text: 'Vui lòng nhập mã OTP 6 số!' });
+            return;
+        }
+
+        try {
+            setLoading(true);
+            // Gọi API backend xác thực OTP
+            await verifyOtpApi({ email, otp: otpInput });
             setStep(3);
-        } else {
-            setMessage({ type: 'error', text: 'Mã xác nhận không đúng!' });
+        } catch (error) {
+            setMessage({ type: 'error', text: error.message });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -78,7 +76,7 @@ const QuenMatKhau = ({ onBackToLogin }) => {
         setLoading(true);
         try {
             // Gọi API đổi mật khẩu
-            await resetPasswordApi(email, newPassword);
+            await resetPasswordApi({ email, newPassword });
 
             setMessage({ type: 'success', text: 'Đổi mật khẩu thành công! Vui lòng đăng nhập lại.' });
             
@@ -178,9 +176,10 @@ const QuenMatKhau = ({ onBackToLogin }) => {
                                 
                                 <button
                                     type="submit"
+                                    disabled={loading}
                                     className="w-full bg-[#10b981] hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-full transition-colors h-[45px]"
                                 >
-                                    Xác Nhận
+                                    {loading ? 'Đang xác thực...' : 'Xác Nhận'}
                                 </button>
                                 
                                 <div className="text-center mt-4">
@@ -242,4 +241,3 @@ const QuenMatKhau = ({ onBackToLogin }) => {
 };
 
 export default QuenMatKhau;
-

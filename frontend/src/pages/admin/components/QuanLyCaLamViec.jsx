@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getAllShiftsApi, createShiftApi, deleteShiftApi } from '../../../api/shiftApi';
 import { getAllNhanVienApi as getAllEmployeesApi } from '../../../api/employeeApi';
 import { getAllChucVuApi as getChucVuApi, getAllPhongApi as getPhongApi, getAllChuyenKhoaApi as getChuyenKhoaApi } from '../../../api/danhMucApi';
@@ -35,8 +35,22 @@ export default function QuanLyCaLamViec() {
   const [filterChucVu, setFilterChucVu] = useState('');
   const [selectedCell, setSelectedCell] = useState(null);
   const [formData, setFormData] = useState({ phong: '', gioLam: '08:00', gioKetThuc: '17:00' });
+  const [openRoomDropdown, setOpenRoomDropdown] = useState(false);
+  const roomWrapRef = useRef(null);
 
   useEffect(() => { fetchData(); }, []);
+
+  // Đóng dropdown phòng khi click ra ngoài vùng chọn phòng (thay cho overlay toàn màn hình chặn nút X)
+  useEffect(() => {
+    if (!openRoomDropdown) return;
+    const handleOutsideClick = (e) => {
+      if (roomWrapRef.current && !roomWrapRef.current.contains(e.target)) {
+        setOpenRoomDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [openRoomDropdown]);
 
   const fetchData = async () => {
     setLoading(true); setError(null);
@@ -69,7 +83,7 @@ export default function QuanLyCaLamViec() {
     // Nếu không có dữ liệu nhân viên truyền vào, trả về mảng rỗng ngay lập tức
     if (!employee) return [];
 
-    // 1. TÌM ĐĐI TƯỢNG CHỨC VỤ (cvObj) ĐỂ LẤY MÃ ID
+    // 1. TÌM ĐỐI TƯỢNG CHỨC VỤ (cvObj) ĐỂ LẤY MÃ ID
     // Lọc trong danh sách chucVuList xem dòng nào có "Tên chức vụ" khớp với tên của nhân viên đang chọn
     const cvObj = chucVuList.find(c =>
       (c.tenChucVu || c.ten_chuc_vu) === (employee.chucVu || employee.chuc_vu)
@@ -77,20 +91,35 @@ export default function QuanLyCaLamViec() {
     // Nếu tìm thấy cvObj thì lấy cột ID (ví dụ: 16), nếu không thấy thì gán là null
     const maCv = cvObj ? (cvObj.id || cvObj.ma_chuc_vu) : null;
 
-    // 2. TÌM ĐĐI TƯỢNG CHUYÊN KHOA (ckObj) ĐỂ LẤY MÃ ID
-    // Lọc trong danh sách chuyenKhoaList xem dòng nào có "Tên chuyên khoa" khớp với chuyên khoa của nhân viên
-    const ckObj = chuyenKhoaList.find(c =>
-      (c.ten_chuyen_khoa || c.tenChuyenKhoa) === (employee.chuyenKhoa || employee.chuyen_khoa)
-    );
-    // Nếu tìm thấy ckObj thì lấy cột mã chuyên khoa (ví dụ: 1), nếu không thấy gán là null
-    const maCk = ckObj ? (ckObj.ma_ch_khoa || ckObj.ma_chuyen_khoa || ckObj.maChuyenKhoa) : null;
+    // 2. TÌM ĐỐI TƯỢNG CHUYÊN KHOA (ckObj) ĐỂ LẤY MÃ ID
+    // LƯU Ý: employee.chuyenKhoa từ API là một SỐ NGUYÊN (Integer ID) - ví dụ: 1, 2, 3
+    // KHÔNG phải là tên chuyên khoa (chuỗi). Nên phải so khớp theo ID, không phải theo tên.
+    let maCk = null;
+    const empCk = employee.chuyenKhoa ?? employee.chuyen_khoa;
+
+    if (empCk !== null && empCk !== undefined && empCk !== '') {
+      const isNumeric = typeof empCk === 'number' || /^\d+$/.test(String(empCk).trim());
+      if (isNumeric) {
+        // Trường hợp A: empCk là ID số nguyên → tìm trong chuyenKhoaList theo maChuyenKhoa
+        const ckById = chuyenKhoaList.find(c =>
+          Number(c.maChuyenKhoa || c.ma_chuyen_khoa || c.ma_ch_khoa) === Number(empCk)
+        );
+        if (ckById) maCk = Number(empCk);
+      } else {
+        // Trường hợp B: empCk là tên chuyên khoa (chuỗi) → tìm theo tenChuyenKhoa
+        const ckByName = chuyenKhoaList.find(c =>
+          (c.tenChuyenKhoa || c.ten_chuyen_khoa) === String(empCk).trim()
+        );
+        maCk = ckByName ? (ckByName.maChuyenKhoa || ckByName.ma_chuyen_khoa || ckByName.ma_ch_khoa) : null;
+      }
+    }
 
     // 3. LOGIC SO KHỚP PHÒNG (GIỐNG JAVA - ƯU TIÊN CHUYÊN KHOA TRƯỚC)
 
     // ƯU TIÊN 1: Nếu nhân viên CÓ chuyên khoa (ví dụ: Bác sĩ, Trợ lý chuyên khoa)
     if (maCk) {
       // Lọc trong danh sách phòng, lấy tất cả phòng có ma_chuyen_khoa khớp với ID chuyên khoa vừa tìm được
-      // Tại đây ta bĐ qua mã chức vụ vì Bác sĩ và Trợ lý ngồi chung phòng chuyên khoa đó
+      // Tại đây ta bỏ qua mã chức vụ vì Bác sĩ và Trợ lý ngồi chung phòng chuyên khoa đó
       const roomsByCk = phongList.filter(p =>
         Number(p.ma_ch_khoa || p.ma_chuyen_khoa || p.maChuyenKhoa) === Number(maCk)
       );
@@ -113,9 +142,18 @@ export default function QuanLyCaLamViec() {
 
 
 
+  // Loại bỏ "Quản trị viên" khỏi danh sách nhân viên hiển thị trong bảng ca làm việc
+  // (Quản trị viên không cần phân công ca làm việc)
+  const ADMIN_ROLE_NAMES = ['quản trị viên', 'quản trị'];
+  const isAdminRole = (s) => {
+    const cv = String(s.chucVu || s.chuc_vu || '').trim().toLowerCase();
+    return ADMIN_ROLE_NAMES.some(name => cv.includes(name));
+  };
+  const nonAdminStaff = staff.filter(s => !isAdminRole(s));
+
   const displayedStaff = filterChucVu
-    ? staff.filter(s => (s.chucVu || s.chuc_vu) === filterChucVu)
-    : staff;
+    ? nonAdminStaff.filter(s => (s.chucVu || s.chuc_vu) === filterChucVu)
+    : nonAdminStaff;
 
   const openModal = (employee, day) => {
     const matchedRooms = getRoomsForEmployee(employee);
@@ -178,7 +216,13 @@ export default function QuanLyCaLamViec() {
               style={{ padding: '6px 14px', border: 'none', borderRadius: '8px', fontSize: '13px', background: 'rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', outline: 'none' }}
             >
               <option value="" style={{ color: '#111', background: '#fff' }}>👥 Tất cả nhân viên</option>
-              {chucVuList.map(cv => (
+              {chucVuList
+                // Loại bỏ "Quản trị viên" khỏi dropdown lọc
+                .filter(cv => {
+                  const name = String(cv.tenChucVu || cv.ten_chuc_vu || '').trim().toLowerCase();
+                  return !ADMIN_ROLE_NAMES.some(r => name === r);
+                })
+                .map(cv => (
                 <option key={cv.id || cv.ma_chuc_vu} value={cv.tenChucVu || cv.ten_chuc_vu} style={{ color: '#111', background: '#fff' }}>
                   {cv.tenChucVu || cv.ten_chuc_vu}
                 </option>
@@ -206,14 +250,23 @@ export default function QuanLyCaLamViec() {
                     <div>ID: NV{String(nv.maNhanVien || nv.ma_nhan_vien).padStart(3, '0')}</div>
                     <div>
                       {(nv.chucVu || nv.chuc_vu) && <span style={{ color: '#059669', fontWeight: 600 }}>{nv.chucVu || nv.chuc_vu}</span>}
-                      {(nv.chuyenKhoa || nv.chuyen_khoa) && (
-                        <>
-                          <span style={{ margin: '0 5px', color: '#cbd5e1' }}>|</span>
-                          <span style={{ color: '#0284c7', fontStyle: 'italic', fontWeight: 500 }}>
-                            {nv.chuyenKhoa || nv.chuyen_khoa}
-                          </span>
-                        </>
-                      )}
+                      {(nv.chuyenKhoa || nv.chuyen_khoa) && (() => {
+                        // Hiển thị TÊN chuyên khoa (vì API trả về ID số nguyên), không phải ID
+                        const empCk = nv.chuyenKhoa ?? nv.chuyen_khoa;
+                        const isNumeric = typeof empCk === 'number' || (typeof empCk === 'string' && /^\d+$/.test(empCk.trim()));
+                        const foundCk = isNumeric
+                          ? chuyenKhoaList.find(c => Number(c.maChuyenKhoa || c.ma_chuyen_khoa || c.ma_ch_khoa) === Number(empCk))
+                          : null;
+                        const ckName = isNumeric
+                          ? (foundCk?.tenChuyenKhoa || foundCk?.ten_chuyen_khoa || '')
+                          : String(empCk);
+                        return ckName ? (
+                          <>
+                            <span style={{ margin: '0 5px', color: '#cbd5e1' }}>|</span>
+                            <span style={{ color: '#0284c7', fontStyle: 'italic', fontWeight: 500 }}>{ckName}</span>
+                          </>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                 </td>
@@ -252,8 +305,8 @@ export default function QuanLyCaLamViec() {
         const matchedRooms = getRoomsForEmployee(employee);
         return (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-            <div style={{ background: '#fff', width: '450px', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
-              <div style={{ background: '#005bc0', padding: '18px', color: '#fff', display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ background: '#fff', width: '450px', borderRadius: '16px', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+              <div style={{ background: '#005bc0', padding: '18px', color: '#fff', display: 'flex', justifyContent: 'space-between', borderRadius: '16px 16px 0 0' }}>
                 <div>
                   <div style={{ fontWeight: 700 }}>Thêm Ca Làm Việc</div>
                   <div style={{ fontSize: '12px', opacity: 0.8 }}>{employee.hoTen || employee.ho_ten} ({day.label})</div>
@@ -269,28 +322,62 @@ export default function QuanLyCaLamViec() {
 
                 <label style={{ fontSize: '13px', display: 'block', marginBottom: '20px' }}>
                   Phòng làm việc:
-                  <select
-                    value={formData.phong}
-                    onChange={e => setFormData({ ...formData, phong: e.target.value })}
-                    style={{ width: '100%', padding: '8px', marginTop: '5px', borderRadius: '5px', border: '1px solid #ddd', background: matchedRooms.length > 0 ? '#f0fdf4' : '#fff' }}
-                  >
-                    <option value="">-- Chọn phòng --</option>
-                    {matchedRooms.map(p => (
-                      <option key={p.ma_phong || p.maPhong} value={p.ten_phong || p.tenPhong}>
-                        {p.ten_phong || p.tenPhong}
-                      </option>
-                    ))}
-                    {/* Fallback nếu không khớp logic gợi ý thì hiện toàn bộ danh sách phòng để người dùng tự chọn */}
-                    {matchedRooms.length === 0 && phongList.map(p => (
-                      <option key={p.ma_phong || p.maPhong} value={p.ten_phong || p.tenPhong}>
-                        {p.ten_phong || p.tenPhong}
-                      </option>
-                    ))}
-                  </select>
-                  {matchedRooms.length > 0 && <small style={{ color: '#059669', display: 'block', marginTop: '4px' }}>✨ Đã tự động lọc phòng khớp với Chức vụ và Chuyên khoa</small>}
+                  {/* Custom dropdown luôn mở XUỐNG DƯỚI (top: 100%) thay vì select native có thể mở hướng lên */}
+                  <div ref={roomWrapRef} style={{ position: 'relative', marginTop: '5px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenRoomDropdown(!openRoomDropdown)}
+                      style={{
+                        width: '100%', padding: '8px', borderRadius: '5px',
+                        border: '1px solid #ddd', textAlign: 'left',
+                        background: matchedRooms.length > 0 ? '#f0fdf4' : '#fff',
+                        cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        color: formData.phong ? '#111' : '#9ca3af'
+                      }}
+                    >
+                      <span>{formData.phong || '-- Chọn phòng --'}</span>
+                      <span style={{ fontSize: '10px' }}>{openRoomDropdown ? '▲' : '▼'}</span>
+                    </button>
+
+                    {openRoomDropdown && (
+                      <>
+                        {/* Danh sách phòng mở XUỐNG DƯỚI button */}
+                        <div style={{
+                          position: 'absolute', top: '100%', left: 0, right: 0,
+                          marginTop: '4px', background: '#fff',
+                          border: '1px solid #e5e7eb', borderRadius: '8px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 20,
+                          maxHeight: '220px', overflowY: 'auto'
+                        }}>
+                          {/* Luôn hiển thị TOÀN BỘ danh sách phòng để admin có thể đổi thủ công.
+                              Phòng đề xuất tự động được đánh dấu ✓. */}
+                          {phongList.map(p => {
+                            const tenPhong = p.ten_phong || p.tenPhong;
+                            const isSuggested = matchedRooms.some(m => (m.ten_phong || m.tenPhong) === tenPhong);
+                            const selected = formData.phong === tenPhong;
+                            return (
+                              <div
+                                key={p.ma_phong || p.maPhong}
+                                onClick={() => { setFormData({ ...formData, phong: tenPhong }); setOpenRoomDropdown(false); }}
+                                style={{
+                                  padding: '9px 14px', cursor: 'pointer', fontSize: '13px',
+                                  background: selected ? '#dbeafe' : '#fff',
+                                  borderBottom: '1px solid #f3f4f6',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                                }}
+                              >
+                                <span>{tenPhong}</span>
+                                {isSuggested && <span style={{ color: '#059669', fontWeight: 600 }}>✓</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </label>
 
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '5px' }}>
                   <button onClick={() => setSelectedCell(null)} style={{ padding: '8px 20px', borderRadius: '6px', border: '1px solid #ddd', cursor: 'pointer' }}>Hủy</button>
                   <button onClick={handleAdd} style={{ padding: '8px 25px', borderRadius: '6px', background: '#005bc0', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Lưu Ca</button>
                 </div>

@@ -120,7 +120,8 @@ const dispatchToApi = async (path, method, body, url) => {
     else if (method === 'POST') return await khoThuocApi.createPhieuNhapApi(body);
   }
   else if (path.startsWith('/kho-thuoc/sap-het')) {
-    return [];
+    const threshold = new URL(url).searchParams.get('threshold') || 20;
+    return await khoThuocApi.getThuocSapHetApi(Number(threshold));
   }
   else if (path.startsWith('/dang-ky')) {
     if (path.includes('/status')) return await dangKyApi.updateStatusApi(path.split('/')[2], body);

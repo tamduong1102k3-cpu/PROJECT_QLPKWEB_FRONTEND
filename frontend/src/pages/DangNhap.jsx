@@ -15,150 +15,161 @@ const DangNhap = ({ onForgotPassword, onLoginSuccess }) => {
     setErrorMessage('');
 
     if (!identity.trim() || !password.trim()) {
-      setErrorMessage('Vui lòng nhập đầy đủ Email/Số điện thoại và Mật khẩu.');
+      setErrorMessage('Vui lòng nhập đầy đủ thông tin.');
       return;
     }
 
     setIsLoading(true);
     try {
       const data = await loginApi({ identity, password });
-      
-      // LƯU TOKEN VÀ THÔNG TIN VÀO LOCALSTORAGE
       if (data.token) {
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify({
-          username: data.username,
-          email: data.email,
-          maTaiKhoan: data.maTaiKhoan,
-          vaiTro: data.role,
-          maNhanVien: data.maNhanVien,
-          maChuyenKhoa: data.maChuyenKhoa,
-          tenChuyenKhoa: data.tenChuyenKhoa
-        }));
+        localStorage.setItem('refreshToken', data.refreshToken || '');
+        // Lưu mã nhân viên để sử dụng khi làm thủ tục tiếp đón,
+        // tránh phụ thuộc vào JWT decode (vì token refresh có thể mất maNhanVien)
+        if (data.maNhanVien) {
+          localStorage.setItem('maNhanVien', data.maNhanVien);
+        }
       }
-
-      // Xử lý khi đăng nhập thành công
-      if (onLoginSuccess) {
-        onLoginSuccess({
-          ...data,
-          vaiTro: data.role // Đồng bộ tên trường với App.jsx
-        });
-      }
+      if (onLoginSuccess) onLoginSuccess({ ...data, vaiTro: data.role });
     } catch (error) {
-      if (error.message.includes('Failed to fetch')) {
-        setErrorMessage('Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại Backend.');
-      } else {
-        setErrorMessage(error.message || 'Đăng nhập thất bại.');
-      }
+      setErrorMessage(error.message || 'Đăng nhập thất bại.');
     } finally {
       setIsLoading(false);
     }
   }, 'Đang đăng nhập...');
 
   return (
-    <main className="flex-grow flex items-center justify-center relative overflow-hidden px-gutter py-xl">
-      {/* Abstract Background Decorative Elements */}
-      <div className="absolute inset-0 z-0 opacity-40">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-container/10 rounded-full blur-[120px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-container/10 rounded-full blur-[120px]"></div>
+    <main className="fixed inset-0 flex items-center justify-center overflow-hidden bg-[#f0f4f9]">
+      {/* Hiệu ứng nền loang màu lớn */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[70%] rounded-full bg-blue-200/40 blur-[140px]" />
+        <div className="absolute bottom-[-15%] right-[-10%] w-[50%] h-[70%] rounded-full bg-indigo-200/40 blur-[140px]" />
       </div>
-      <div className="w-full max-w-[448px] z-10">
-        {/* DangNhap Card */}
-        <div className="bg-white rounded-xl border border-outline-variant p-xl shadow-sm">
-          <div className="flex flex-col items-center mb-lg">
-            <div className="mb-md">
-              <div className="w-12 h-12 bg-primary-container rounded-lg flex items-center justify-center text-white">
-                <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>medical_services</span>
-              </div>
+
+      <div className="w-full max-w-[850px] z-10 px-6 animate-fade-in">
+        {/* Card thiết kế Rộng & Thấp (Side-by-side) */}
+        <div className="bg-white/95 backdrop-blur-2xl rounded-[45px] shadow-[0_40px_100px_rgba(0,0,0,0.08)] border border-white overflow-hidden flex flex-col md:flex-row min-h-[460px]">
+          
+          {/* CỘT TRÁI: Thương hiệu (Cực kỳ tối giản) */}
+          <div className="md:w-5/12 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-700 p-12 flex flex-col justify-center items-center text-white relative">
+            {/* Họa tiết chìm */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none overflow-hidden">
+              <div className="absolute top-[-10%] left-[-10%] w-40 h-40 rounded-full border-[15px] border-white" />
+              <div className="absolute bottom-[-10%] right-[-10%] w-60 h-60 rounded-full border-[20px] border-white" />
             </div>
-            <h1 className="font-headline-lg text-headline-lg text-on-surface mb-xs">Đăng nhập vào hệ thống</h1>
-            <p className="font-body-sm text-body-sm text-outline">Quản lý phòng khám chuyên nghiệp cùng MedCore</p>
+            
+            <div className="w-24 h-24 bg-white/20 backdrop-blur-xl rounded-[30px] flex items-center justify-center mb-6 shadow-2xl transform hover:scale-110 transition-transform duration-500">
+              <span className="material-symbols-outlined text-[56px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                medical_services
+              </span>
+            </div>
+            <h2 className="text-4xl font-black tracking-tighter uppercase">MedCore</h2>
           </div>
 
-          {errorMessage && (
-            <div className="mb-4 p-3 bg-error-container text-error rounded-lg text-sm font-medium border border-red-200">
-              {errorMessage}
+          {/* CỘT PHẢI: Form đăng nhập */}
+          <div className="md:w-7/12 p-12 flex flex-col justify-center bg-white">
+            <div className="mb-10">
+              <h1 className="text-3xl font-black text-slate-800 tracking-tight">Đăng nhập hệ thống</h1>
+              <div className="h-1.5 w-16 bg-blue-500 rounded-full mt-3"></div>
             </div>
-          )}
 
-          <form className="space-y-md" onSubmit={handleLogin}>
-            <div>
-              <label className="block font-label-md text-label-md text-on-surface mb-xs" htmlFor="identity">Email/Số điện thoại</label>
-              <div className="relative">
-                <input 
-                  className="w-full px-md py-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary bg-surface-container-lowest transition-all placeholder:text-outline-variant text-body-md font-body-md" 
-                  id="identity" 
-                  name="identity" 
-                  placeholder="name@clinic.com hoặc 090..." 
-                  type="text"
-                  value={identity}
-                  onChange={(e) => setIdentity(e.target.value)}
-                />
+            {errorMessage && (
+              <div className="mb-8 p-4 bg-red-50 border-l-4 border-red-500 rounded-xl flex items-center gap-3 animate-shake">
+                <span className="material-symbols-outlined text-red-500 text-[24px]">error</span>
+                <p className="text-[14px] font-bold text-red-700">{errorMessage}</p>
               </div>
-            </div>
-            <div>
-              <div className="flex justify-between items-center mb-xs">
-                <label className="block font-label-md text-label-md text-on-surface" htmlFor="password">Mật khẩu</label>
+            )}
+
+            <form className="space-y-6" onSubmit={handleLogin}>
+              <div className="space-y-5">
+                {/* Tài khoản */}
+                <div className="relative group">
+                  <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                    <span className="material-symbols-outlined text-[26px]">person</span>
+                  </span>
+                  <input 
+                    className="w-full pl-14 pr-6 py-4.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[16px] font-bold transition-all focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-8 focus:ring-blue-500/5 placeholder:text-slate-400" 
+                    placeholder="Email hoặc Số điện thoại" 
+                    type="text"
+                    value={identity}
+                    onChange={(e) => setIdentity(e.target.value)}
+                  />
+                </div>
+
+                {/* Mật khẩu */}
+                <div className="relative group">
+                  <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                    <span className="material-symbols-outlined text-[26px]">lock</span>
+                  </span>
+                  <input 
+                    className="w-full pl-14 pr-14 py-4.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[16px] font-bold transition-all focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-8 focus:ring-blue-500/5 placeholder:text-slate-400" 
+                    placeholder="Mật khẩu" 
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button 
+                    className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors" 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    <span className="material-symbols-outlined text-[24px]">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
                 <button 
                   type="button" 
                   onClick={onForgotPassword} 
-                  className="font-label-sm text-label-sm text-primary hover:underline bg-transparent border-none cursor-pointer"
+                  className="text-[14px] font-black text-blue-600 hover:text-blue-800 tracking-wide"
                 >
-                  Quên mật khẩu?
+                  QUÊN MẬT KHẨU?
                 </button>
               </div>
-              <div className="relative">
-                <input 
-                  className="w-full px-md py-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary bg-surface-container-lowest transition-all placeholder:text-outline-variant text-body-md font-body-md" 
-                  id="password" 
-                  name="password" 
-                  placeholder="••••••••" 
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <button 
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface" 
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  <span className="material-symbols-outlined text-[20px]">{showPassword ? 'visibility_off' : 'visibility'}</span>
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <input className="w-4 h-4 text-primary border-outline-variant rounded focus:ring-primary" id="remember" type="checkbox"/>
-              <label className="ml-2 font-body-sm text-body-sm text-on-surface-variant" htmlFor="remember">Ghi nhớ đăng nhập</label>
-            </div>
-            <button 
-              className="w-full py-md bg-primary-container text-white font-label-md text-body-md rounded-lg shadow-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" 
-              type="submit"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Đang xử lý...' : 'Đăng nhập'}
-              {!isLoading && <span className="material-symbols-outlined text-[20px]">arrow_forward</span>}
-            </button>
-          </form>
-        </div>
-        {/* Trust Badges or Security Text */}
-        <div className="mt-lg flex justify-center gap-md text-outline">
-          <div className="flex items-center gap-1 opacity-70">
-            <span className="material-symbols-outlined text-[16px]">verified_user</span>
-            <span className="text-label-sm font-label-sm">Bảo mật SSL 256-bit</span>
-          </div>
-          <div className="flex items-center gap-1 opacity-70">
-            <span className="material-symbols-outlined text-[16px]">lock</span>
-            <span className="text-label-sm font-label-sm">Tuân thủ HIPAA</span>
+
+              <button 
+                className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-black text-[18px] rounded-[22px] shadow-2xl shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70 group" 
+                type="submit"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <span className="flex items-center gap-3">
+                    <svg className="animate-spin h-6 w-6 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    ĐANG XÁC THỰC...
+                  </span>
+                ) : (
+                  <>
+                    <span>ĐĂNG NHẬP NGAY</span>
+                    <span className="material-symbols-outlined text-[24px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                  </>
+                )}
+              </button>
+            </form>
           </div>
         </div>
+        <p className="text-center mt-8 text-[11px] text-slate-400 font-bold uppercase tracking-[0.3em]">
+          Secure Access Protocol v2.0
+        </p>
       </div>
-      {/* Optional background image element as per prompt */}
-      <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-1/3 z-[-1]">
-        <img className="w-full h-full object-cover opacity-20 grayscale-50" alt="A clean, high-end medical laboratory setting with soft focus on advanced diagnostic equipment. The lighting is bright and clinical but warm, creating a professional and trustworthy healthcare atmosphere. Subtle blue and white tones dominate the palette, aligning with a modern minimalist aesthetic that emphasizes clarity and innovation in medical technology." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkO1T4M7jPmNEKa4hVYhHT0IQqPGrreXAi_uVYnUf5BDSqK0RPGB-wbPTKDSRHJB5F_1zQuDw5W4FPkPNhjaeL8IdTRsCfesFjc_xPJNEK7lY3VJYHuAyDHmn4JNCRdkwCtYbcLKQxawtobziY2BB7Y1HjU57ocRGA8ibhDvSOnfq2txivjHdQMFX37-NypGp8qNUDf440iq64UZJsP0HO0CZOtGYFF9fg3xpJxZDzM8C3iqD0_mHqPLtYiWYKPul21Q-Rw-8n28nz"/>
-      </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-6px); }
+          75% { transform: translateX(6px); }
+        }
+        .animate-shake { animation: shake 0.3s ease-in-out; }
+        .animate-fade-in { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95) translateY(20px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .py-4\\.5 { padding-top: 1.15rem; padding-bottom: 1.15rem; }
+      `}} />
     </main>
   );
 };
 
 export default DangNhap;
-

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getPaidInvoicesWithThuocAndStatusApi } from '../../api/hoaDonApi';
 import UserMenu from '../../components/UserMenu';
+import LichLamViecTab from '../../components/LichLamViecTab';
 import NotificationBell from '../../components/NotificationBell';
 import useWebSocket from '../../hooks/useWebSocket';
 import DanhSachBenhNhanDuocSi from './components/DanhSachBenhNhanDuocSi';
@@ -122,6 +123,7 @@ const BangDieuKhienDuocSi = ({ onLogout, user }) => {
     { id: 'patients', label: 'Danh Sách Bệnh Nhân', icon: 'group' },
     { id: 'history', label: 'Lịch Sử Đã Cấp', icon: 'history' },
     { id: 'pharmacy', label: 'Quản Lý Thuốc', icon: 'medication' },
+    { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: 'calendar_month' },
   ];
 
   return (
@@ -196,7 +198,7 @@ const BangDieuKhienDuocSi = ({ onLogout, user }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10 shadow-sm">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 relative z-50 shadow-sm">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -265,6 +267,10 @@ const BangDieuKhienDuocSi = ({ onLogout, user }) => {
 
           {activeTab === 'pharmacy' && (
             <QuanLyNhaThuoc isPharmacist={true} />
+          )}
+
+          {activeTab === 'lichlamviec' && (
+            <LichLamViecTab user={user} />
           )}
         </main>
       </div>

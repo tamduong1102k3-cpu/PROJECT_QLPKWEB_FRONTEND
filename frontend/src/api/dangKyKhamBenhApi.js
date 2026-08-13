@@ -93,7 +93,6 @@ export const createApi = async (data) => {
           errorMsg = errorData.message || errorMsg;
         } catch (jsonParseError) {}
       } catch (readError) {}
-      console.error("Server response chi tiết:", { status: response.status, body: responseBody });
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -171,6 +170,65 @@ export const updateStatusApi = async (id, data) => {
     return text ? JSON.parse(text) : null;
   } catch (error) {
     console.error("Error in updateStatusApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * PATCH /{id}/xep-cuoi
+ * Đánh dấu bệnh nhân xếp cuối danh sách chờ khám
+ * @param {number|string} id - ID đăng ký khám bệnh
+ */
+export const setXepCuoiApi = async (id) => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}/xep-cuoi`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in setXepCuoiApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * PATCH /{id}/goi-lai?maChuyenKhoa={maChuyenKhoa}
+ * Gọi lại bệnh nhân vắng mặt - đặt STT cuối danh sách cùng chuyên khoa + 1
+ * @param {number|string} id - ID đăng ký khám bệnh
+ * @param {number} maChuyenKhoa - Mã chuyên khoa của trợ lý
+ */
+export const goiLaiApi = async (id, maChuyenKhoa) => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}/goi-lai?maChuyenKhoa=${maChuyenKhoa}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in goiLaiApi:", error);
     throw error;
   }
 };

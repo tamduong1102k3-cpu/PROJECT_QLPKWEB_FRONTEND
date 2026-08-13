@@ -14,6 +14,15 @@ const fmtGia = val => {
   if (!val && val !== 0) return '—';
   return Number(val).toLocaleString('vi-VN') + ' đ';
 };
+const fmtLoai = val => {
+  if (!val) return '—';
+  const map = {
+    'KHAM_BENH': 'Khám bệnh',
+    'CLS_XET_NGHIEM': 'CLS xét nghiệm',
+    'CLS_CHAN_DOAN_HINH_ANH': 'CLS chẩn đoán hình ảnh'
+  };
+  return map[val] || val.replace(/_/g, ' ');
+};
 export default function QuanLyDichVu() {
   const [list, setList] = useState([]);
   const [phongList, setPhongList] = useState([]);
@@ -186,7 +195,7 @@ export default function QuanLyDichVu() {
           }}>Tất cả loại</option>
             {loaiOptions.map(l => <option key={l} value={l} style={{
             color: '#111'
-          }}>{l}</option>)}
+          }}>{fmtLoai(l)}</option>)}
           </select>
           <button onClick={openAdd} style={{
           padding: '8px 18px',
@@ -320,7 +329,7 @@ export default function QuanLyDichVu() {
                 borderRadius: '20px',
                 fontSize: '11px',
                 fontWeight: 600
-              }}>{d.loaiDichVu.replace(/_/g, ' ')}</span> : '—'}
+              }}>{fmtLoai(d.loaiDichVu)}</span> : '—'}
                   </td>
                   <td style={{
               padding: '10px 14px',
@@ -507,9 +516,9 @@ export default function QuanLyDichVu() {
                 fontSize: '13px'
               }}>
                     <option value="">-- Chọn loại --</option>
-                    <option value="KHAM_BENH">KHAM BENH</option>
-                    <option value="CLS_XET_NGHIEM">CLS XET NGHIEM</option>
-                    <option value="CLS_CHAN_DOAN_HINH_ANH">CLS CHAN DOAN HINH ANH</option>
+                    <option value="KHAM_BENH">Khám bệnh</option>
+                    <option value="CLS_XET_NGHIEM">CLS xét nghiệm</option>
+                    <option value="CLS_CHAN_DOAN_HINH_ANH">CLS chẩn đoán hình ảnh</option>
                   </select>
                 </label>
               </div>

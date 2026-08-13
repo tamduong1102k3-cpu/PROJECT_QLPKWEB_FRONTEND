@@ -3,15 +3,40 @@ import { getAllApi as _getDichVuAll } from '../../../api/dichVuApi';
 import { getWorkingTodayApi as _getWorkingToday } from '../../../api/shiftApi';
 import { getAllApi as getBenhNhanAll, searchApi } from '../../../api/benhNhanApi';
 import { createApi as createDangKyApi } from '../../../api/dangKyKhamBenhApi';
+import { updateTrangThaiApi } from '../../../api/lichKhamApi';
 import { getAllChuyenKhoaApi as _getChuyenKhoaAll } from '../../../api/danhMucApi';
 import { useNotification } from '../../../components/NotificationContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import InPhieuTiepDon from './InPhieuTiepDon';
+import DangKyBenhNhan from './DangKyBenhNhan';
 
 const removeVietnameseTones = str => {
   if (!str) return '';
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+};
+
+/**
+ * Lấy mã nhân viên từ JWT token trong localStorage.
+ * Nếu không decode được, fallback về giá trị mặc định.
+ */
+const getMaNhanVienFromToken = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(window.atob(base64));
+    const maNhanVien = payload.maNhanVien;
+    // Chỉ trả về nếu là số dương hợp lệ
+    if (maNhanVien && parseInt(maNhanVien) > 0) {
+      return parseInt(maNhanVien);
+    }
+  } catch (error) {
+    console.error("Lỗi giải mã JWT:", error);
+  }
+  return null;
 };
 
 const QuyTrinhTiepDon = ({
@@ -177,18 +202,12 @@ const QuyTrinhTiepDon = ({
   const handleCompleteCheckIn = async e => {
     e.preventDefault();
     
-    const token = localStorage.getItem('token');
-    let maLeTan = 72; // Default dự phòng
+    // Ưu tiên lấy maNhanVien từ localStorage (đã lưu khi login)
+    let maLeTan = localStorage.getItem('maNhanVien');
 
-    if (token) {
-      try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const payload = JSON.parse(window.atob(base64));
-        maLeTan = payload.maNhanVien || payload.userId || maLeTan;
-      } catch (error) {
-        console.error("Lỗi giải mã token:", error);
-      }
+    // Nếu không có trong localStorage, fallback giải mã từ JWT
+    if (!maLeTan) {
+      maLeTan = getMaNhanVienFromToken();
     }
 
     // Bắt buộc chọn chuyên khoa
@@ -198,26 +217,27 @@ const QuyTrinhTiepDon = ({
     }
 
     try {
-      // Log request details để debug
-      console.log("=== DEBUG REQUEST ===");
-      console.log("Token gửi đi:", token ? token.substring(0, 30) + "..." : "KHÔNG CÓ TOKEN");
-      console.log("URL:", 'https://qlpk-backend-spring-boot.onrender.com/api/dang-ky');
-      console.log("Headers:", { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : 'N/A' });
-
       // Bước 1: Tạo đăng ký khám bệnh (DangKyKhamBenh)
       const dangKyData = {
         maBenhNhan: selectedPatient.maBenhNhan,
         maNhanVien: maLeTan,
         maChuyenKhoa: parseInt(checkInData.maChuyenKhoa),
         maDichVu: checkInData.maDichVu ? parseInt(checkInData.maDichVu) : null,
+        maLichKham: appointmentId || null,
         ghiChu: checkInData.ghiChu || ''
       };
-      console.log("Request body:", JSON.stringify(dangKyData));
-
       const dangKyResult = await createDangKyApi(dangKyData);
       const soThuTu = dangKyResult.soThuTu;
       const dangKyId = dangKyResult.id;
 
+      // Bước 2: Cập nhật trạng thái lịch khám nếu có appointmentId
+      if (appointmentId) {
+        try {
+          await updateTrangThaiApi(appointmentId, 'DA_CHECK_IN');
+        } catch (err) {
+          console.warn("Không thể cập nhật trạng thái lịch khám:", err);
+        }
+      }
 
       setPrintData({
         soThuTu,
@@ -301,6 +321,14 @@ const QuyTrinhTiepDon = ({
                </button>
             </div>
           </div>}
+
+        {step === 2 && <DangKyBenhNhan
+          onCancel={() => setStep(1)}
+          onSuccess={(newPatient) => {
+            setSelectedPatient(newPatient);
+            setStep(3);
+          }}
+        />}
 
         {step === 3 && selectedPatient && <div className="p-8 animate-scale-up">
              <div className="flex items-center gap-4 mb-8 p-6 bg-primary/5 rounded-3xl border border-primary/10">

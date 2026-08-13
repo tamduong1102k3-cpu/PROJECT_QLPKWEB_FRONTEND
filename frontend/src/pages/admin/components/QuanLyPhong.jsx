@@ -8,6 +8,33 @@ const empty = {
   maChuyenKhoa: '',
   maChucVu: ''
 };
+const fmtLoaiPhong = val => {
+  if (!val) return '—';
+  const map = {
+    'KHOA_NOI': 'Khoa nội',
+    'KHOA_NGOAI': 'Khoa ngoại',
+    'NHA_THUOC': 'Nhà thuốc',
+    'LE_TAN': 'Lễ tân',
+    'CAP_CUU': 'Cấp cứu',
+    'XET_NGHIEM': 'Xét nghiệm',
+    'CHAN_DOAN_HINH_ANH': 'Chẩn đoán hình ảnh',
+    'DIEU_TRI': 'Điều trị',
+    'PHONG_KHAM': 'Phòng khám'
+  };
+  return map[val] || val.replace(/_/g, ' ');
+};
+const LOAI_PHONG_OPTIONS = [
+  { value: 'KHOA_NOI', label: 'Khoa nội' },
+  { value: 'KHOA_NGOAI', label: 'Khoa ngoại' },
+  { value: 'NHA_THUOC', label: 'Nhà thuốc' },
+  { value: 'LE_TAN', label: 'Lễ tân' },
+  { value: 'CAP_CUU', label: 'Cấp cứu' },
+  { value: 'XET_NGHIEM', label: 'Xét nghiệm' },
+  { value: 'CHAN_DOAN_HINH_ANH', label: 'Chẩn đoán hình ảnh' },
+  { value: 'DIEU_TRI', label: 'Điều trị' },
+  { value: 'PHONG_KHAM', label: 'Phòng khám' },
+  { value: 'OTHER', label: 'Khác' }
+];
 export default function QuanLyPhong() {
   const [phongList, setPhongList] = useState([]);
   const [chucVuList, setChucVuList] = useState([]);
@@ -138,7 +165,7 @@ export default function QuanLyPhong() {
         gap: '10px',
         alignItems: 'center'
       }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Đ Tìm tên phòng..." style={{
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm tên phòng..." style={{
           padding: '8px 14px',
           borderRadius: '8px',
           border: 'none',
@@ -236,7 +263,7 @@ export default function QuanLyPhong() {
                 fontSize: '11px',
                 fontWeight: 600
               }}>
-                        {p.loaiPhong.replace(/_/g, ' ')}
+                        {fmtLoaiPhong(p.loaiPhong)}
                       </span> : '—'}
                   </td>
                   <td style={{
@@ -282,7 +309,7 @@ export default function QuanLyPhong() {
                   fontSize: '12px',
                   fontWeight: 600
                 }}>
-                        ĐĐ Sửa
+                        Sửa
                       </button>
                       <button onClick={() => handleDelete(p.maPhong)} disabled={deleting === p.maPhong} style={{
                   padding: '5px 14px',
@@ -294,7 +321,7 @@ export default function QuanLyPhong() {
                   fontSize: '12px',
                   fontWeight: 600
                 }}>
-                        {deleting === p.maPhong ? '...' : '🗑Đ Xóa'}
+                        {deleting === p.maPhong ? '...' : '🗑 Xóa'}
                       </button>
                     </div>
                   </td>
@@ -335,7 +362,7 @@ export default function QuanLyPhong() {
             fontWeight: 700,
             fontSize: '15px'
           }}>
-                {modal === 'add' ? '➕ Thêm Phòng Mới' : 'ĐĐ Cập Nhật Phòng'}
+                {modal === 'add' ? '➕ Thêm Phòng Mới' : 'Cập Nhật Phòng'}
               </div>
               <button onClick={() => setModal(null)} style={{
             background: 'rgba(255,255,255,0.2)',
@@ -390,15 +417,18 @@ export default function QuanLyPhong() {
               fontWeight: 600,
               color: '#374151'
             }}>Loại Phòng</span>
-                <input type="text" value={form.loaiPhong} onChange={e => setForm({
+                <select value={form.loaiPhong} onChange={e => setForm({
               ...form,
               loaiPhong: e.target.value
-            })} placeholder="VD: KHOA_NOI, NHA_THUOC, LE_TAN..." style={{
+            })} style={{
               padding: '10px 12px',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
               fontSize: '13px'
-            }} />
+            }}>
+                  <option value="">-- Chọn loại --</option>
+                  {LOAI_PHONG_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
               </label>
 
               <div style={{

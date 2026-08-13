@@ -8,9 +8,11 @@ import DanhSachCho from './components/DanhSachCho';
 import LichHenHomNay from './components/LichHenHomNay';
 import QuyTrinhTiepDon from './components/QuyTrinhTiepDon';
 import DangKyBenhNhan from './components/DangKyBenhNhan';
+import LichKham from './components/LichKham';
 import NhomOSoLieu from '../doctor/components/NhomOSoLieu';
 
 import UserMenu from '../../components/UserMenu';
+import LichLamViecTab from '../../components/LichLamViecTab';
 import QuanLyLichHen from '../../pages/admin/components/QuanLyLichHen';
 import QuanLyHoaDon from '../../pages/admin/components/QuanLyHoaDon';
 import QuanLyDichVu from '../../pages/admin/components/QuanLyDichVu';
@@ -71,10 +73,11 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
   const navItems = [
     { id: 'dashboard', label: 'Tổng Quan', icon: 'dashboard' },
     { id: 'checkin', label: 'Tiếp Đón', icon: 'person_add' },
-    { id: 'patients', label: 'Bệnh Nhân', icon: 'patient_list' },
-    { id: 'appointments', label: 'Lịch Hẹn', icon: 'calendar_month' },
+    { id: 'waitingList', label: 'Danh Sách Chờ', icon: 'format_list_numbered' },
+    { id: 'patients', label: 'Thông Tin Bệnh Nhân', icon: 'patient_list' },
     { id: 'invoices', label: 'Thanh Toán', icon: 'payments' },
     { id: 'services', label: 'Bảng Giá Dịch Vụ', icon: 'medical_services' },
+    { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: 'calendar_month' },
   ];
 
   const renderContent = () => {
@@ -84,38 +87,13 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
           <div className="animate-fade-in space-y-6">
             <NhomOSoLieu user={user} />
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              {/* Cột trái: DS chờ khám */}
-              <div className="xl:col-span-2">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary">pending_actions</span>
-                      Bệnh nhân đang chờ (Hôm nay)
-                    </h3>
-                    <button onClick={fetchStats} className="text-gray-400 hover:text-primary transition-colors">
-                      <span className="material-symbols-outlined text-sm">refresh</span>
-                    </button>
-                  </div>
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                    <DanhSachCho refreshTrigger={refreshTrigger} />
-                  </div>
-                  <button onClick={() => setActiveTab('checkin')} className="w-full mt-4 py-2 text-sm text-primary font-semibold hover:bg-primary/5 rounded-lg border border-dashed border-primary/30 transition-colors">
-                    + Tiếp đón bệnh nhân mới
-                  </button>
-                </div>
-              </div>
-
-              {/* Cột phải: Danh sách hủy */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="material-symbols-outlined text-red-500">cancel_schedule_send</span>
-                  <h3 className="text-lg font-bold text-gray-700">Danh sách hủy</h3>
-                </div>
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                  <DanhSachCho type="cancelled" refreshTrigger={refreshTrigger} />
-                </div>
-              </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <LichKham
+                onCheckIn={(appt) => {
+                  setQuickCheckInAppt(appt);
+                  setActiveTab('checkin');
+                }}
+              />
             </div>
           </div>
         );
@@ -129,20 +107,28 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
           presetDoctor={quickCheckInAppt ? quickCheckInAppt.maNhanVien : undefined}
           appointmentId={quickCheckInAppt ? quickCheckInAppt.id : undefined}
         />;
+      case 'waitingList':
+        return (
+          <div className="animate-fade-in space-y-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[500px]">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Danh Sách Bệnh Nhân đã đăng ký khám bệnh</h2>
+                <p className="text-sm text-gray-500">Danh sách bệnh nhân đã tiếp đón và đang xếp hàng chờ vào phòng khám</p>
+              </div>
+              <div className="space-y-4">
+                <DanhSachCho type="waiting" refreshTrigger={refreshTrigger} />
+              </div>
+            </div>
+          </div>
+        );
       case 'patients':
-        return <QuanLyBenhNhan allowViewDetail={false} />;
-      case 'appointments':
-        return <QuanLyLichHen
-          showActions="checkin"
-          onQuickCheckIn={(appt) => {
-            setQuickCheckInAppt(appt);
-            setActiveTab('checkin');
-          }}
-        />;
+        return <QuanLyBenhNhan allowViewDetail={false} title="Thông Tin Bệnh Nhân" />;
       case 'invoices':
         return <QuanLyHoaDon />;
       case 'services':
         return <QuanLyDichVu />;
+      case 'lichlamviec':
+        return <LichLamViecTab user={user} />;
       default:
         return <div>Chưa có nội dung cho tab này</div>;
     }
@@ -191,7 +177,7 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10 shadow-sm">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 relative z-50 shadow-sm">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg transition-colors">
               <span className="material-symbols-outlined">menu</span>

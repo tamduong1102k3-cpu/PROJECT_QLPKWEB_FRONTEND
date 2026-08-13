@@ -130,17 +130,30 @@ export const loginApi = async data => {
  * POST /forgot-password/send-otp
  * Không cần JWT (public endpoint)
  */
-export const sendOtpApi = async data => {
+export const sendOtpApi = async (data) => {
+  // Nếu data là string (email) thì wrap thành object, nếu không thì giữ nguyên object
+  const payload = typeof data === 'string' ? { email: data } : data;
+  
+  // Tạo AbortController để timeout sau 30 giây (tránh bị treo do Render.com cold start)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  
   try {
     const response = await fetch(`${API_URL}/forgot-password/send-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(payload),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (!response.ok) await handleError(response);
     return await handleResponse(response);
   } catch (error) {
+    clearTimeout(timeoutId);
     console.error("Error in sendOtpApi:", error);
+    if (error.name === 'AbortError') {
+      throw new Error('Yêu cầu bị timeout. Vui lòng thử lại sau.');
+    }
     throw error;
   }
 };
@@ -160,6 +173,26 @@ export const resetPasswordApi = async data => {
     return await handleResponse(response);
   } catch (error) {
     console.error("Error in resetPasswordApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * POST /forgot-password/verify-otp
+ * Không cần JWT (public endpoint)
+ */
+export const verifyOtpApi = async (data) => {
+  try {
+    const payload = typeof data === 'object' ? data : { email: data.email, otp: data.otp };
+    const response = await fetch(`${API_URL}/forgot-password/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) await handleError(response);
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error in verifyOtpApi:", error);
     throw error;
   }
 };

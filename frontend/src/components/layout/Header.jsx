@@ -11,16 +11,6 @@ const Header = () => {
           <nav className="flex items-center gap-6">
             <span className="text-slate-600 dark:text-slate-400 font-medium">Hệ thống Quản lý Nội bộ</span>
           </nav>
-          <div className="flex items-center gap-4 border-l border-slate-200 pl-6">
-            <button className="flex items-center gap-1 text-slate-600 hover:text-blue-600 transition-colors">
-              <span className="material-symbols-outlined text-[20px]">language</span>
-              <span className="text-sm font-medium">VN</span>
-            </button>
-            <button className="flex items-center gap-1 text-slate-600 hover:text-blue-600 transition-colors">
-              <span className="material-symbols-outlined text-[20px]">help_outline</span>
-              <span className="text-sm font-medium">Support</span>
-            </button>
-          </div>
         </div>
       </div>
     </header>

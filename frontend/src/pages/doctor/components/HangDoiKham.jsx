@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import NhomOSoLieu from './NhomOSoLieu';
 import { getTodayApi } from '../../../api/dangKyKhamBenhApi';
 import { getTodayResultsApi as getTodayResultsXetNghiemApi } from '../../../api/ketQuaXetNghiemApi';
 import { getTodayResultsApi as getTodayResultsCdhaApi } from '../../../api/ketQuaCdhaApi';
 import { getPendingTestsApi, getCompletedTestsTodayApi } from '../../../api/phieuChiDinhApi';
+import usePagination from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 
 const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
   const [patients, setPatients] = useState({
@@ -28,7 +30,6 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
       setLoadingQueue(true);
       let data = null;
       if (isLabDoctor) {
-        // Lấy danh sách chờ duyệt theo mã chuyên khoa (kèm thông tin bệnh nhân)
         const params = { maChuyenKhoa: user?.maChuyenKhoa };
         const [pendingRes, completedRes] = await Promise.allSettled([
           getPendingTestsApi(params),
@@ -47,7 +48,6 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
       } else if (isCdhaDoc) {
         data = await getTodayResultsCdhaApi();
       } else {
-        // Sử dụng keyword cho tìm kiếm bệnh nhân backend-side (SQL LIKE)
         data = await getTodayApi(keyword);
       }
 
@@ -80,7 +80,7 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
   }, [user, isXetNghiemDoc, isCdhaDoc, isRhmDoc, isLabDoctor]);
 
   useEffect(() => {
-    fetchQueue(appliedSearch);
+    fetchQueue(appliedSearch); // eslint-disable-line react-hooks/set-state-in-effect
     const interval = setInterval(() => fetchQueue(appliedSearch), 30000);
     return () => clearInterval(interval);
   }, [fetchQueue, appliedSearch, refreshTrigger]);
@@ -106,7 +106,33 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
   };
 
   // Danh sách hiển thị theo tab
-  const displayedPatients = activeTab === 'waiting' ? patients.waiting : activeTab === 'waitingCls' ? patients.waitingCls : patients.completed;
+  const allDisplayed = activeTab === 'waiting' ? patients.waiting : activeTab === 'waitingCls' ? patients.waitingCls : patients.completed;
+
+  // Phân trang dùng chung (search đã xử lý server-side qua appliedSearch)
+  const {
+    paginatedData: displayedPatients,
+    filteredData: allFiltered,
+    totalItems: displayedCount,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    safeCurrentPage,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+    pageError,
+    resetPage,
+  } = usePagination({
+    data: allDisplayed,
+    pageSize: 8,
+    resetOnChange: false, // Tab change sẽ tự gọi resetPage
+  });
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
+  };
 
   const getTabLabel = () => {
     if (isLabDoctor) {
@@ -140,11 +166,11 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
   const actionButton = getActionButton();
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-6 flex flex-col h-full">
       <NhomOSoLieu user={user} />
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <span className="material-symbols-outlined text-indigo-600">person_search</span>
@@ -158,7 +184,7 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
           {/* Tabs: Chờ khám | Chờ CLS | Đã khám */}
           <div className="flex gap-2 mb-4">
             <button
-              onClick={() => setActiveTab('waiting')}
+              onClick={() => handleTabChange('waiting')}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
                 activeTab === 'waiting'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
@@ -177,7 +203,7 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
             </button>
             {!isLabDoctor && (
               <button
-                onClick={() => setActiveTab('waitingCls')}
+                onClick={() => handleTabChange('waitingCls')}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
                   activeTab === 'waitingCls'
                     ? 'bg-purple-600 text-white shadow-md shadow-purple-200'
@@ -196,7 +222,7 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
               </button>
             )}
             <button
-              onClick={() => setActiveTab('completed')}
+              onClick={() => handleTabChange('completed')}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
                 activeTab === 'completed'
                   ? 'bg-green-600 text-white shadow-md shadow-green-200'
@@ -232,8 +258,16 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
             )}
           </div>
         </div>
-        
-        <div className="overflow-x-auto">
+
+        {/* IN-LIST WARNING */}
+        {pageError && (
+          <div className="px-6 py-3 bg-rose-50 border-b border-rose-100 text-rose-600 text-xs font-bold flex items-center gap-2 flex-shrink-0">
+            <span className="material-symbols-outlined text-sm">error</span>
+            {pageError}
+          </div>
+        )}
+
+        <div className="overflow-x-auto flex-1 min-h-0">
           <table className="w-full text-left">
             <thead className="bg-white text-gray-500 text-xs uppercase font-bold border-b border-gray-100">
               <tr>
@@ -252,8 +286,8 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
                 <tr>
                   <td colSpan="8" className="text-center py-10 text-gray-400">Đang tải...</td>
                 </tr>
-              ) : displayedPatients.length === 0 ? (
-                <tr>
+              ) : allDisplayed.length === 0 ? (
+                <tr className="h-full">
                   <td colSpan="8" className="text-center py-10 text-gray-400">
                     {appliedSearch
                       ? `Không tìm thấy bệnh nhân với từ khóa "${appliedSearch}"`
@@ -271,7 +305,7 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
                     <td className="px-6 py-4 text-sm font-bold text-gray-800">{p.hoTen || p.tenBenhNhan || 'Bệnh nhân'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">#{p.maPhieuKham || p.maBenhNhan || p.maChiTiet || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{p.cccd || '-'}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{p.tenChuyenKhoa || p.tenDichVu || p.dichVu || p.phong || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{p.tenChuyenKhoa || p.tenDichVu || p.dichVu || p.phong || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600 max-w-[150px] truncate" title={p.ghiChu || ''}>{p.ghiChu || '-'}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${statusBadge.bg} ${statusBadge.text}`}>
@@ -280,7 +314,7 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
-                        onClick={() => handleSelectPatient(p)}
+                        onClick={() => handleSelectPatient(p, activeTab === 'completed')}
                         className={`px-3 py-1.5 text-white text-xs font-bold rounded-lg transition-all ${actionButton.bg}`}
                       >
                         {actionButton.label}
@@ -292,6 +326,26 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION UI */}
+        {!loadingQueue && allDisplayed.length > 0 && (
+          <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={allDisplayed.length}
+              label="bệnh nhân"
+              visiblePages={visiblePages}
+              onPageChange={setCurrentPage}
+              jumpPage={jumpPage}
+              onJumpPage={handleJumpPage}
+              onJumpBlur={handleJumpPageBlur}
+              activeClass="bg-indigo-600 text-white shadow-md shadow-indigo-100"
+              hoverClass="hover:bg-indigo-50 hover:text-indigo-600"
+              ringClass="focus:ring-2 focus:ring-indigo-200"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -26,6 +26,30 @@ export const getAllApi = async () => {
 };
 
 /**
+ * GET /{id}
+ */
+export const getByIdApi = async (id) => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in getByIdApi:", error);
+    throw error;
+  }
+};
+
+/**
  * POST /
  */
 export const createApi = async data => {
@@ -232,8 +256,6 @@ export const getAssistantHistoryApi = async (maChuyenKhoa) => {
 
 /**
  * PUT /{maPhieuKham}/status-cls
- * Cập nhật trạng thái phiếu khám và đăng ký sang CHO_CLS
- * Dùng khi Bác sĩ chỉ định dịch vụ CLS
  */
 export const updateToClsApi = async (maPhieuKham) => {
   try {
@@ -263,8 +285,6 @@ export const updateToClsApi = async (maPhieuKham) => {
 
 /**
  * PUT /{maPhieuKham}/status-waiting
- * Cập nhật trạng thái phiếu khám và đăng ký sang CHO_BAC_SI
- * Dùng khi Trợ lý hoàn tất đo sinh hiệu/khám RHM sơ bộ
  */
 export const updateToWaitingForDoctorApi = async (maPhieuKham) => {
   try {
@@ -317,11 +337,7 @@ export const getAvailableClsResultsApi = async id => {
 };
 
 /**
- * GET /specialty-history
- */
-/**
  * POST /accept-cls-patient/{registrationId}
- * KTV tiếp nhận bệnh nhân CLS: tạo PhieuKham
  */
 export const acceptClsPatientApi = async (registrationId, technicianId) => {
   try {
@@ -342,7 +358,6 @@ export const acceptClsPatientApi = async (registrationId, technicianId) => {
 
 /**
  * POST /{maPhieuKham}/tech-confirm-cls
- * Kỹ thuật viên xác nhận dịch vụ CLS: tạo TiepNhanCls + PhieuChiDinh + ChiTietChiDinh
  */
 export const techConfirmClsApi = async (maPhieuKham, technicianId, data) => {
   try {
@@ -367,7 +382,6 @@ export const techConfirmClsApi = async (maPhieuKham, technicianId, data) => {
 
 /**
  * POST /{maPhieuKham}/confirm-cls
- * Bác sĩ CLS xác nhận thực hiện dịch vụ: tạo PhieuChiDinh
  */
 export const confirmClsServiceApi = async (maPhieuKham, doctorId) => {
   try {
@@ -388,7 +402,6 @@ export const confirmClsServiceApi = async (maPhieuKham, doctorId) => {
 
 /**
  * GET /pending-cls-confirmation
- * Lấy danh sách bệnh nhân CLS chờ bác sĩ xác nhận
  */
 export const getPendingClsConfirmationApi = async (maChuyenKhoa) => {
   try {
@@ -411,6 +424,32 @@ export const getPendingClsConfirmationApi = async (maChuyenKhoa) => {
   }
 };
 
+/**
+ * GET /patient-history?maBenhNhan=...&maChuyenKhoa=...
+ */
+export const getPatientHistoryApi = async (maBenhNhan, maChuyenKhoa) => {
+  try {
+    let url = `${API_URL}/patient-history?maBenhNhan=${maBenhNhan}`;
+    if (maChuyenKhoa != null) url += `&maChuyenKhoa=${maChuyenKhoa}`;
+    const response = await fetchClient(url, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : [];
+  } catch (error) {
+    console.error("Error in getPatientHistoryApi:", error);
+    throw error;
+  }
+};
+
 export const getSpecialtyHistoryApi = async maChuyenKhoa => {
   try {
     const response = await fetchClient(`${API_URL}/specialty-history?maChuyenKhoa=${maChuyenKhoa}`, {
@@ -429,5 +468,31 @@ export const getSpecialtyHistoryApi = async maChuyenKhoa => {
   } catch (error) {
     console.error("Error in getSpecialtyHistoryApi:", error);
     throw error;
+  }
+};
+
+/**
+ * GET /current-cho?maChuyenKhoa=...
+ * Lấy phiếu khám hiện tại đang có trạng thái CHO (đang được khám)
+ * Trả về thông tin bệnh nhân đang được khám hiện tại
+ */
+export const getCurrentChoPatientApi = async (maChuyenKhoa) => {
+  try {
+    const url = maChuyenKhoa 
+      ? `${API_URL}/current-cho?maChuyenKhoa=${maChuyenKhoa}`
+      : `${API_URL}/current-cho`;
+    const response = await fetchClient(url, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      // Nếu 404 hoặc không tìm thấy, trả về null
+      if (response.status === 404) return null;
+      throw new Error(`Lỗi: ${response.status}`);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in getCurrentChoPatientApi:", error);
+    return null;
   }
 };

@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { sqlLikeMatch } from '../../../utils/searchUtils';
+import usePagination from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 
 const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, formatDateTime }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,14 +24,21 @@ const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, for
 
   const activeList = activeTab === 'cho_cap' ? choCapList : daCapList;
 
-  const filteredPatients = activeList.filter(p => {
-    if (!searchTerm) return true;
-    return (
-      sqlLikeMatch(p.hoTen, searchTerm) ||
-      sqlLikeMatch(p.soDienThoai, searchTerm) ||
-      sqlLikeMatch(p.maBenhNhan, searchTerm) ||
-      sqlLikeMatch(p.maHoaDon, searchTerm)
-    );
+  const {
+    paginatedData: pagedPatients,
+    totalItems: pagedTotalItems,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+  } = usePagination({
+    data: activeList,
+    pageSize: 8,
+    searchKeys: ['hoTen', 'soDienThoai', 'maBenhNhan', 'maHoaDon'],
+    searchTerm,
   });
 
   const tabs = [
@@ -166,7 +175,7 @@ const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, for
         </div>
 
         {/* Empty State */}
-        {filteredPatients.length === 0 ? (
+        {pagedPatients.length === 0 ? (
           <div className="p-10 text-center">
             <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <span className="material-symbols-outlined text-gray-300 text-3xl">patient_list</span>
@@ -195,7 +204,7 @@ const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, for
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredPatients.map((patient) => (
+                {pagedPatients.map((patient) => (
                   <tr
                     key={`${patient.maHoaDon}-${patient.maBenhNhan}`}
                     className="hover:bg-amber-50/40 transition-colors group"
@@ -249,6 +258,24 @@ const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, for
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* Pagination */}
+        {pagedTotalItems > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={pagedTotalItems}
+            label="bệnh nhân"
+            visiblePages={visiblePages}
+            onPageChange={setCurrentPage}
+            jumpPage={jumpPage}
+            onJumpPage={handleJumpPage}
+            onJumpBlur={handleJumpPageBlur}
+            activeClass="bg-amber-600 text-white shadow-md shadow-amber-100"
+            hoverClass="hover:bg-amber-50 hover:text-amber-600"
+            ringClass="focus:ring-2 focus:ring-amber-200"
+          />
         )}
       </div>
     </div>

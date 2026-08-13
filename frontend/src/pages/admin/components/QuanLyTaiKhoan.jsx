@@ -1,13 +1,36 @@
 import { getAllApi, updateApi, deleteApi } from '../../../api/accountApi'; 
 import React, { useState, useEffect } from 'react';
+import usePagination from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 
-const VAI_TRO_OPTIONS = ['QUAN_TRI_VIEN', 'BAC_SI_CHUYEN_KHOA', 'Y_TA', 'LE_TAN'];
+const VAI_TRO_OPTIONS = [
+  'QUAN_TRI_VIEN',
+  'BAC_SI_CHUYEN_KHOA',
+  'BAC_SI',
+  'TRO_LY_BAC_SI_CHUYEN_KHOA',
+  'TRO_LY_BAC_SI_TONG_QUAT',
+  'Y_TA',
+  'LE_TAN',
+  'THU_NGAN',
+  'DUOC_SI',
+  'NHAN_VIEN_KHO',
+  'KY_THUAT_VIEN_XET_NGHIEM',
+  'KY_THUAT_VIEN_CHAN_DOAN_HINH_ANH'
+];
 const roleLabel = role => {
   const map = {
-    QUAN_TRI_VIEN: 'Quản Trị Viên',
-    BAC_SI_CHUYEN_KHOA: 'Bác Sĩ Chuyên Khoa',
-    Y_TA: 'Y Tá',
-    LE_TAN: 'Lễ Tân'
+    QUAN_TRI_VIEN: 'Quản trị viên',
+    BAC_SI_CHUYEN_KHOA: 'Bác sĩ chuyên khoa',
+    BAC_SI: 'Bác sĩ',
+    TRO_LY_BAC_SI_CHUYEN_KHOA: 'Trợ lý bác sĩ chuyên khoa',
+    TRO_LY_BAC_SI_TONG_QUAT: 'Trợ lý bác sĩ tổng quát',
+    Y_TA: 'Y tá',
+    LE_TAN: 'Lễ tân',
+    THU_NGAN: 'Thu ngân',
+    DUOC_SI: 'Dược sĩ',
+    NHAN_VIEN_KHO: 'Nhân viên kho',
+    KY_THUAT_VIEN_XET_NGHIEM: 'Kỹ thuật viên xét nghiệm',
+    KY_THUAT_VIEN_CHAN_DOAN_HINH_ANH: 'Kỹ thuật viên chẩn đoán hình ảnh'
   };
   return map[role] || role;
 };
@@ -15,8 +38,16 @@ const roleBadgeClass = role => {
   const map = {
     QUAN_TRI_VIEN: 'bg-purple-100 text-purple-700',
     BAC_SI_CHUYEN_KHOA: 'bg-blue-100 text-blue-700',
+    BAC_SI: 'bg-blue-100 text-blue-700',
+    TRO_LY_BAC_SI_CHUYEN_KHOA: 'bg-cyan-100 text-cyan-700',
+    TRO_LY_BAC_SI_TONG_QUAT: 'bg-cyan-100 text-cyan-700',
     Y_TA: 'bg-green-100 text-green-700',
-    LE_TAN: 'bg-orange-100 text-orange-700'
+    LE_TAN: 'bg-orange-100 text-orange-700',
+    THU_NGAN: 'bg-emerald-100 text-emerald-700',
+    DUOC_SI: 'bg-teal-100 text-teal-700',
+    NHAN_VIEN_KHO: 'bg-amber-100 text-amber-700',
+    KY_THUAT_VIEN_XET_NGHIEM: 'bg-indigo-100 text-indigo-700',
+    KY_THUAT_VIEN_CHAN_DOAN_HINH_ANH: 'bg-violet-100 text-violet-700'
   };
   return map[role] || 'bg-gray-100 text-gray-600';
 };
@@ -56,6 +87,21 @@ const QuanLyTaiKhoan = () => {
     if (!searchTerm) return true;
     const t = searchTerm.toLowerCase();
     return (acc.username || '').toLowerCase().includes(t) || (acc.email || '').toLowerCase().includes(t) || (acc.vaiTro || '').toLowerCase().includes(t);
+  });
+
+  const {
+    paginatedData: pagedAccounts,
+    totalItems: pagedTotalItems,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+  } = usePagination({
+    data: filtered,
+    pageSize: 8,
   });
 
   // ── Open edit modal ───────────────────────────────────────────
@@ -234,13 +280,13 @@ const QuanLyTaiKhoan = () => {
                 padding: '48px',
                 textAlign: 'center',
                 color: '#9ca3af'
-              }}>Đang tải dữ liệu...</td></tr> : filtered.length === 0 ? <tr><td colSpan="6" style={{
+              }}>Đang tải dữ liệu...</td></tr> : pagedAccounts.length === 0 ? <tr><td colSpan="6" style={{
                 padding: '48px',
                 textAlign: 'center',
                 color: '#9ca3af'
               }}>
                   {searchTerm ? `Không tìm thấy tài khoản nào phù hợp với "${searchTerm}".` : 'Không có tài khoản nào.'}
-                </td></tr> : filtered.map(acc => <tr key={acc.maTaiKhoan} style={{
+                </td></tr> : pagedAccounts.map(acc => <tr key={acc.maTaiKhoan} style={{
               borderBottom: '1px solid #f3f4f6'
             }} onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{
@@ -348,6 +394,21 @@ const QuanLyTaiKhoan = () => {
             </tbody>
           </table>
         </div>
+
+        {!isLoading && pagedTotalItems > 0 && (
+          <Pagination
+            mode="inline"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={pagedTotalItems}
+            label="tài khoản"
+            visiblePages={visiblePages}
+            onPageChange={setCurrentPage}
+            jumpPage={jumpPage}
+            onJumpPage={handleJumpPage}
+            onJumpBlur={handleJumpPageBlur}
+          />
+        )}
       </div>
 
       {/* ── Edit Modal ── */}
