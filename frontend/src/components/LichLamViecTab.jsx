@@ -240,7 +240,7 @@ export default function LichLamViecTab({ user }) {
                                 onClick={() => setSelectedShift(shift)}
                                 className={`w-full text-left rounded-xl p-2 text-white transition-transform hover:-translate-y-1 bg-gradient-to-br ${style.gradient} shadow-sm`}
                               >
-                                <p className="text-[11px] font-extrabold mb-1 truncate">{shift.phong || 'Phòng trực'}</p>
+                                <p className="text-[11px] font-extrabold mb-1 leading-snug break-words">{shift.phong || 'Phòng trực'}</p>
                                 <div className="inline-flex items-center gap-1 bg-black/10 px-1.5 py-0.5 rounded-lg text-[9px] font-bold">
                                   <span className="material-symbols-outlined text-[12px]">schedule</span>
                                   {shift.gioLam} - {shift.gioKetThuc}
