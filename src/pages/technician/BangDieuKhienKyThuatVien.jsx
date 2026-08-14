@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getPendingTestsApi, getCompletedTestsTodayApi } from '../../api/phieuChiDinhApi';
-import { getTodayApi as getTodayDangKyApi } from '../../api/dangKyKhamBenhApi';
+import { getTodayApi as getTodayDangKyApi, updateStatusApi, setXepCuoiApi } from '../../api/dangKyKhamBenhApi';
 import { acceptClsPatientApi, updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
 import { getByPhieuKhamApi } from '../../api/chiSoKhamTongHopApi';
-import { getAllApi as getAllServicesApi } from '../../api/dichVuApi'; // API lấy danh mục dịch vụ
+import { getAllApi as getAllServicesApi } from '../../api/dichVuApi';
 import { removeVietnameseTones } from './component/TienIchKyThuatVien';
 import BangDanhSachCongViec from './component/BangDanhSachCongViec';
 import ModalNhapKetQua from './component/ModalNhapKetQua';
@@ -13,10 +13,12 @@ import ModalNhapTiepNhanCls from './component/ModalNhapTiepNhanCls';
 
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import UserMenu from '../../components/UserMenu';
+import LichLamViecTab from '../../components/LichLamViecTab';
 import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
 import { useNotification } from '../../components/NotificationContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import ModalGoiLai from '../../components/ModalGoiLai';
 
 const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   const { showWarning } = useNotification();
@@ -27,7 +29,6 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [pendingTests, setPendingTests] = useState([]);
   const [completedTests, setCompletedTests] = useState([]);
-  const [absentTests, setAbsentTests] = useState([]);
   const [pendingRegistrations, setPendingRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const isInitialLoad = React.useRef(true);
@@ -46,6 +47,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   // Danh sách toàn bộ dịch vụ để tra cứu loại dịch vụ
   const [servicesList, setServicesList] = useState([]);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, type: 'primary', icon: '' });
+  const [goiLaiState, setGoiLaiState] = useState({ isOpen: false, patient: null });
 
   // Fetch danh sách và kiểm tra sinh hiệu cho từng bệnh nhân
   const fetchWorklist = useCallback(async (showIndicator) => {
@@ -59,7 +61,25 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
         getCompletedTestsTodayApi({ maChuyenKhoa }),
         getTodayDangKyApi()
       ]);
-      setPendingTests(pending || []);
+
+      // Tạo map maBenhNhan -> id dang_ky_kham_benh
+      const regByPatient = {};
+      (registrations || []).forEach(r => {
+        if (r.maBenhNhan) regByPatient[r.maBenhNhan] = r.id;
+      });
+
+      // Gộp bệnh nhân VANG_MAT vào danh sách pending
+      const pendingItems = (pending || []).map(p => ({
+        ...p,
+        registrationId: regByPatient[p.maBenhNhan] || null
+      }));
+      const vangMatPatients = (registrations || []).filter(r =>
+        r.trangThai === 'VANG_MAT'
+      ).map(r => ({
+        ...r,
+        registrationId: r.id
+      }));
+      setPendingTests([...pendingItems, ...vangMatPatients]);
       setCompletedTests(completed || []);
 
       // Lọc đăng ký mới (CHO_KHAM, chưa có maPhieuKham) theo chuyên khoa của KTV
@@ -178,14 +198,96 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
     setVitalsPatient(null);
   };
 
-  const handleMarkAbsent = (item) => {
-    setPendingTests(prev => prev.filter(t => t.id !== item.id));
-    setAbsentTests(prev => [...prev, item]);
+  // Helper: lấy đúng id đăng ký khám bệnh
+  // Ưu tiên registrationId (gán từ fetchWorklist), fallback item.id,
+  // nhưng với items từ pendingTests (chi_tiet_chi_dinh), item.id là sai -> cần lookup lại
+  const getRegistrationId = (item) => {
+    if (item.registrationId) return item.registrationId;
+    // Nếu không có registrationId, tra cứu từ lại từ registrations (đã được lưu)
+    // Dùng item.maBenhNhan để lookup
+    if (item.maBenhNhan) {
+      const reg = pendingRegistrations.find(r =>
+        Number(r.maBenhNhan) === Number(item.maBenhNhan)
+      );
+      if (reg) return reg.id;
+      // Cũng kiểm tra trong vangMatPatients (đã gộp vào pendingTests)
+      const vangMat = pendingTests.find(p =>
+        Number(p.maBenhNhan) === Number(item.maBenhNhan) && p.registrationId
+      );
+      if (vangMat) return vangMat.registrationId;
+    }
+    return item.id;
+  };
+
+  const handleMarkAbsent = async (item, type = 'tam_thoi') => {
+    try {
+      const regId = getRegistrationId(item);
+      console.log('Mark absent - regId:', regId, 'type:', type, 'item:', item);
+      const result1 = await updateStatusApi(regId, { trangThai: 'VANG_MAT' });
+      console.log('Update status result:', result1);
+      // Nếu vắng quá lâu thì tự động đánh dấu xếp cuối
+      if (type === 'qua_lau') {
+        const result2 = await setXepCuoiApi(regId);
+        console.log('Set xep cuoi result:', result2);
+      }
+      await fetchWorklist();
+    } catch (error) {
+      console.error('Error in handleMarkAbsent:', error);
+      showWarning('Lỗi: ' + error.message);
+    }
   };
 
   const handleMarkPresent = (item) => {
-    setAbsentTests(prev => prev.filter(t => t.id !== item.id));
-    setPendingTests(prev => [...prev, item]);
+    // Hiển thị dialog xác nhận tiếp nhận, khi xác nhận thì update VANG_MAT -> DANG_KHAM
+    // và mở form sinh hiệu giống như nút KHÁM BỆNH bình thường
+    setConfirmState({
+      isOpen: true,
+      title: 'Xác nhận tiếp nhận',
+      message: `Tiếp nhận bệnh nhân "${item.hoTen}"?`,
+      type: 'primary',
+      icon: 'assignment_ind',
+      onConfirm: async () => {
+        setConfirmState(prev => ({ ...prev, isOpen: false }));
+        try {
+          const regId = getRegistrationId(item);
+          await updateStatusApi(regId, { trangThai: 'DANG_KHAM' });
+          await fetchWorklist();
+          // Mở form sinh hiệu giống như quy trình khám bệnh bình thường
+          if (item.hasVitals) {
+            handleOpenResult(item);
+          } else {
+            handleOpenVitals(item);
+          }
+        } catch (error) {
+          showWarning('Lỗi: ' + error.message);
+        }
+      }
+    });
+  };
+
+  const handleGoiLai_SauNguoiDangKham = async () => {
+    const item = goiLaiState.patient;
+    setGoiLaiState({ isOpen: false, patient: null });
+    try {
+      const regId = getRegistrationId(item);
+      await updateStatusApi(regId, { trangThai: 'CHO_KHAM' });
+      await fetchWorklist();
+    } catch (error) {
+      showWarning('Lỗi: ' + error.message);
+    }
+  };
+
+  const handleGoiLai_XepCuoiHang = async () => {
+    const item = goiLaiState.patient;
+    setGoiLaiState({ isOpen: false, patient: null });
+    try {
+      const regId = getRegistrationId(item);
+      await updateStatusApi(regId, { trangThai: 'CHO_KHAM' });
+      await setXepCuoiApi(regId);
+      await fetchWorklist();
+    } catch (error) {
+      showWarning('Lỗi: ' + error.message);
+    }
   };
 
   // KTV nhấn KHÁM - gộp: tạo Phiếu khám + mở đo sinh hiệu
@@ -219,7 +321,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   return (
     <div className="flex h-screen bg-slate-50 font-body-md overflow-hidden text-slate-800 selection:bg-indigo-100 selection:text-indigo-900">
       <WebSocketAutoRefresh
-        topics={['/topic/phieu-kham', '/topic/cls']}
+        topics={['/topic/phieu-kham', '/topic/cls', '/topic/dang-ky-kham']}
         onMessage={(topic, data) => {
           fetchWorklist(false);
         }}
@@ -238,7 +340,8 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
             {[
               { id: 'worklist', label: deptName, icon: isImaging ? 'image' : 'science' },
               { id: 'history', label: 'Lịch Sử Khoa', icon: 'history' },
-              { id: 'patients', label: 'Hồ Sơ', icon: 'person_search' }
+              { id: 'patients', label: 'Thông Tin Bệnh Nhân', icon: 'person_search' },
+              { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: 'calendar_month' }
             ].map(i => (
               <li key={i.id}>
                 <button onClick={() => setActiveTab(i.id)} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200" style={{ backgroundColor: activeTab === i.id ? '#eef2ff' : 'transparent', color: activeTab === i.id ? '#4338ca' : '#64748b' }}>
@@ -252,13 +355,13 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-20 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between px-8 z-10 shadow-sm sticky top-0">
+        <header className="h-20 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between px-8 relative z-50 shadow-sm">
           <div className="flex items-center gap-5">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-500 p-2.5 hover:bg-slate-100 rounded-xl transition-colors ring-1 ring-transparent hover:ring-slate-200">
               <span className="material-symbols-outlined">menu</span>
             </button>
             <h1 className="text-2xl font-black text-slate-800 tracking-tight">
-              {activeTab === 'worklist' ? `Phòng ${deptName}` : 'Hồ Sơ Bệnh Nhân'}
+              {activeTab === 'worklist' ? `Phòng ${deptName}` : 'Thông Tin Bệnh Nhân'}
             </h1>
           </div>
           <div className="flex items-center gap-6 border-l border-slate-200 pl-6">
@@ -273,7 +376,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
         </header>
 
         <main className="flex-1 overflow-y-auto p-8 bg-slate-50/50 scroll-smooth">
-          {activeTab === 'patients' ? <QuanLyBenhNhan /> : activeTab === 'history' ? (
+          {activeTab === 'lichlamviec' ? <LichLamViecTab user={user} /> : activeTab === 'patients' ? <QuanLyBenhNhan title="Thông Tin Bệnh Nhân" /> : activeTab === 'history' ? (
             <LichSuChuyenKhoa user={user} onReview={(item) => setViewingResult({
               ...item,
               id: item.maPhieuKham,
@@ -295,12 +398,10 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
                   data: enrichItems(filterList(
                     worklistTab === 'reception' ? pendingRegistrations :
                       worklistTab === 'pending' ? pendingTests :
-                        worklistTab === 'completed' ? completedTests :
-                          absentTests
+                        completedTests
                   )),
                   pendingCount: pendingTests.length,
                   completedCount: completedTests.length,
-                  absentCount: absentTests.length,
                   receptionCount: pendingRegistrations.length
                 }}
                 worklistTab={worklistTab} setWorklistTab={setWorklistTab}
@@ -354,6 +455,13 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
         icon={confirmState.icon}
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+      />
+      <ModalGoiLai
+        isOpen={goiLaiState.isOpen}
+        patient={goiLaiState.patient}
+        onSauNguoiDangKham={handleGoiLai_SauNguoiDangKham}
+        onXepCuoiHang={handleGoiLai_XepCuoiHang}
+        onCancel={() => setGoiLaiState({ isOpen: false, patient: null })}
       />
     </div>
   );

@@ -10,6 +10,8 @@ import {
   getAllChuyenKhoaApi as getChuyenKhoaApi, 
   getAllVaiTroApi as getVaiTroApi 
 } from '../../../api/danhMucApi';
+import usePagination from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 
 
 const QuanLyNhanVien = () => {
@@ -50,18 +52,22 @@ const QuanLyNhanVien = () => {
         getChuyenKhoaApi(),
         getVaiTroApi()
       ]);
-      console.log("DEBUG API - Chuc Vu:", chucVuData);
-      console.log("DEBUG API - Chuyen Khoa:", chuyenKhoaData);
-      console.log("DEBUG API - Vai Tro:", vaiTroData);
-      
       setDsChucVu(chucVuData || []);
       setDsChuyenKhoa(chuyenKhoaData || []);
       
       const fallbackVaiTro = [
         { maVaiTro: 'QUAN_TRI_VIEN', tenBienThe: 'Quản Trị Viên' },
-        { maVaiTro: 'BAC_SI_CHUYEN_KHOA', tenBienThe: 'Bác Sĩ Chuyên Khoa' },
-        { maVaiTro: 'Y_TA', tenBienThe: 'Y Tá' },
-        { maVaiTro: 'LE_TAN', tenBienThe: 'Lễ Tân' }
+        { maVaiTro: 'BAC_SI_CHUYEN_KHOA', tenBienThe: 'Bác sĩ chuyên khoa' },
+        { maVaiTro: 'BAC_SI', tenBienThe: 'Bác sĩ' },
+        { maVaiTro: 'TRO_LY_BAC_SI_CHUYEN_KHOA', tenBienThe: 'Trợ lý bác sĩ chuyên khoa' },
+        { maVaiTro: 'TRO_LY_BAC_SI_TONG_QUAT', tenBienThe: 'Trợ lý bác sĩ tổng quát' },
+        { maVaiTro: 'Y_TA', tenBienThe: 'Y tá' },
+        { maVaiTro: 'LE_TAN', tenBienThe: 'Lễ tân' },
+        { maVaiTro: 'THU_NGAN', tenBienThe: 'Thu ngân' },
+        { maVaiTro: 'DUOC_SI', tenBienThe: 'Dược sĩ' },
+        { maVaiTro: 'NHAN_VIEN_KHO', tenBienThe: 'Nhân viên kho' },
+        { maVaiTro: 'KY_THUAT_VIEN_XET_NGHIEM', tenBienThe: 'Kỹ thuật viên xét nghiệm' },
+        { maVaiTro: 'KY_THUAT_VIEN_CHAN_DOAN_HINH_ANH', tenBienThe: 'Kỹ thuật viên chẩn đoán hình ảnh' }
       ];
 
       if (vaiTroData && vaiTroData.length > 0) {
@@ -76,10 +82,18 @@ const QuanLyNhanVien = () => {
     } catch (error) {
       console.error("Lỗi lấy danh mục:", error);
       setDsVaiTro([
-        { maVaiTro: 'QUAN_TRI_VIEN', tenBienThe: 'Quản Trị Viên' },
-        { maVaiTro: 'BAC_SI_CHUYEN_KHOA', tenBienThe: 'Bác Sĩ Chuyên Khoa' },
-        { maVaiTro: 'Y_TA', tenBienThe: 'Y Tá' },
-        { maVaiTro: 'LE_TAN', tenBienThe: 'Lễ Tân' }
+        { maVaiTro: 'QUAN_TRI_VIEN', tenBienThe: 'Quản trị viên' },
+        { maVaiTro: 'BAC_SI_CHUYEN_KHOA', tenBienThe: 'Bác sĩ chuyên khoa' },
+        { maVaiTro: 'BAC_SI', tenBienThe: 'Bác sĩ' },
+        { maVaiTro: 'TRO_LY_BAC_SI_CHUYEN_KHOA', tenBienThe: 'Trợ lý bác sĩ chuyên khoa' },
+        { maVaiTro: 'TRO_LY_BAC_SI_TONG_QUAT', tenBienThe: 'Trợ lý bác sĩ tổng quát' },
+        { maVaiTro: 'Y_TA', tenBienThe: 'Y tá' },
+        { maVaiTro: 'LE_TAN', tenBienThe: 'Lễ tân' },
+        { maVaiTro: 'THU_NGAN', tenBienThe: 'Thu ngân' },
+        { maVaiTro: 'DUOC_SI', tenBienThe: 'Dược sĩ' },
+        { maVaiTro: 'NHAN_VIEN_KHO', tenBienThe: 'Nhân viên kho' },
+        { maVaiTro: 'KY_THUAT_VIEN_XET_NGHIEM', tenBienThe: 'Kỹ thuật viên xét nghiệm' },
+        { maVaiTro: 'KY_THUAT_VIEN_CHAN_DOAN_HINH_ANH', tenBienThe: 'Kỹ thuật viên chẩn đoán hình ảnh' }
       ]);
     }
   };
@@ -152,7 +166,7 @@ const QuanLyNhanVien = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa nhân viên nàyĐ Hành động này sẽ xóa luôn tài khoản hệ thống của hĐ!")) {
+    if (window.confirm("Bạn có chắc chắn muốn xóa nhân viên này? Hành động này sẽ xóa luôn tài khoản hệ thống của họ!")) {
       try {
         await deleteEmployeeApi(id);
         alert("Xóa nhân viên thành công!");
@@ -176,6 +190,21 @@ const QuanLyNhanVien = () => {
            email.includes(lowerTerm) || 
            cccd.includes(lowerTerm) || 
            sdt.includes(lowerTerm);
+  });
+
+  const {
+    paginatedData: pagedEmployees,
+    totalItems: pagedTotalItems,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+  } = usePagination({
+    data: filteredEmployees,
+    pageSize: 8,
   });
 
   const handleInputChange = (e) => {
@@ -270,7 +299,7 @@ const QuanLyNhanVien = () => {
                 <tr>
                   <td colSpan="6" className="p-10 text-center text-gray-500">Đang tải dữ liệu...</td>
                 </tr>
-              ) : filteredEmployees.map((emp) => (
+              ) : pagedEmployees.map((emp) => (
                 <tr key={emp.maNhanVien} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 text-sm font-semibold text-gray-700">NV{emp.maNhanVien ? emp.maNhanVien.toString().padStart(3, '0') : '???'}</td>
                   <td className="px-6 py-4">
@@ -308,10 +337,23 @@ const QuanLyNhanVien = () => {
             </tbody>
           </table>
         </div>
-        {filteredEmployees.length === 0 && !isLoading && (
+        {pagedEmployees.length === 0 && !isLoading && (
           <div className="p-10 text-center text-gray-500">
             Không tìm thấy nhân viên nào phù hợp với "{searchTerm}".
           </div>
+        )}
+        {!isLoading && pagedTotalItems > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={pagedTotalItems}
+            label="nhân viên"
+            visiblePages={visiblePages}
+            onPageChange={setCurrentPage}
+            jumpPage={jumpPage}
+            onJumpPage={handleJumpPage}
+            onJumpBlur={handleJumpPageBlur}
+          />
         )}
       </div>
 
@@ -410,7 +452,7 @@ const QuanLyNhanVien = () => {
                   <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
                     <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
                       <span className="material-symbols-outlined text-blue-600">manage_accounts</span>
-                      3. Tạo tài khoản hệ thống (Dùng Proceduce)
+                      3. Tạo tài khoản hệ thống
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
@@ -447,7 +489,7 @@ const QuanLyNhanVien = () => {
                 onClick={() => { setShowAddModal(false); resetForm(); }}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
               >
-                Hủy bĐ
+                Hủy bỏ
               </button>
               <button 
                 type="submit"

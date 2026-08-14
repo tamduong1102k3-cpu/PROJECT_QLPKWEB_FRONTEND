@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
-import DuyetKetQuaXetNghiem from './components/DuyetKetQuaXetNghiem';
-import DuyetKetQuaCDHA from './components/DuyetKetQuaCDHA';
 import BangDieuKhienChanDoan from './components/BangDieuKhienChanDoan';
 import HangDoiKham from './components/HangDoiKham';
 import ManHinhKhamBenh from './components/ManHinhKhamBenh';
 import TabHenTaiKham from './components/TabHenTaiKham';
 import UserMenu from '../../components/UserMenu';
+import LichLamViecTab from '../../components/LichLamViecTab';
 import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 
 const BangDieuKhienBacSi = ({ onLogout, user }) => {
@@ -26,9 +25,11 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState(isLabDoctor ? 'examination' : 'dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
-  const handleSelectPatient = (patient) => {
+  const handleSelectPatient = (patient, readOnly = false) => {
     setSelectedPatient(patient);
+    setIsReadOnly(readOnly);
     setActiveTab('examination');
   };
 
@@ -50,6 +51,11 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
           id: 'patients',
           label: 'Hồ Sơ Bệnh Nhân',
           icon: 'person_search'
+        },
+        {
+          id: 'lichlamviec',
+          label: 'Lịch Làm Việc',
+          icon: 'calendar_month'
         }
       ]
     : [
@@ -64,6 +70,11 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
           icon: 'medical_services'
         }, 
         {
+          id: 'appointments',
+          label: 'Lịch Hẹn',
+          icon: 'calendar_month'
+        }, 
+        {
           id: 'history',
           label: 'Lịch Sử Khám',
           icon: 'history'
@@ -72,10 +83,10 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
           id: 'patients',
           label: 'Hồ Sơ Bệnh Nhân',
           icon: 'person_search'
-        }, 
+        },
         {
-          id: 'appointments',
-          label: 'Lịch Hẹn',
+          id: 'lichlamviec',
+          label: 'Lịch Làm Việc',
           icon: 'calendar_month'
         }
       ];
@@ -85,7 +96,7 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
     return (
       <>
         {!isLabDoctor && (
-          <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
+          <div style={{ display: activeTab === 'dashboard' ? 'flex' : 'none' }} className="flex-1 flex-col min-h-0">
             <HangDoiKham 
               user={user} 
               handleSelectPatient={handleSelectPatient} 
@@ -104,8 +115,10 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
                 selectedPatient={selectedPatient} 
                 setSelectedPatient={setSelectedPatient} 
                 user={user} 
+                readOnly={isReadOnly}
                 onBackToQueue={() => {
                   setSelectedPatient(null);
+                  setIsReadOnly(false);
                   setActiveTab('dashboard');
                 }} 
               />
@@ -123,9 +136,11 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
             )}
           </>
         )}
+        {activeTab === 'appointments' && !isLabDoctor && <TabHenTaiKham user={user} />}
         {activeTab === 'history' && <LichSuChuyenKhoa user={user} onReview={handleSelectPatient} />}
         {activeTab === 'patients' && <QuanLyBenhNhan />}
-        {!isLabDoctor && activeTab === 'appointments' && <TabHenTaiKham user={user} />}
+        {activeTab === 'lichlamviec' && <LichLamViecTab user={user} />}
+        
       </>
     );
   };
@@ -134,7 +149,7 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
     <div className="flex h-screen bg-[#f8f9fa] font-body-md text-on-background overflow-hidden">
       <WebSocketAutoRefresh
         topics={['/topic/phieu-kham', '/topic/dang-ky-kham', '/topic/cls']}
-        onMessage={(topic, data) => {
+        onMessage={() => {
           setRefreshTrigger(prev => prev + 1);
         }}
       />
@@ -165,7 +180,7 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10 shadow-sm">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 relative z-50 shadow-sm">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg transition-colors">
               <span className="material-symbols-outlined">menu</span>
@@ -186,7 +201,7 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
               />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6 bg-[#f8f9fa]">{renderContent()}</main>
+        <main className="flex-1 overflow-y-auto p-6 bg-[#f8f9fa] flex flex-col h-full">{renderContent()}</main>
       </div>
     </div>
   );

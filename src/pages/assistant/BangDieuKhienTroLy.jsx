@@ -1,15 +1,14 @@
-import { getTodayApi as _getTodayDangKy, updateStatusApi as _updateDangKyStatus } from '../../api/dangKyKhamBenhApi';
+import { getTodayApi as _getTodayDangKy, updateStatusApi as _updateDangKyStatus, setXepCuoiApi as _setXepCuoiApi, goiLaiApi as _goiLaiApi } from '../../api/dangKyKhamBenhApi';
 import { getCurrentRoomApi as _getCurrentRoomApi } from '../../api/shiftApi';
-import { getAssistantHistoryApi as _getAssistantHistoryApi, updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
-import { getByPhieuKhamApi, saveAndUpdateApi } from '../../api/chiSoKhamTongHopApi';
+import { updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
 // ĐẢM BẢO IMPORT apiClient
 import { apiClient } from "../../api/apiClient"; 
 import { useNotification } from '../../components/NotificationContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import ModalGoiLai from '../../components/ModalGoiLai';
 import React, { useState, useEffect, useCallback } from 'react';
 import { sqlLikeMatch } from '../../utils/searchUtils';
 import VitalSignsFormComponent from '../../components/VitalSignsForm';
-import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import TroLyRHMForm from './TroLyRHMForm';
 import TroLyTMHForm from './TroLyTMHForm';
@@ -19,6 +18,7 @@ import TroLyTongQuatForm from './TroLyTongQuatForm';
 import BangDanhSachCongViec from '../technician/component/BangDanhSachCongViec';
 import NhomOSoLieu from '../doctor/components/NhomOSoLieu';
 import UserMenu from '../../components/UserMenu';
+import LichLamViecTab from '../../components/LichLamViecTab';
 import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 
 // KHAI BÁO API_BASE
@@ -37,6 +37,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
   const [currentRoom, setCurrentRoom] = useState("Đang tải...");
   const { showSuccess, showError } = useNotification();
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
+  const [goiLaiState, setGoiLaiState] = useState({ isOpen: false, patient: null });
 
   const isRhmAssistant = Number(user?.maChuyenKhoa) === 5;
   const isTmhAssistant = Number(user?.maChuyenKhoa) === 4;
@@ -58,11 +59,13 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
         if (user?.maChuyenKhoa) {
           filteredData = data.filter(r => Number(r.maChuyenKhoa) === Number(user.maChuyenKhoa));
         }
-        const pending = filteredData.filter(r => r.trangThai === 'CHO_KHAM' || r.trangThai === 'DANG_KHAM');
-        const absent = filteredData.filter(r => r.trangThai === 'VANG_MAT');
-        const completedList = filteredData.filter(r => r.trangThai === 'CHO_BAC_SI' || r.trangThai === 'HOAN_THANH');
-        
-        setPatients({ pending, completed: completedList, absent });
+      const choKhamOrDangKham = filteredData.filter(r => r.trangThai === 'CHO_KHAM' || r.trangThai === 'DANG_KHAM');
+      const absentList = filteredData.filter(r => r.trangThai === 'VANG_MAT');
+      const completedList = filteredData.filter(r => r.trangThai === 'CHO_BAC_SI' || r.trangThai === 'HOAN_THANH');
+      // Gộp bệnh nhân VANG_MAT vào danh sách pending để không bị mất khỏi danh sách
+      const pending = [...choKhamOrDangKham, ...absentList];
+      
+      setPatients({ pending, completed: completedList, absent: absentList });
         setStats({ waitingToday: pending.length, processedToday: completedList.length, absentToday: absent.length });
       }
       if (user?.maNhanVien) {
@@ -127,17 +130,24 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
     handleSelectPatient(patient);
   };
 
-  const handleMarkAbsent = (patient) => {
+  const handleMarkAbsent = (patient, type = 'tam_thoi') => {
+    const isQuaLau = type === 'qua_lau';
     setConfirmState({
       isOpen: true,
       title: 'Xác nhận vắng mặt',
-      message: `Đánh dấu bệnh nhân "${patient.hoTen}" vắng mặt?`,
+      message: isQuaLau
+        ? `Đánh dấu bệnh nhân "${patient.hoTen}" vắng quá lâu? Bệnh nhân sẽ được xếp xuống cuối danh sách khi quay lại.`
+        : `Đánh dấu bệnh nhân "${patient.hoTen}" vắng mặt?`,
       type: 'warning',
       icon: 'person_off',
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, isOpen: false }));
         try {
           await _updateDangKyStatus(patient.id, { trangThai: 'VANG_MAT' });
+          // Nếu vắng quá lâu thì đánh dấu xếp cuối
+          if (isQuaLau) {
+            await _setXepCuoiApi(patient.id);
+          }
           showSuccess(`Đã đánh dấu vắng mặt "${patient.hoTen}"`);
           fetchStats();
         } catch (e) {
@@ -148,18 +158,21 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
   };
 
   const handleMarkPresent = (patient) => {
+    // Hiển thị dialog xác nhận tiếp nhận, khi xác nhận thì update VANG_MAT -> DANG_KHAM
+    // và mở form sinh hiệu giống như nút KHÁM BỆNH bình thường
     setConfirmState({
       isOpen: true,
-      title: 'Xác nhận có mặt',
-      message: `Đánh dấu bệnh nhân "${patient.hoTen}" đã có mặt?`,
+      title: 'Xác nhận tiếp nhận',
+      message: `Tiếp nhận bệnh nhân "${patient.hoTen}"?`,
       type: 'primary',
-      icon: 'person',
+      icon: 'assignment_ind',
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, isOpen: false }));
         try {
-          await _updateDangKyStatus(patient.id, { trangThai: 'CHO_KHAM' });
-          showSuccess(`Đã đánh dấu có mặt "${patient.hoTen}"`);
-          fetchStats();
+          await _updateDangKyStatus(patient.id, { trangThai: 'DANG_KHAM' });
+          await fetchStats();
+          // Mở form sinh hiệu giống như quy trình khám bệnh bình thường
+          handleSelectPatient(patient);
         } catch (e) {
           showError("Lỗi: " + e.message);
         }
@@ -167,10 +180,45 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
     });
   };
 
+  const handleGoiLai_SauNguoiDangKham = async () => {
+    const patient = goiLaiState.patient;
+    setGoiLaiState({ isOpen: false, patient: null });
+    try {
+      await _updateDangKyStatus(patient.id, { trangThai: 'CHO_KHAM' });
+      await fetchStats();
+      showSuccess(`Đã gọi lại "${patient.hoTen}"`);
+    } catch (e) {
+      showError("Lỗi: " + e.message);
+    }
+  };
+
+  const handleGoiLai_XepCuoiHang = async () => {
+    const patient = goiLaiState.patient;
+    setGoiLaiState({ isOpen: false, patient: null });
+    try {
+      await _updateDangKyStatus(patient.id, { trangThai: 'CHO_KHAM' });
+      await _setXepCuoiApi(patient.id);
+      await fetchStats();
+      showSuccess(`Đã xếp "${patient.hoTen}" xuống cuối hàng chờ`);
+    } catch (e) {
+      showError("Lỗi: " + e.message);
+    }
+  };
+
+  const handleGoiLai = async (patient) => {
+    try {
+      await _goiLaiApi(patient.id, user?.maChuyenKhoa);
+      await fetchStats();
+      showSuccess(`Đã gọi lại "${patient.hoTen}"`);
+    } catch (e) {
+      showError("Lỗi: " + e.message);
+    }
+  };
+
   const navItems = [
     { id: 'dashboard', label: 'Bàn Làm Việc', icon: 'desk' },
-    { id: 'patients', label: 'Hồ Sơ Bệnh Nhân', icon: 'person_search' },
-    { id: 'history', label: 'Lịch Sử Tiếp Đón', icon: 'history' },
+    { id: 'patients', label: 'Thông Tin Bệnh Nhân', icon: 'person_search' },
+    { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: 'calendar_month' },
   ];
 
   const renderContent = () => {
@@ -196,6 +244,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
                 onOpenResult={handleOpenResult}
                 onMarkAbsent={handleMarkAbsent}
                 onMarkPresent={handleMarkPresent}
+                onGoiLai={handleGoiLai}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 isRefreshing={loadingQueue}
@@ -240,17 +289,8 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
             )}
           </div>
         );
-      case 'patients': return <QuanLyBenhNhan />;
-      case 'history':
-        return (
-          <LichSuChuyenKhoa
-            user={user}
-            onReview={(item) => {
-              setSelectedPatient({ ...item, trangThai: 'DANG_KHAM' });
-              setActiveTab('dashboard');
-            }}
-          />
-        );
+      case 'patients': return <QuanLyBenhNhan allowViewDetail={false} title="Thông Tin Bệnh Nhân" />;
+      case 'lichlamviec': return <LichLamViecTab user={user} />;
       default: return null;
     }
   };
@@ -287,7 +327,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10 shadow-sm">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 relative z-50 shadow-sm">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg transition-colors"><span className="material-symbols-outlined">menu</span></button>
             <h1 className="text-xl font-bold text-gray-800">{navItems.find(i => i.id === activeTab)?.label}</h1>
@@ -311,13 +351,20 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
             onConfirm={confirmState.onConfirm}
             onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
           />
+          <ModalGoiLai
+            isOpen={goiLaiState.isOpen}
+            patient={goiLaiState.patient}
+            onSauNguoiDangKham={handleGoiLai_SauNguoiDangKham}
+            onXepCuoiHang={handleGoiLai_XepCuoiHang}
+            onCancel={() => setGoiLaiState({ isOpen: false, patient: null })}
+          />
         </main>
       </div>
     </div>
   );
 };
 
-// CÁC COMPONENT PHỤ (TheThongKe, PatientQueue, VitalSignsForm, LichSuKham)
+// CÁC COMPONENT PHỤ (TheThongKe, PatientQueue, VitalSignsForm)
 const TheThongKe = ({ title, value, icon, color }) => (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center gap-4 hover:shadow-lg transition-all group">
       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white ${color} shadow-lg group-hover:scale-110 transition-transform`}><span className="material-symbols-outlined text-3xl">{icon}</span></div>
@@ -383,36 +430,6 @@ const VitalSignsForm = ({ phieuKhamId, registrationId, assistantId, initialGhiCh
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
       />
-    </div>
-  );
-};
-
-const LichSuKham = ({ user, onEdit }) => {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    if (user?.maChuyenKhoa) {
-      setLoading(true);
-      _getAssistantHistoryApi(user.maChuyenKhoa).then(data => setHistory(data || [])).finally(() => setLoading(false));
-    }
-  }, [user]);
-  if (loading) return <div className="p-10 text-center italic text-gray-400">Đang tải lịch sử...</div>;
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade-in">
-      <div className="p-6 border-b font-bold text-lg text-gray-800 flex items-center gap-2"><span className="material-symbols-outlined text-indigo-600">history</span>Lịch sử tiếp đón trong ngày</div>
-      <table className="w-full text-left">
-        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider"><tr className="border-b"><th className="p-4">Mã Phiếu</th><th className="p-4">Bệnh Nhân</th><th className="p-4">Trạng Thái</th><th className="p-4 text-right">Thao tác</th></tr></thead>
-        <tbody className="divide-y divide-gray-100">
-          {history.map(item => (
-            <tr key={item.maPhieuKham} className="hover:bg-gray-50/50 transition-colors">
-              <td className="p-4 text-indigo-600 font-medium">#{item.maPhieuKham}</td>
-              <td className="p-4 font-bold text-gray-800">{item.hoTen}</td>
-              <td className="p-4"><span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold">Chờ bác sĩ khám</span></td>
-              <td className="p-4 text-right"><button onClick={() => onEdit(item)} className="text-indigo-600 font-bold text-sm inline-flex items-center gap-1 hover:text-indigo-800 transition-colors"><span className="material-symbols-outlined text-sm">edit</span> Sửa sinh hiệu</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 };

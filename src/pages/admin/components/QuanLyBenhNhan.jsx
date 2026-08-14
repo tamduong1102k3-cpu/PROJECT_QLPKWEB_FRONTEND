@@ -1,8 +1,8 @@
 import { getAllApi, searchApi, getHoSoApi } from '../../../api/benhNhanApi';
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ChiTietKhamModal from '../../../components/ChiTietKhamModal';
-
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/benh-nhan';
+import usePagination from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 
 const fmt = (v) => v ?? '—';
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
@@ -26,7 +26,7 @@ const statusHD = (s) => {
 };
 
 const statusPK = (s) => {
-  const m = { 'hoan_thanh':['#dcfce7','#166534','Hoàn thành'], 'dang_kham':['#dbeafe','#1d4ed8','Đang khám'], 'cho':['#fef3c7','#92400e','ChĐ khám'], 'da_huy':['#fee2e2','#991b1b','Đã hủy'] };
+  const m = { 'hoan_thanh':['#dcfce7','#166534','Hoàn thành'], 'dang_kham':['#dbeafe','#1d4ed8','Đang khám'], 'cho':['#fef3c7','#92400e','Chờ khám'], 'da_huy':['#fee2e2','#991b1b','Đã hủy'] };
   const key = (s||'').toLowerCase().replace(' ','_');
   const [bg, color, label] = m[key] || ['#f3f4f6','#4b5563', s||'—'];
   return <Badge text={label} bg={bg} color={color} />;
@@ -34,7 +34,7 @@ const statusPK = (s) => {
 
 
 // ── MAIN ─────────────────────────────────────────────────────────────────────
-const QuanLyBenhNhan = ({ allowViewDetail = true }) => {
+const QuanLyBenhNhan = ({ allowViewDetail = true, title = 'Hồ Sơ Bệnh Nhân' }) => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -43,17 +43,38 @@ const QuanLyBenhNhan = ({ allowViewDetail = true }) => {
   const [hoSoLoading, setHoSoLoading] = useState(false);
   const [activeHoSoTab, setActiveHoSoTab] = useState('lich-su');
 
+  // Phân trang + search dùng chung
+  const {
+    paginatedData: paged,
+    totalItems: filteredCount,
+    totalPages: totalP,
+    currentPage,
+    setCurrentPage,
+    safeCurrentPage: safeP,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+    pageError,
+  } = usePagination({
+    data: patients,
+    pageSize: 10,
+    searchKeys: ['hoTen', 'soDienThoai', 'cccd'],
+    searchTerm: search,
+  });
+
   const loadPatients = useCallback(async (kw = '') => {
     setLoading(true);
     try {
-      const url = kw ? `${API}/search?keyword=${encodeURIComponent(kw)}` : API;
       const data = kw ? await searchApi({ keyword: kw }) : await getAllApi();
-        setPatients(data || []);
+      setPatients(data || []);
     } catch { setPatients([]); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { loadPatients(); }, [loadPatients]);
+  useEffect(() => {
+    loadPatients(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [loadPatients]);
 
   useEffect(() => {
     const t = setTimeout(() => loadPatients(search), 350);
@@ -84,7 +105,7 @@ const QuanLyBenhNhan = ({ allowViewDetail = true }) => {
         <div style={{ ...S.card, padding:'20px 24px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px' }}>
             <div>
-              <h2 style={{ margin:0, fontSize:'20px', fontWeight:700, color:'#1f2937' }}>Hồ Sơ Bệnh Nhân</h2>
+              <h2 style={{ margin:0, fontSize:'20px', fontWeight:700, color:'#1f2937' }}>{title}</h2>
               <p style={{ margin:'4px 0 0', fontSize:'14px', color:'#6b7280' }}>
                 Tổng: <strong style={{ color:'#2563eb' }}>{patients.length}</strong> bệnh nhân
               </p>
@@ -99,6 +120,14 @@ const QuanLyBenhNhan = ({ allowViewDetail = true }) => {
 
         {/* Table */}
         <div style={{ ...S.card, overflow:'hidden' }}>
+          {/* In-list warning */}
+          {pageError && (
+            <div style={{ padding:'9px 16px', background:'#fef2f2', borderBottom:'1px solid #fee2e2', color:'#dc2626', fontSize:'13px', fontWeight:600, display:'flex', alignItems:'center', gap:'6px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:'16px' }}>error</span>
+              {pageError}
+            </div>
+          )}
+
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead style={{ background:'#f9fafb', borderBottom:'1px solid #e5e7eb' }}>
@@ -116,28 +145,44 @@ const QuanLyBenhNhan = ({ allowViewDetail = true }) => {
                   <tr><td colSpan="6" style={{ ...S.td, textAlign:'center', padding:'48px', color:'#9ca3af' }}>Đang tải...</td></tr>
                 ) : patients.length === 0 ? (
                   <tr><td colSpan="6" style={{ ...S.td, textAlign:'center', padding:'48px', color:'#9ca3af' }}>Không có dữ liệu</td></tr>
-                ) : patients.map(p => {
-                  const isActive = selected?.maBenhNhan === p.maBenhNhan;
-                  return (
-                    <tr key={p.maBenhNhan} style={{ background: isActive ? '#eff6ff' : 'transparent', cursor:'pointer' }}
-                      onClick={() => openProfile(p)}
-                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#f9fafb'; }}
-                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
-                      <td style={S.td}><strong style={{ color:'#2563eb' }}>BN{String(p.maBenhNhan).padStart(4,'0')}</strong></td>
-                      <td style={{ ...S.td, fontWeight:600 }}>{fmt(p.hoTen)}</td>
-                      <td style={S.td}>
-                        <span style={{ fontSize:'13px' }}>{p.gioiTinh === true ? '👨 Nam' : p.gioiTinh === false ? '👩 Nữ' : '—'}</span>
-                      </td>
-                      <td style={S.td}>{fmtDate(p.ngaySinh)}</td>
-                      <td style={S.td}>{fmt(p.soDienThoai)}</td>
-                      <td style={S.td}>
-                        {p.nhomMau ? <Badge text={p.nhomMau} bg="#fef2f2" color="#dc2626" /> : '—'}
-                      </td>
-                    </tr>
-                  );
+                ) : paged.map(p => {
+              const isActive = selected?.maBenhNhan === p.maBenhNhan;
+              return (
+                <tr key={p.maBenhNhan} style={{ background: isActive ? '#eff6ff' : 'transparent', cursor:'pointer' }}
+                  onClick={() => openProfile(p)}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#f9fafb'; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+                  <td style={S.td}><strong style={{ color:'#2563eb' }}>BN{String(p.maBenhNhan).padStart(4,'0')}</strong></td>
+                  <td style={{ ...S.td, fontWeight:600 }}>{fmt(p.hoTen)}</td>
+                  <td style={S.td}>
+                    <span style={{ fontSize:'13px' }}>{p.gioiTinh === true ? '👨 Nam' : p.gioiTinh === false ? '👩 Nữ' : '—'}</span>
+                  </td>
+                  <td style={S.td}>{fmtDate(p.ngaySinh)}</td>
+                  <td style={S.td}>{fmt(p.soDienThoai)}</td>
+                  <td style={S.td}>
+                    {p.nhomMau ? <Badge text={p.nhomMau} bg="#fef2f2" color="#dc2626" /> : '—'}
+                  </td>
+                </tr>
+              );
                 })}
               </tbody>
             </table>
+
+            {/* Pagination */}
+            {!loading && totalP > 1 && (
+              <Pagination
+                mode="inline"
+                currentPage={currentPage}
+                totalPages={totalP}
+                totalItems={filteredCount}
+                label="bệnh nhân"
+                visiblePages={visiblePages}
+                onPageChange={setCurrentPage}
+                jumpPage={jumpPage}
+                onJumpPage={handleJumpPage}
+                onJumpBlur={handleJumpPageBlur}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -173,7 +218,7 @@ const QuanLyBenhNhan = ({ allowViewDetail = true }) => {
                 ['Email', fmt(selected.email)],
                 ['Nhóm máu', selected.nhomMau || '—'],
                 ['Dị ứng thuốc', fmt(selected.diUngThuoc)],
-                ['NghĐ nghiệp', fmt(selected.ngheNghiep)],
+                ['Nghề nghiệp', fmt(selected.ngheNghiep)],
                 ['Người giám hộ', fmt(selected.nguoiGiamHo)],
               ].map(([label, val]) => (
                 <div key={label} style={{ background:'#f9fafb', borderRadius:'8px', padding:'9px 12px' }}>
@@ -245,6 +290,7 @@ const QuanLyBenhNhan = ({ allowViewDetail = true }) => {
                         <th style={{ ...S.th, fontSize:'11px' }}>Mã PK</th>
                         <th style={{ ...S.th, fontSize:'11px' }}>Ngày Khám</th>
                         <th style={{ ...S.th, fontSize:'11px' }}>Chuyên Khoa</th>
+                        <th style={{ ...S.th, fontSize:'11px' }}>Dịch Vụ Khám</th>
                         <th style={{ ...S.th, fontSize:'11px' }}>Bác Sĩ</th>
                         <th style={{ ...S.th, fontSize:'11px' }}>Trạng Thái</th>
                         <th style={{ ...S.th, fontSize:'11px', textAlign:'center' }}>Thao Tác</th>
@@ -261,6 +307,7 @@ const QuanLyBenhNhan = ({ allowViewDetail = true }) => {
                           </td>
                           <td style={{ ...S.td, fontSize:'12px' }}>{fmtDateTime(h.ngayKham)}</td>
                           <td style={{ ...S.td, fontSize:'12px' }}>{h.tenChuyenKhoa}</td>
+                          <td style={{ ...S.td, fontSize:'12px' }}>{fmt(h.tenDichVu)}</td>
                           <td style={{ ...S.td, fontSize:'12px' }}>{h.tenNhanVien}</td>
                           <td style={S.td}>{statusPK(h.trangThaiKham)}</td>
                           <td style={{ ...S.td, textAlign:'center' }}>

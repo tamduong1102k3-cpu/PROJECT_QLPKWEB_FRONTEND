@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../../../api/apiClient';
 import { card, th, td, formatCurrency, formatDate } from './styles';
+import usePagination from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 
 const API = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
 
@@ -125,6 +127,21 @@ const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, current
     return String(p.maPhieuNhapThuoc).includes(t) || (p.trangThai || '').toLowerCase().includes(t) || tenNV.includes(t);
   });
 
+  const {
+    paginatedData: pagedPhieu,
+    totalItems: pagedTotalItems,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+  } = usePagination({
+    data: filtered,
+    pageSize: 8,
+  });
+
   return <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
     {/* LIST */}
     <div style={{ flex: selected ? '0 0 55%' : '1', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -176,9 +193,9 @@ const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, current
             <tbody>
               {loading
                 ? <tr><td colSpan="6" style={{ ...td, textAlign: 'center', padding: '48px', color: '#9ca3af' }}>Đang tải...</td></tr>
-                : filtered.length === 0
+                : pagedPhieu.length === 0
                   ? <tr><td colSpan="6" style={{ ...td, textAlign: 'center', padding: '48px', color: '#9ca3af' }}>Không có dữ liệu.</td></tr>
-                  : filtered.map(p => {
+                  : pagedPhieu.map(p => {
                       const st = statusStyle(p.trangThai);
                       const isActive = selected?.maPhieuNhapThuoc === p.maPhieuNhapThuoc;
                       return <tr key={p.maPhieuNhapThuoc} onClick={() => openDetail(p)}
@@ -204,6 +221,21 @@ const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, current
             </tbody>
           </table>
         </div>
+
+        {!loading && pagedTotalItems > 0 && (
+          <Pagination
+            mode="inline"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={pagedTotalItems}
+            label="phiếu"
+            visiblePages={visiblePages}
+            onPageChange={setCurrentPage}
+            jumpPage={jumpPage}
+            onJumpPage={handleJumpPage}
+            onJumpBlur={handleJumpPageBlur}
+          />
+        )}
       </div>
     </div>
 

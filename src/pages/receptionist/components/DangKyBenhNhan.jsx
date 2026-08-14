@@ -1,6 +1,5 @@
-import { apiClient } from "../../../api/apiClient";
-import { createApi } from '../../../api/benhNhanApi';
-import React, { useState, useEffect } from 'react';
+import { createApi, searchApi } from '../../../api/benhNhanApi';
+import React, { useState, useRef } from 'react';
 
 const DangKyBenhNhan = ({
   onCancel,
@@ -9,6 +8,7 @@ const DangKyBenhNhan = ({
   const [formData, setFormData] = useState({
     hoTen: '',
     ngaySinh: '',
+    ngaySinhDisplay: '',
     gioiTinh: true,
     soDienThoai: '',
     cccd: '',
@@ -22,14 +22,67 @@ const DangKyBenhNhan = ({
     ghiChu: ''
   });
   const [errors, setErrors] = useState({});
+  const dateInputRef = useRef(null);
+
+  // Format DD/MM/YYYY khi gõ
+  const formatDateDisplay = (val) => {
+    const digits = val.replace(/\D/g, '').slice(0, 8);
+    let result = '';
+    for (let i = 0; i < digits.length; i++) {
+      if (i === 2 || i === 4) result += '/';
+      result += digits[i];
+    }
+    return result;
+  };
+
+  // Parse DD/MM/YYYY -> YYYY-MM-DD
+  const parseDisplayToDate = (display) => {
+    const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return '';
+    return `${match[3]}-${match[2]}-${match[1]}`;
+  };
+
+  // Kiểm tra ngày hợp lệ
+  const isValidDate = (display) => {
+    const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return false;
+    const d = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10) - 1;
+    const y = parseInt(match[3], 10);
+    const date = new Date(y, m, d);
+    return date.getFullYear() === y && date.getMonth() === m && date.getDate() === d;
+  };
+
   const validate = () => {
     const newErrors = {};
     if (!formData.hoTen.trim()) newErrors.hoTen = 'Họ tên không được để trống';
-    if (!formData.ngaySinh) newErrors.ngaySinh = 'Vui lòng chọn ngày sinh';
+    
+    // Validate ngày sinh
+    const ngaySinhDisplay = formData.ngaySinhDisplay || '';
+    if (!ngaySinhDisplay) {
+      newErrors.ngaySinh = 'Vui lòng nhập ngày sinh';
+    } else if (!isValidDate(ngaySinhDisplay)) {
+      newErrors.ngaySinh = 'Ngày sinh không hợp lệ';
+    } else {
+      // Kiểm tra không được là ngày tương lai
+      const match = ngaySinhDisplay.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      const d = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10) - 1;
+      const y = parseInt(match[3], 10);
+      const dob = new Date(y, m, d);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (dob > today) {
+        newErrors.ngaySinh = 'Ngày sinh không thể ở tương lai';
+      }
+    }
+    
+    // Validate SĐT: bỏ spaces trước khi test
+    const phoneDigits = formData.soDienThoai.replace(/\s/g, '');
     const phoneRegex = /^[0-9]{10}$/;
     if (!formData.soDienThoai) {
       newErrors.soDienThoai = 'Số điện thoại là bắt buộc';
-    } else if (!phoneRegex.test(formData.soDienThoai)) {
+    } else if (!phoneRegex.test(phoneDigits)) {
       newErrors.soDienThoai = 'Số điện thoại phải có đúng 10 chữ số';
     }
     if (formData.cccd && !/^[0-9]{12}$/.test(formData.cccd)) {
@@ -41,6 +94,10 @@ const DangKyBenhNhan = ({
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+  const formatPhone = (val) => {
+    return val.replace(/\D/g, '').slice(0, 10);
+  };
+
   const handleChange = e => {
     const {
       name,
@@ -48,9 +105,42 @@ const DangKyBenhNhan = ({
       type,
       checked
     } = e.target;
+    let newValue = type === 'checkbox' ? checked : value;
+    
+    // Tự động viết hoa chữ cái đầu mỗi từ cho Họ tên
+    if (name === 'hoTen') {
+      newValue = newValue
+        .toLowerCase()
+        .replace(/\b\w/g, char => char.toUpperCase());
+    }
+    
+    // Định dạng số điện thoại
+    if (name === 'soDienThoai' || name === 'soDienThoaiNguoiGiamHo') {
+      newValue = formatPhone(newValue);
+    }
+    
+    // Giới hạn CCCD 12 số
+    if (name === 'cccd') {
+      newValue = newValue.replace(/\D/g, '').slice(0, 12);
+    }
+    
+    // Xử lý input ngày sinh
+    if (name === 'ngaySinhDisplay') {
+      const formatted = formatDateDisplay(value);
+      setFormData(prev => ({
+        ...prev,
+        ngaySinhDisplay: formatted,
+        ngaySinh: parseDisplayToDate(formatted)
+      }));
+      if (errors.ngaySinh) {
+        setErrors(prev => ({ ...prev, ngaySinh: null }));
+      }
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: newValue
     }));
     // Xóa lỗi của trường đang nhập
     if (errors[name]) {
@@ -60,42 +150,42 @@ const DangKyBenhNhan = ({
       }));
     }
   };
+
+  // Xử lý khi chọn từ native datepicker
+  const handleDatePickerChange = (e) => {
+    const val = e.target.value; // YYYY-MM-DD
+    if (!val) return;
+    const [y, m, d] = val.split('-');
+    const display = `${d}/${m}/${y}`;
+    setFormData(prev => ({
+      ...prev,
+      ngaySinhDisplay: display,
+      ngaySinh: val
+    }));
+    if (errors.ngaySinh) {
+      setErrors(prev => ({ ...prev, ngaySinh: null }));
+    }
+  };
+
+  // Lấy max date hôm nay cho native datepicker
+  const todayStr = new Date().toISOString().split('T')[0];
   const handleSubmit = async e => {
     e.preventDefault();
     if (!validate()) return;
     try {
-      const response = await apiClient(`${API_BASE}/benh-nhan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-      if (response.ok) {
-        const data = createdData;
-        onSuccess(data);
-      } else {
-        const errorText = await response.text().catch(() => 'Không thể đọc nội dung lỗi');
-        let errorMessage = errorText;
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorText;
-        } catch (e) {
-          // Không phải JSON, giữ nguyên text
-        }
-        alert(`Lỗi đăng ký: ${errorMessage}`);
-      }
+      const data = await createApi(formData);
+      onSuccess(data);
     } catch (error) {
-      alert('Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại mạng.');
+      alert(`Lỗi đăng ký: ${error.message}`);
     }
   };
-  return <div className="bg-white">
-      <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+  return <div className="bg-white rounded-3xl">
+      <div className="p-8 border-b border-gray-100 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-black text-gray-800">Đăng ký Hồ sơ mới</h2>
-          <p className="text-sm text-gray-500 font-medium">Vui lòng nhập chính xác thông tin để tránh trùng lặp</p>
+          <p className="text-sm text-gray-400 font-medium">Vui lòng nhập chính xác thông tin để tránh trùng lặp</p>
         </div>
-        <button onClick={onCancel} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:bg-gray-50 rounded-xl transition-colors">
+        <button onClick={onCancel} className="w-10 h-10 flex items-center justify-center text-gray-300 hover:bg-gray-100 rounded-xl transition-colors hover:text-gray-500">
           <span className="material-symbols-outlined">close</span>
         </button>
       </div>
@@ -103,16 +193,42 @@ const DangKyBenhNhan = ({
       <form onSubmit={handleSubmit} className="p-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
           <div className="space-y-6">
-            <h3 className="text-xs font-black text-primary uppercase tracking-[0.2em]">Thông tin cá nhân</h3>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-1 h-5 bg-primary rounded-full"></div>
+              <h3 className="text-sm font-black text-primary uppercase tracking-[0.15em]">Thông tin cá nhân</h3>
+            </div>
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Họ và Tên *</label>
-              <input name="hoTen" value={formData.hoTen} onChange={handleChange} className={`w-full px-5 py-3.5 bg-gray-50 border ${errors.hoTen ? 'border-red-500' : 'border-gray-100'} rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold`} placeholder="VD: NGUYEN VAN A" />
+              <input name="hoTen" value={formData.hoTen} onChange={handleChange} className={`w-full px-5 py-3.5 bg-white border-2 ${errors.hoTen ? 'border-red-400' : 'border-gray-200'} rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300`} placeholder="VD: NGUYEN VAN A" />
               {errors.hoTen && <p className="text-red-500 text-[10px] mt-1 font-bold italic">{errors.hoTen}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Ngày Sinh *</label>
-                <input name="ngaySinh" type="date" value={formData.ngaySinh} onChange={handleChange} className={`w-full px-5 py-3.5 bg-gray-50 border ${errors.ngaySinh ? 'border-red-500' : 'border-gray-100'} rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold`} />
+                <div className="relative">
+                  <input
+                    name="ngaySinhDisplay"
+                    type="text"
+                    value={formData.ngaySinhDisplay}
+                    onChange={handleChange}
+                    placeholder="DD/MM/YYYY"
+                    maxLength={10}
+                    className={`w-full px-5 py-3.5 bg-white border-2 ${errors.ngaySinh ? 'border-red-400' : 'border-gray-200'} rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold text-gray-700 pr-12`}
+                  />
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    max={todayStr}
+                    onChange={handleDatePickerChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <span
+                    onClick={() => dateInputRef.current?.showPicker?.()}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined">calendar_month</span>
+                  </span>
+                </div>
                 {errors.ngaySinh && <p className="text-red-500 text-[10px] mt-1 font-bold italic">{errors.ngaySinh}</p>}
               </div>
               <div>
@@ -120,7 +236,7 @@ const DangKyBenhNhan = ({
                 <select name="gioiTinh" value={formData.gioiTinh} onChange={e => setFormData({
                 ...formData,
                 gioiTinh: e.target.value === 'true'
-              })} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold">
+              })} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:border-primary outline-none transition-all font-bold text-gray-700">
                   <option value="true">Nam</option>
                   <option value="false">Nữ</option>
                 </select>
@@ -128,60 +244,65 @@ const DangKyBenhNhan = ({
             </div>
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">CCCD / CMND</label>
-              <input name="cccd" value={formData.cccd} onChange={handleChange} className={`w-full px-5 py-3.5 bg-gray-50 border ${errors.cccd ? 'border-red-500' : 'border-gray-100'} rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold`} placeholder="001200012345" />
+              <input name="cccd" value={formData.cccd} onChange={handleChange} className={`w-full px-5 py-3.5 bg-white border-2 ${errors.cccd ? 'border-red-400' : 'border-gray-200'} rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300`} placeholder="001200012345" />
               {errors.cccd && <p className="text-red-500 text-[10px] mt-1 font-bold italic">{errors.cccd}</p>}
             </div>
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Số Điện Thoại *</label>
-              <input name="soDienThoai" value={formData.soDienThoai} onChange={handleChange} className={`w-full px-5 py-3.5 bg-gray-50 border ${errors.soDienThoai ? 'border-red-500' : 'border-gray-100'} rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold text-primary`} placeholder="0987654321" />
+              <input name="soDienThoai" value={formData.soDienThoai} onChange={handleChange} className={`w-full px-5 py-3.5 bg-white border-2 ${errors.soDienThoai ? 'border-red-400' : 'border-gray-200'} rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold text-primary placeholder:text-gray-300`} placeholder="0987 654 321" />
               {errors.soDienThoai && <p className="text-red-500 text-[10px] mt-1 font-bold italic">{errors.soDienThoai}</p>}
             </div>
           </div>
 
           <div className="space-y-6">
-            <h3 className="text-xs font-black text-primary uppercase tracking-[0.2em]">Thông tin bổ sung</h3>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-1 h-5 bg-primary rounded-full"></div>
+              <h3 className="text-sm font-black text-primary uppercase tracking-[0.15em]">Thông tin bổ sung</h3>
+            </div>
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Email</label>
-              <input name="email" type="email" value={formData.email} onChange={handleChange} className={`w-full px-5 py-3.5 bg-gray-50 border ${errors.email ? 'border-red-500' : 'border-gray-100'} rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold`} placeholder="benhnhan@example.com" />
+              <input name="email" type="email" value={formData.email} onChange={handleChange} className={`w-full px-5 py-3.5 bg-white border-2 ${errors.email ? 'border-red-400' : 'border-gray-200'} rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300`} placeholder="benhnhan@example.com" />
               {errors.email && <p className="text-red-500 text-[10px] mt-1 font-bold italic">{errors.email}</p>}
             </div>
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Địa Chỉ</label>
-              <input name="diaChi" value={formData.diaChi} onChange={handleChange} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold" placeholder="TP. Hồ Chí Minh..." />
+              <input name="diaChi" value={formData.diaChi} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300" placeholder="TP. Hồ Chí Minh..." />
             </div>
             <div className="grid grid-cols-2 gap-4">
                <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Nhóm Máu</label>
-                  <input name="nhomMau" value={formData.nhomMau} onChange={handleChange} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold" placeholder="O+" />
+                  <input name="nhomMau" value={formData.nhomMau} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300" placeholder="O+" />
                </div>
                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">NghĐ nghiệp</label>
-                  <input name="ngheNghiep" value={formData.ngheNghiep} onChange={handleChange} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold" placeholder="Tự do..." />
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Nghề nghiệp</label>
+                  <input name="ngheNghiep" value={formData.ngheNghiep} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300" placeholder="Tự do..." />
                </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Người giám hộ</label>
-                <input name="nguoiGiamHo" value={formData.nguoiGiamHo} onChange={handleChange} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold" placeholder="Tên người giám hộ" />
+                <input name="nguoiGiamHo" value={formData.nguoiGiamHo} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300" placeholder="Tên người giám hộ" />
               </div>
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">SĐT người giám hộ</label>
-                <input name="soDienThoaiNguoiGiamHo" value={formData.soDienThoaiNguoiGiamHo} onChange={handleChange} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold" placeholder="09xxxxxxxx" />
+                <input name="soDienThoaiNguoiGiamHo" value={formData.soDienThoaiNguoiGiamHo} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300" placeholder="09xxxxxxxx" />
               </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Dị ứng thuốc</label>
-              <input name="diUngThuoc" value={formData.diUngThuoc} onChange={handleChange} className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold text-red-500" placeholder="Không..." />
+            <div className={formData.diUngThuoc ? 'p-3 -mx-3 bg-red-50 rounded-2xl border border-red-200' : ''}>
+              <label className={`block text-[10px] font-black ${formData.diUngThuoc ? 'text-red-600' : 'text-gray-400'} uppercase tracking-widest mb-1.5`}>
+                {formData.diUngThuoc ? '⚠ Dị ứng thuốc' : 'Dị ứng thuốc'}
+              </label>
+              <input name="diUngThuoc" value={formData.diUngThuoc} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold text-red-600 placeholder:text-gray-300" placeholder={formData.diUngThuoc ? '' : 'Không...'} />
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-4 mt-12 pt-8 border-t border-gray-50">
-          <button type="button" onClick={onCancel} className="px-8 py-3.5 text-gray-400 font-bold hover:text-gray-600 transition-colors">
+        <div className="flex items-center justify-between mt-12 pt-8 border-t border-gray-100">
+          <button type="button" onClick={onCancel} className="px-8 py-3.5 border-2 border-gray-200 text-gray-500 font-bold rounded-2xl hover:border-gray-300 hover:text-gray-700 transition-all">
             Quay lại
           </button>
-          <button type="submit" className="px-12 py-3.5 bg-primary text-white font-black rounded-2xl hover:bg-primary-dark shadow-xl shadow-primary/20 transition-all transform hover:-translate-y-1">
-            TIẾP TỤC ĐẾN CHECK-IN
+          <button type="submit" className="px-10 py-3.5 bg-primary text-white font-black rounded-2xl hover:bg-primary-dark shadow-lg shadow-primary/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0">
+            TIẾP TỤC ĐẾN CHECK-IN →
           </button>
         </div>
       </form>

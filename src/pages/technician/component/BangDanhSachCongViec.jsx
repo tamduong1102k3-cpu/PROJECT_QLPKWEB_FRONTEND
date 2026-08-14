@@ -1,5 +1,13 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatDateOfBirth, calculateAge, formatDateTime } from './TienIchKyThuatVien';
+
+// Sort patients: normal order by soThuTu ASC, but xepCuoi=true patients go to the end
+function sortPatientList(patients) {
+  const sorted = [...patients].sort((a, b) => (a.soThuTu || 0) - (b.soThuTu || 0));
+  const normal = sorted.filter(p => !p.xepCuoi);
+  const xepCuoi = sorted.filter(p => p.xepCuoi);
+  return [...normal, ...xepCuoi];
+}
 
 const BangDanhSachCongViec = ({ 
   list, 
@@ -13,6 +21,7 @@ const BangDanhSachCongViec = ({
   onEditResult, 
   onMarkAbsent, 
   onMarkPresent, 
+  onGoiLai,
   searchQuery, 
   setSearchQuery, 
   isRefreshing, 
@@ -20,7 +29,23 @@ const BangDanhSachCongViec = ({
   loading, 
   onAcceptPatient 
 }) => {
+  const [filterMode, setFilterMode] = useState('all');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [absentDropdown, setAbsentDropdown] = useState({ open: false, patient: null });
   const headerTitle = title || (isImaging ? 'Bệnh nhân chờ Chụp chiếu' : 'Bệnh nhân chờ Xét nghiệm');
+
+  // Apply filter + sort before rendering
+  const displayData = useMemo(() => {
+    let data = list.data || [];
+    
+    // Filter "Đang chờ": chỉ hiển thị bệnh nhân đang chờ khám (CHO_KHAM)
+    // Bệnh nhân VANG_MAT chỉ hiển thị khi chọn "Tất cả"
+    if (filterMode === 'pending') {
+      data = data.filter(p => p.trangThai === 'CHO_KHAM' || p.trangThai === 'DANG_KHAM');
+    }
+    
+    return sortPatientList(data);
+  }, [list.data, worklistTab, filterMode]);
 
   return (
     <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-sm border border-slate-200/60 space-y-8">
@@ -36,33 +61,114 @@ const BangDanhSachCongViec = ({
         </button>
       </div>
 
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-        <div className="flex gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/50 w-fit backdrop-blur-sm">
-          {list.receptionCount !== undefined && (
-            <button onClick={() => setWorklistTab('reception')} className={`flex-1 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'reception' ? 'bg-white text-sky-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-              <span>CHỜ TIẾP NHẬN</span>
-              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'reception' ? 'bg-sky-100 text-sky-700' : 'bg-slate-200 text-slate-600'}`}>{list.receptionCount}</span>
+      {/* Filter + Search */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button 
+              onClick={() => setShowFilterDropdown(!showFilterDropdown)} 
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 border bg-white ${
+                filterMode === 'pending' 
+                  ? 'text-indigo-700 border-indigo-200 bg-indigo-50' 
+                  : 'text-slate-600 border-slate-200 hover:border-indigo-300'
+              }`}
+            >
+              <span className="material-symbols-outlined text-lg">filter_alt</span>
+              <span>{filterMode === 'all' ? 'Tất cả' : 'Đang chờ'}</span>
             </button>
-          )}
-          <button onClick={() => setWorklistTab('pending')} className={`flex-1 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-            <span>CHỜ THỰC HIỆN</span>
-            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'pending' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>{list.pendingCount}</span>
-          </button>
-          <button onClick={() => setWorklistTab('completed')} className={`flex-1 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'completed' ? 'bg-white text-teal-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-            <span>ĐÃ HOÀN THÀNH</span>
-            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'completed' ? 'bg-teal-100 text-teal-700' : 'bg-slate-200 text-slate-600'}`}>{list.completedCount}</span>
-          </button>
-          <button onClick={() => setWorklistTab('absent')} className={`flex-1 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'absent' ? 'bg-white text-red-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-            <span>VẮNG MẶT</span>
-            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'absent' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600'}`}>{list.absentCount || 0}</span>
-          </button>
+            {showFilterDropdown && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowFilterDropdown(false)}></div>
+                <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-20 min-w-[160px]">
+                  <button 
+                    onClick={() => { setFilterMode('all'); setShowFilterDropdown(false); }} 
+                    className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors flex items-center gap-2 ${filterMode === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    <span className="material-symbols-outlined text-lg">filter_list</span>
+                    Tất cả
+                  </button>
+                  <button 
+                    onClick={() => { setFilterMode('pending'); setShowFilterDropdown(false); }} 
+                    className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors flex items-center gap-2 ${filterMode === 'pending' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    <span className="material-symbols-outlined text-lg">pending_actions</span>
+                    Đang chờ
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="relative w-full md:w-80 lg:w-96 group flex-shrink-0">
+        <div className="relative w-72">
           <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors pointer-events-none">search</span>
           <input type="text" placeholder="Tìm tên bệnh nhân..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-slate-50 focus:bg-white border border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 rounded-2xl text-sm font-semibold outline-none transition-all placeholder:font-medium placeholder:text-slate-400" />
         </div>
       </div>
+
+      {/* Các tab ngang */}
+      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/50 backdrop-blur-sm">
+        {list.receptionCount !== undefined && (
+          <button onClick={() => setWorklistTab('reception')} className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'reception' ? 'bg-white text-sky-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+            <span>CHỜ TIẾP NHẬN</span>
+            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'reception' ? 'bg-sky-100 text-sky-700' : 'bg-slate-200 text-slate-600'}`}>{list.receptionCount}</span>
+          </button>
+        )}
+        <button onClick={() => setWorklistTab('pending')} className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'pending' ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+          <span>CHỜ THỰC HIỆN</span>
+          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'pending' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>{list.pendingCount}</span>
+        </button>
+        <button onClick={() => setWorklistTab('completed')} className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'completed' ? 'bg-white text-teal-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+          <span>ĐÃ HOÀN THÀNH</span>
+          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'completed' ? 'bg-teal-100 text-teal-700' : 'bg-slate-200 text-slate-600'}`}>{list.completedCount}</span>
+        </button>
+      </div>
+
+      {/* Absent options dropdown */}
+      {absentDropdown.open && (
+        <>
+          <div className="fixed inset-0 z-30 bg-black/20" onClick={() => setAbsentDropdown({ open: false, patient: null })}></div>
+          <div className="fixed z-40 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 min-w-[240px]"
+               style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+            <div className="px-4 py-3 border-b border-slate-100">
+              <p className="font-bold text-slate-700">Xác nhận vắng mặt</p>
+              <p className="text-sm text-slate-500">{absentDropdown.patient?.hoTen}</p>
+            </div>
+            <button 
+              onClick={() => {
+                const p = absentDropdown.patient;
+                setAbsentDropdown({ open: false, patient: null });
+                onMarkAbsent && onMarkAbsent(p, 'tam_thoi');
+              }} 
+              className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl flex items-center gap-3 mt-1"
+            >
+              <span className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">
+                <span className="material-symbols-outlined text-xl">timer</span>
+              </span>
+              <div>
+                <p>Vắng tạm thời</p>
+                <p className="text-xs text-slate-400 font-normal">Vẫn giữ nguyên vị trí trong danh sách</p>
+              </div>
+            </button>
+            <button 
+              onClick={() => {
+                const p = absentDropdown.patient;
+                setAbsentDropdown({ open: false, patient: null });
+                onMarkAbsent && onMarkAbsent(p, 'qua_lau');
+              }} 
+              className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl flex items-center gap-3 mb-1"
+            >
+              <span className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-700">
+                <span className="material-symbols-outlined text-xl">schedule</span>
+              </span>
+              <div>
+                <p>Vắng quá lâu</p>
+                <p className="text-xs text-slate-400 font-normal">Đưa xuống cuối danh sách khi quay lại</p>
+              </div>
+            </button>
+          </div>
+        </>
+      )}
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200/60 shadow-sm">
         <table className="w-full text-left border-collapse text-sm">
@@ -73,11 +179,11 @@ const BangDanhSachCongViec = ({
               <th className="py-5 px-6">SĐT</th>
               <th className="py-5 px-6">CCCD</th>
               <th className="py-5 px-6">Dịch vụ</th>
-              <th className="py-5 px-6 text-center w-48">Thao tác</th>
+              <th className="py-5 px-6 text-center w-56">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {list.data.length === 0 ? (
+            {displayData.length === 0 ? (
               <tr>
                 <td colSpan="6" className="py-16 text-center text-slate-400">
                   <div className="flex flex-col items-center gap-3">
@@ -86,10 +192,10 @@ const BangDanhSachCongViec = ({
                   </div>
                 </td>
               </tr>
-            ) : list.data.map((item, idx) => (
-              <tr key={item.id || idx} className="hover:bg-slate-50/80 transition-colors duration-200 group">
+            ) : displayData.map((item, idx) => (
+              <tr key={item.id || idx} className={`hover:bg-slate-50/80 transition-colors duration-200 group ${item.trangThai === 'VANG_MAT' ? 'bg-red-50/60' : ''}`}>
                 <td className="py-4 px-6">
-                  <span className="font-extrabold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200/50">{idx + 1}</span>
+                  <span className={`font-extrabold px-3 py-1.5 rounded-lg border ${item.trangThai === 'VANG_MAT' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200/50'}`}>{item.soThuTu || idx + 1}</span>
                 </td>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-4">
@@ -97,7 +203,15 @@ const BangDanhSachCongViec = ({
                       {item.hoTen ? item.hoTen[0].toUpperCase() : 'BN'}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="font-black text-slate-800 text-base truncate">{item.hoTen}</h4>
+                      <h4 className="font-black text-slate-800 text-base truncate flex items-center gap-2">
+                        {item.hoTen}
+                        {item.trangThai === 'VANG_MAT' && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">VẮNG MẶT</span>
+                        )}
+                        {item.xepCuoi && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">XẾP CUỐI</span>
+                        )}
+                      </h4>
                       <div className="flex items-center gap-2 mt-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] ${item.gioiTinh === 'Nam' || item.gioiTinh === 1 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>{item.gioiTinh === 1 || item.gioiTinh === 'Nam' ? 'Nam' : 'Nữ'}</span>
                         <span>•</span>
@@ -115,31 +229,42 @@ const BangDanhSachCongViec = ({
                 </td>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-2.5">
-                    <span className={`w-2 h-2 rounded-full ${worklistTab === 'pending' ? 'bg-amber-400 animate-pulse' : worklistTab === 'completed' ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+                    <span className={`w-2 h-2 rounded-full ${item.trangThai === 'VANG_MAT' ? 'bg-red-400' : worklistTab === 'pending' ? 'bg-amber-400 animate-pulse' : worklistTab === 'completed' ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
                     <span className="font-bold text-slate-700">{item.tenDichVu || item.tenChuyenKhoa || 'Khám bệnh'}</span>
                   </div>
                 </td>
                 <td className="py-4 px-6 text-center">
                   {worklistTab === 'pending' ? (
                     <div className="flex items-center justify-center gap-2">
-                      {/* Nút KHÁM BỆNH - gộp sinh hiệu + kết quả */}
-                      <button 
-                        onClick={() => {
-                          if (item.hasVitals) {
-                            onOpenResult(item);
-                          } else {
-                            onOpenVitals(item);
-                          }
-                        }} 
-                        className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-indigo-600 shadow-md shadow-indigo-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">stethoscope</span> KHÁM BỆNH
-                      </button>
-                      {/* Nút VẮNG MẶT */}
-                      {onMarkAbsent && (
-                        <button onClick={() => onMarkAbsent(item)} className="px-3 py-2.5 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center gap-1.5 transition-all">
-                          <span className="material-symbols-outlined text-[18px]">person_off</span> VẮNG
+                      {item.trangThai === 'VANG_MAT' ? (
+                        <button 
+                          onClick={() => {
+                            if (onGoiLai) onGoiLai(item);
+                          }} 
+                          className="px-4 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold rounded-xl hover:from-sky-600 hover:to-blue-700 shadow-md shadow-sky-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">forward_media</span> GỌI LẠI
                         </button>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => {
+                              if (item.hasVitals) {
+                                onOpenResult(item);
+                              } else {
+                                onOpenVitals(item);
+                              }
+                            }} 
+                            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-indigo-600 shadow-md shadow-indigo-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">stethoscope</span> KHÁM BỆNH
+                          </button>
+                          {onMarkAbsent && (
+                            <button onClick={() => setAbsentDropdown({ open: true, patient: item })} className="px-3 py-2.5 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center gap-1.5 transition-all">
+                              <span className="material-symbols-outlined text-[18px]">person_off</span> VẮNG
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   ) : worklistTab === 'reception' ? (
@@ -151,25 +276,8 @@ const BangDanhSachCongViec = ({
                         <span className="material-symbols-outlined text-[18px]">stethoscope_arrow</span> KHÁM
                       </button>
                       {onMarkAbsent && (
-                        <button onClick={() => onMarkAbsent(item)} className="px-3 py-2.5 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center gap-1.5 transition-all">
+                        <button onClick={() => setAbsentDropdown({ open: true, patient: item })} className="px-3 py-2.5 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center gap-1.5 transition-all">
                           <span className="material-symbols-outlined text-[18px]">person_off</span> VẮNG
-                        </button>
-                      )}
-                    </div>
-                  ) : worklistTab === 'absent' ? (
-                    <div className="flex items-center justify-center gap-2">
-                      {onMarkPresent && (
-                        <button onClick={() => onMarkPresent(item)} className="px-3 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-teal-600 shadow-md shadow-emerald-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
-                          <span className="material-symbols-outlined text-[18px]">person</span> GỌI LẠI
-                        </button>
-                      )}
-                      {onOpenView ? (
-                        <button onClick={() => onOpenView(item)} className="px-3 py-2.5 bg-gradient-to-r from-slate-600 to-slate-500 text-white font-bold rounded-xl hover:from-slate-700 hover:to-slate-600 shadow-md shadow-slate-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
-                          <span className="material-symbols-outlined text-[18px]">visibility</span> XEM
-                        </button>
-                      ) : (
-                        <button onClick={() => onOpenResult(item)} className="px-3 py-2.5 bg-gradient-to-r from-slate-600 to-slate-500 text-white font-bold rounded-xl hover:from-slate-700 hover:to-slate-600 shadow-md shadow-slate-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
-                          <span className="material-symbols-outlined text-[18px]">visibility</span> XEM
                         </button>
                       )}
                     </div>
@@ -177,7 +285,6 @@ const BangDanhSachCongViec = ({
                     <div className="flex items-center justify-center gap-2">
                       {onOpenView ? (
                         <>
-                          {/* Nút SINH HIỆU - sửa lại chỉ số */}
                           <button 
                             onClick={() => onOpenVitals(item)} 
                             className={`px-3 py-2.5 font-bold rounded-xl shadow-md text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm ${
@@ -193,7 +300,6 @@ const BangDanhSachCongViec = ({
                               {item.hasVitals && <span className="material-symbols-outlined text-sm">check_circle</span>}
                             </span>
                           </button>
-                          {/* Nút SỬA kết quả chuyên môn - yêu cầu có sinh hiệu trước */}
                           <button 
                             onClick={() => {
                               if (!item.hasVitals) {
@@ -213,7 +319,6 @@ const BangDanhSachCongViec = ({
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span> KẾT QUẢ
                           </button>
-                          {/* Nút XEM */}
                           <button onClick={() => onOpenView(item)} className="px-3 py-2.5 bg-gradient-to-r from-slate-600 to-slate-500 text-white font-bold rounded-xl hover:from-slate-700 hover:to-slate-600 shadow-md shadow-slate-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
                             <span className="material-symbols-outlined text-[18px]">visibility</span> XEM
                           </button>

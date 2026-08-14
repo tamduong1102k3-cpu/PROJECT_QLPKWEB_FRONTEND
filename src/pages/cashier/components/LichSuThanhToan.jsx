@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getPaidInvoicesApi, getChiTietApi } from '../../../api/hoaDonApi';
-import { sqlLikeMatch } from '../../../utils/searchUtils';
+import usePagination from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 
 const formatCurrencyLocal = (amount) => {
   if (amount == null) return '—';
@@ -46,7 +47,10 @@ const LichSuThanhToan = ({ formatCurrency }) => {
     }
   };
 
-  const filteredHistory = history.filter(item => {
+  // Lọc theo ngày - dùng useCallback để reference ổn định giữa các render,
+  // tránh bị reset trang về 1 mỗi lần re-render (vì filters trong usePagination
+  // là dependency của useEffect reset page)
+  const invoiceFilters = useCallback((item) => {
     if (filterNgay === 'today') {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -54,12 +58,25 @@ const LichSuThanhToan = ({ formatCurrency }) => {
       const date = new Date(item.ngayThanhToan);
       if (date < today) return false;
     }
-    if (!searchTerm) return true;
-    return (
-      sqlLikeMatch(item.hoTen, searchTerm) ||
-      sqlLikeMatch(item.maBenhNhan, searchTerm) ||
-      sqlLikeMatch(item.maHoaDon, searchTerm)
-    );
+    return true;
+  }, [filterNgay]);
+
+  const {
+    paginatedData: pagedHistory,
+    totalItems: pagedTotalItems,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+  } = usePagination({
+    data: history,
+    pageSize: 8,
+    searchKeys: ['hoTen', 'maBenhNhan', 'maHoaDon'],
+    searchTerm,
+    filters: invoiceFilters,
   });
 
   const formatDateTime = (dateStr) => {
@@ -74,7 +91,14 @@ const LichSuThanhToan = ({ formatCurrency }) => {
     });
   };
 
+  // Chỉ tính doanh thu từ các hóa đơn ĐÃ THANH TOÁN
+  const isPaid = (item) => {
+    const st = (item.trangThai || '').toLowerCase();
+    return st === 'da thanh toan' || st === 'da_thanh_toan';
+  };
+
   const tongTienHomNay = history.filter(item => {
+    if (!isPaid(item)) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (!item.ngayThanhToan) return false;
@@ -82,9 +106,37 @@ const LichSuThanhToan = ({ formatCurrency }) => {
     return date >= today;
   }).reduce((sum, item) => sum + (Number(item.tongTien) || 0), 0);
 
-  const tongTienTatCa = history.reduce((sum, item) => sum + (Number(item.tongTien) || 0), 0);
+  const tongTienTatCa = history.filter(isPaid).reduce((sum, item) => sum + (Number(item.tongTien) || 0), 0);
 
   const fmt = formatCurrency || formatCurrencyLocal;
+
+  // Hàm render badge trạng thái hóa đơn
+  const renderTrangThai = (trangThai) => {
+    const st = (trangThai || '').toLowerCase();
+    if (st === 'da thanh toan' || st === 'da_thanh_toan') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200">
+          <span className="material-symbols-outlined text-[14px]">check_circle</span>
+          Đã thanh toán
+        </span>
+      );
+    }
+    if (st === 'dang_cho_thanh_toan' || st === 'cho thanh toan' || st === 'dang cho thanh toan') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg border border-amber-200">
+          <span className="material-symbols-outlined text-[14px]">hourglass_top</span>
+          Chờ thanh toán
+        </span>
+      );
+    }
+    // Mặc định: chưa thanh toán / các trạng thái khác
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-bold rounded-lg border border-red-200">
+        <span className="material-symbols-outlined text-[14px]">cancel</span>
+        {st === 'chua thanh toan' || st === 'chua_thanh_toan' ? 'Chưa thanh toán' : (trangThai || 'Không xác định')}
+      </span>
+    );
+  };
 
   return (
     <>
@@ -96,7 +148,7 @@ const LichSuThanhToan = ({ formatCurrency }) => {
               <span className="material-symbols-outlined text-emerald-600">receipt_long</span>
               Lịch sử thanh toán (Tất cả các ngày)
             </h3>
-            <p className="text-xs text-slate-400 font-medium">Danh sách hóa đơn đã thanh toán</p>
+            <p className="text-xs text-slate-400 font-medium">Danh sách tất cả hóa đơn</p>
           </div>
           
           <div className="flex items-center gap-3">
@@ -178,6 +230,7 @@ const LichSuThanhToan = ({ formatCurrency }) => {
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Bệnh Nhân</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Ngày Thanh Toán</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Số Điện Thoại</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider text-center">Trạng Thái</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider text-right">Tổng Tiền</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider text-center">Thao Tác</th>
               </tr>
@@ -185,21 +238,21 @@ const LichSuThanhToan = ({ formatCurrency }) => {
             <tbody className="divide-y divide-slate-50">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-slate-400 font-medium">
+                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400 font-medium">
                     <div className="flex items-center justify-center gap-2">
                       <span className="material-symbols-outlined animate-spin">progress_activity</span>
                       Đang tải dữ liệu...
                     </div>
                   </td>
                 </tr>
-              ) : filteredHistory.length === 0 ? (
+              ) : pagedHistory.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-slate-400 font-medium">
+                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400 font-medium">
                     Không tìm thấy hóa đơn nào.
                   </td>
                 </tr>
               ) : (
-                filteredHistory.map(item => (
+                pagedHistory.map(item => (
                   <tr key={item.maHoaDon} className="hover:bg-emerald-50/20 transition-colors group">
                     <td className="px-6 py-4 font-bold text-xs text-emerald-600">
                       #{item.maHoaDon}
@@ -221,6 +274,9 @@ const LichSuThanhToan = ({ formatCurrency }) => {
                     <td className="px-6 py-4 text-xs text-slate-500 font-medium">
                       {item.soDienThoai || <span className="text-slate-300 italic">N/A</span>}
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      {renderTrangThai(item.trangThai)}
+                    </td>
                     <td className="px-6 py-4 text-xs font-bold text-slate-700 text-right">
                       {fmt(item.tongTien)}
                     </td>
@@ -239,6 +295,24 @@ const LichSuThanhToan = ({ formatCurrency }) => {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION */}
+        {!loading && pagedTotalItems > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={pagedTotalItems}
+            label="hóa đơn"
+            visiblePages={visiblePages}
+            onPageChange={setCurrentPage}
+            jumpPage={jumpPage}
+            onJumpPage={handleJumpPage}
+            onJumpBlur={handleJumpPageBlur}
+            activeClass="bg-emerald-600 text-white shadow-md shadow-emerald-100"
+            hoverClass="hover:bg-emerald-50 hover:text-emerald-600"
+            ringClass="focus:ring-2 focus:ring-emerald-200"
+          />
+        )}
       </div>
 
       {/* Modal chi tiết hóa đơn */}

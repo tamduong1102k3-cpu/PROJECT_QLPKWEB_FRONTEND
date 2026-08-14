@@ -43,9 +43,18 @@ const ModalXemThongTin = ({ user, onClose }) => {
   const roleLabel = {
     LE_TAN: 'Lễ tân',
     BAC_SI: 'Bác sĩ',
+    BAC_SI_CHUYEN_KHOA: 'Bác sĩ chuyên khoa',
+    TRO_LY_BAC_SI_CHUYEN_KHOA: 'Trợ lý bác sĩ chuyên khoa',
+    TRO_LY_BAC_SI_TONG_QUAT: 'Trợ lý bác sĩ tổng quát',
+    Y_TA: 'Y tá',
     KY_THUAT_VIEN: 'Kỹ thuật viên',
+    KY_THUAT_VIEN_XET_NGHIEM: 'Kỹ thuật viên xét nghiệm',
+    KY_THUAT_VIEN_CHAN_DOAN_HINH_ANH: 'Kỹ thuật viên chẩn đoán hình ảnh',
     THU_NGAN: 'Thu ngân',
-    QUAN_TRI: 'Quản trị',
+    DUOC_SI: 'Dược sĩ',
+    NHAN_VIEN_KHO: 'Nhân viên kho',
+    QUAN_TRI: 'Quản trị viên',
+    QUAN_TRI_VIEN: 'Quản trị viên',
     TRO_LY: 'Trợ lý'
   };
 

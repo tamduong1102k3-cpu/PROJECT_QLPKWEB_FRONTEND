@@ -43,13 +43,21 @@ const InDonThuoc = ({ patient, prescriptions, formatDateTime }) => {
         <td>${item.thoiDiemDung || '—'}</td>
       </tr>`).join('');
 
-      const statusLabel = toa.trangThai === 'DA_CAP_THUOC' ? '✓ Đã cấp thuốc' : '⏳ Chờ cấp thuốc';
+      let statusLabel = '⏳ Chờ cấp thuốc';
+      let statusClass = 'pending';
+      if (toa.trangThai === 'DA_CAP_THUOC') {
+        statusLabel = '✓ Đã cấp thuốc';
+        statusClass = 'done';
+      } else if (toa.trangThai === 'HET_HAN_NHAN_THUOC') {
+        statusLabel = '✖ Hết hạn nhận thuốc';
+        statusClass = 'expired';
+      }
 
       return `
         <div class="toa-section">
           <div class="toa-header">
             <h3>Toa thuốc #${toa.maToaThuoc}</h3>
-            <span class="status ${toa.trangThai === 'DA_CAP_THUOC' ? 'done' : 'pending'}">${statusLabel}</span>
+            <span class="status ${statusClass}">${statusLabel}</span>
           </div>
           <div class="toa-meta">Ngày tạo: ${formatDate(toa.ngayTao)} ${formatTime(toa.ngayTao)}${toa.ghiChu ? ` &nbsp;|&nbsp; Ghi chú: ${toa.ghiChu}` : ''}</div>
           <table>
@@ -84,6 +92,7 @@ body{font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#f0f2f5;di
 .toa-header .status{font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px}
 .toa-header .status.done{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
 .toa-header .status.pending{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
+.toa-header .status.expired{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0}
 .toa-meta{font-size:10px;color:#94a3b8;padding:6px 14px;border-bottom:1px solid #f1f5f9}
 table{width:100%;border-collapse:collapse;font-size:11.5px}
 th{font-size:8.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;padding:7px 5px;border-bottom:1.5px solid #e2e8f0;text-align:left}

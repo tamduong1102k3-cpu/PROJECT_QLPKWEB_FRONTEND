@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getAllThuocApi, getAllKhoApi, getAllPhieuNhapApi, getChiTietPhieuNhapApi, getKhoCanhBaoApi } from '../../api/khoThuocApi';
 import { getAllNhanVienApi } from '../../api/employeeApi';
 import UserMenu from '../../components/UserMenu';
+import LichLamViecTab from '../../components/LichLamViecTab';
 import { useNotification } from '../../components/NotificationContext';
 import LichSuNhapThuoc from './components/LichSuNhapThuoc';
 import KhoThuocTab from '../admin/components/KhoThuocTab';
@@ -191,6 +192,7 @@ const BangDieuKhienKho = ({ onLogout, user }) => {
     { id: 'inventory', label: 'Kho Thuốc', icon: 'inventory' },
     { id: 'history', label: 'Lịch Sử Nhập', icon: 'history' },
     { id: 'import', label: 'Nhập Thuốc', icon: 'add_shopping_cart' },
+    { id: 'lichlamviec', label: 'Lịch Làm Việc', icon: 'calendar_month' },
   ];
 
   return (
@@ -267,7 +269,7 @@ const BangDieuKhienKho = ({ onLogout, user }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10 shadow-sm">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 relative z-50 shadow-sm">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -347,6 +349,10 @@ const BangDieuKhienKho = ({ onLogout, user }) => {
               onRefresh={onRefresh}
               currentUser={user}
             />
+          )}
+
+          {activeTab === 'lichlamviec' && (
+            <LichLamViecTab user={user} />
           )}
         </main>
       </div>

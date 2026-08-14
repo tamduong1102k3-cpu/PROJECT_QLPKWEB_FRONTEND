@@ -13,15 +13,15 @@ const isOutOfStock = (tonKho) => {
 
 const getStockBadge = (med) => {
   if (isOutOfStock(med.tonKho)) {
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-full border border-red-200">Hết hàng</span>;
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full border border-red-200">Hết hàng</span>;
   }
   if (med.tonKho < 20) {
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded-full border border-orange-200">Tồn: {med.tonKho}</span>;
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full border border-orange-200">Tồn: {med.tonKho}</span>;
   }
   if (med.tonKho <= 50) {
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full border border-amber-200">Tồn: {med.tonKho}</span>;
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full border border-amber-200">Tồn: {med.tonKho}</span>;
   }
-  return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200">Tồn: {med.tonKho}</span>;
+  return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">Tồn: {med.tonKho}</span>;
 };
 
 const getExpiryBadge = (med) => {
@@ -50,87 +50,106 @@ const TabKeDonThuoc = ({
   onUpdateMedField,
   isAssistant,
   selectedPatient,
-  user
+  user,
+  readOnly,
+  prescriptionSavedAt
 }) => {
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 animate-fade-in min-h-[500px] flex flex-col w-full">
+      {prescriptionSavedAt && selectedMeds.length > 0 && (
+        <div className="mb-5 flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 animate-fade-in">
+          <span className="w-10 h-10 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-md shadow-emerald-200 shrink-0">
+            <span className="material-symbols-outlined text-[18px]">check</span>
+          </span>
+          <div className="flex-1">
+            <p className="text-emerald-800 font-bold text-sm">Đã lưu toa thuốc thành công</p>
+            <p className="text-emerald-600 text-xs mt-0.5">
+              Toa thuốc đã được lưu vào hệ thống lúc {new Date(prescriptionSavedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày {new Date(prescriptionSavedAt).toLocaleDateString('vi-VN')}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-xl font-bold text-gray-800">Kê đơn thuốc</h3>
           <p className="text-sm text-gray-500">Tìm kiếm thuốc và nhập hướng dẫn sử dụng</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="material-symbols-outlined text-gray-400">search</span>
-            </div>
-            <input 
-              type="text" 
-              className="block w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:text-sm" 
-              placeholder="Tìm tên thuốc..." 
-              value={medSearch} 
-              onChange={(e) => { setMedSearch(e.target.value); setShowMedList(true); }} 
-              onFocus={() => setShowMedList(true)} 
-              onBlur={() => setTimeout(() => setShowMedList(false), 200)} 
-            />
-            {showMedList && (
-              <div className="absolute z-30 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 max-h-72 overflow-y-auto">
-                {allMeds.filter(m => !medSearch || sqlLikeMatch(m.tenThuoc, medSearch) || sqlLikeMatch(m.hoatChat, medSearch)).map(m => {
-                  const canAdd = canAddMed(m);
-                  return (
-                    <div 
-                      key={m.maThuoc} 
-                      className={`p-3 border-b border-gray-50 flex flex-col gap-1.5 ${
-                        canAdd ? 'hover:bg-emerald-50 cursor-pointer' : 'bg-red-50/50 cursor-not-allowed opacity-80'
-                      }`} 
-                      onClick={() => {
-                        if (!canAdd) return;
-                        handleAddMed(m);
-                      }}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-sm font-bold ${canAdd ? 'text-gray-800' : 'text-red-600'}`}>
-                              {m.tenThuoc}
-                            </span>
-                            {!canAdd && (
-                              <span className="material-symbols-outlined text-red-500 text-[16px]">block</span>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-500">{m.hoatChat}</div>
-                        </div>
-                        <div className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded shrink-0 ml-2">{m.donViTinh}</div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {getStockBadge(m)}
-                        {getExpiryBadge(m)}
-                        {!canAdd && (
-                          <span className="text-[10px] text-red-500 font-medium">Không thể thêm vào đơn</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+          {!readOnly && (
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="material-symbols-outlined text-gray-400">search</span>
               </div>
-            )}
-          </div>
-          <button onClick={() => {
-            if (selectedMeds.length === 0) {
-              alert('Vui lòng thêm ít nhất một loại thuốc trước khi lưu đơn!');
-              return;
-            }
-            // Validate each medicine has basic fields filled
-            const invalidMeds = selectedMeds.filter(m => !m.tenThuoc || !m.tenThuoc.trim());
-            if (invalidMeds.length > 0) {
-              alert('Có thông tin thuốc không hợp lệ trong đơn!');
-              return;
-            }
-            handleSavePrescription(false);
-          }} className="px-6 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 flex items-center gap-2">
-            <span className="material-symbols-outlined text-sm">save</span>
-            {isAssistant ? 'LƯU NHÁP ĐƠN THUỐC' : 'LƯU ĐƠN THUỐC'}
-          </button>
+              <input 
+                type="text" 
+                className="block w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:text-sm" 
+                placeholder="Tìm tên thuốc..." 
+                value={medSearch} 
+                onChange={(e) => { setMedSearch(e.target.value); setShowMedList(true); }} 
+                onFocus={() => setShowMedList(true)} 
+                onBlur={() => setTimeout(() => setShowMedList(false), 200)} 
+              />
+              {showMedList && (
+                <div className="absolute z-30 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 max-h-72 overflow-y-auto">
+                  {allMeds.filter(m => !medSearch || sqlLikeMatch(m.tenThuoc, medSearch) || sqlLikeMatch(m.hoatChat, medSearch)).map(m => {
+                    const canAdd = canAddMed(m);
+                    return (
+                      <div 
+                        key={m.maThuoc} 
+                        className={`p-3 border-b border-gray-50 flex flex-col gap-1.5 ${
+                          canAdd ? 'hover:bg-emerald-50 cursor-pointer' : 'bg-red-50/50 cursor-not-allowed opacity-80'
+                        }`} 
+                        onClick={() => {
+                          if (!canAdd) return;
+                          handleAddMed(m);
+                        }}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-bold ${canAdd ? 'text-gray-800' : 'text-red-600'}`}>
+                                {m.tenThuoc}
+                              </span>
+                              {!canAdd && (
+                                <span className="material-symbols-outlined text-red-500 text-[16px]">block</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">{m.hoatChat}</div>
+                          </div>
+                          <div className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded shrink-0 ml-2">{m.donViTinh}</div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {getStockBadge(m)}
+                          {getExpiryBadge(m)}
+                          {!canAdd && (
+                            <span className="text-[10px] text-red-500 font-medium">Không thể thêm vào đơn</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          {!readOnly && (
+            <button onClick={() => {
+              if (selectedMeds.length === 0) {
+                alert('Vui lòng thêm ít nhất một loại thuốc trước khi lưu đơn!');
+                return;
+              }
+              const invalidMeds = selectedMeds.filter(m => !m.tenThuoc || !m.tenThuoc.trim());
+              if (invalidMeds.length > 0) {
+                alert('Có thông tin thuốc không hợp lệ trong đơn!');
+                return;
+              }
+              handleSavePrescription(false);
+            }} className="px-6 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">save</span>
+              {isAssistant ? 'LƯU NHÁP ĐƠN THUỐC' : 'LƯU ĐƠN THUỐC'}
+            </button>
+          )}
           
           {selectedPatient && selectedMeds.length > 0 && (
             <PrintButton 
@@ -151,8 +170,19 @@ const TabKeDonThuoc = ({
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-2">
                   <h4 className="font-bold text-gray-800">{idx + 1}. {m.tenThuoc} ({m.hoatChat})</h4>
+                  {m.isSaved ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 whitespace-nowrap">
+                      <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                      Đã lưu
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full border border-amber-200 whitespace-nowrap">
+                      <span className="material-symbols-outlined text-[12px]">schedule</span>
+                      Đã thêm vào danh sách - Chưa lưu
+                    </span>
+                  )}
                   {m.tonKho !== undefined && (
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                       m.tonKho <= 0 ? 'bg-red-100 text-red-700' : 
                       m.tonKho < 20 ? 'bg-orange-100 text-orange-700' :
                       m.tonKho <= 50 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
@@ -161,9 +191,15 @@ const TabKeDonThuoc = ({
                     </span>
                   )}
                 </div>
-                <button onClick={() => setSelectedMeds(selectedMeds.filter(item => item.maThuoc !== m.maThuoc))} className="text-gray-300 hover:text-red-500">
-                  <span className="material-symbols-outlined">close</span>
-                </button>
+                {readOnly ? (
+                  <span className="text-gray-300">
+                    <span className="material-symbols-outlined">lock</span>
+                  </span>
+                ) : (
+                  <button onClick={() => setSelectedMeds(selectedMeds.filter(item => item.maThuoc !== m.maThuoc))} className="text-gray-300 hover:text-red-500">
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
@@ -172,9 +208,9 @@ const TabKeDonThuoc = ({
                     type="text" 
                     value={m.lieuDung || ''} 
                     onChange={(e) => onUpdateMedField(m.maThuoc, 'lieuDung', e.target.value)}
-                    onBlur={() => handleSavePrescription(true)}
                     placeholder="VD: 1 viên/lần"
                     className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
+                    disabled={readOnly}
                   />
                 </div>
                 <div>
@@ -183,9 +219,9 @@ const TabKeDonThuoc = ({
                     type="text" 
                     value={m.cachDung || ''} 
                     onChange={(e) => onUpdateMedField(m.maThuoc, 'cachDung', e.target.value)}
-                    onBlur={() => handleSavePrescription(true)}
                     placeholder="VD: Uống sau ăn"
                     className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
+                    disabled={readOnly}
                   />
                 </div>
                 <div>
@@ -194,9 +230,9 @@ const TabKeDonThuoc = ({
                     type="text" 
                     value={m.thoiDiemDung || ''} 
                     onChange={(e) => onUpdateMedField(m.maThuoc, 'thoiDiemDung', e.target.value)}
-                    onBlur={() => handleSavePrescription(true)}
                     placeholder="VD: Sau bữa ăn sáng"
                     className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
+                    disabled={readOnly}
                   />
                 </div>
               </div>
@@ -208,8 +244,8 @@ const TabKeDonThuoc = ({
                       type="text" 
                       value={m[time] || ''} 
                       onChange={(e) => onUpdateMedField(m.maThuoc, time, e.target.value)}
-                      onBlur={() => handleSavePrescription(true)}
                       className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
+                      disabled={readOnly}
                     />
                   </div>
                 ))}
@@ -219,8 +255,8 @@ const TabKeDonThuoc = ({
                     type="number" 
                     value={m.soNgay || ''} 
                     onChange={(e) => onUpdateMedField(m.maThuoc, 'soNgay', parseInt(e.target.value) || '')}
-                    onBlur={() => handleSavePrescription(true)}
                     className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
+                    disabled={readOnly}
                   />
                 </div>
               </div>

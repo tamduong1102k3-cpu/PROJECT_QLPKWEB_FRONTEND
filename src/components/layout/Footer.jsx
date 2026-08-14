@@ -7,12 +7,6 @@ const Footer = () => {
         <div className="flex flex-col items-center md:items-start gap-2">
           <p className="text-sm font-manrope text-slate-500 dark:text-slate-400">© 2024 MedCore Healthcare Systems. All rights reserved.</p>
         </div>
-        <div className="flex flex-wrap justify-center gap-6">
-          <a className="text-sm font-manrope text-slate-500 dark:text-slate-400 cursor-pointer transition-opacity hover:text-blue-700 dark:hover:text-blue-300" href="#">Privacy Policy</a>
-          <a className="text-sm font-manrope text-slate-500 dark:text-slate-400 cursor-pointer transition-opacity hover:text-blue-700 dark:hover:text-blue-300" href="#">Terms of Service</a>
-          <a className="text-sm font-manrope text-slate-500 dark:text-slate-400 cursor-pointer transition-opacity hover:text-blue-700 dark:hover:text-blue-300" href="#">HIPAA Compliance</a>
-          <a className="text-sm font-manrope text-slate-500 dark:text-slate-400 cursor-pointer transition-opacity hover:text-blue-700 dark:hover:text-blue-300" href="#">Contact</a>
-        </div>
         <div className="flex items-center gap-4">
           <span className="material-symbols-outlined text-slate-400 hover:text-blue-600 cursor-pointer">social_leaderboard</span>
           <span className="material-symbols-outlined text-slate-400 hover:text-blue-600 cursor-pointer">potted_plant</span>

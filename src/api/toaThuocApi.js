@@ -18,7 +18,7 @@ export const createApi = async data => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch (e) { }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -42,7 +42,7 @@ export const getByPhieuKhamApi = async maPhieuKham => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch (e) { }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -66,7 +66,7 @@ export const getByBenhNhanApi = async maBenhNhan => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch (e) { }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -90,13 +90,37 @@ export const getDetailsApi = async id => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch (e) { }
       throw new Error(errorMsg);
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
     console.error("Error in getDetailsApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * DELETE /phieu-kham/{maPhieuKham} - Xóa toa đang chờ thanh toán và hoàn lại số lượng thuốc đã giữ
+ */
+export const deleteToaByPhieuKhamApi = async maPhieuKham => {
+  try {
+    const response = await fetchClient(`${API_URL}/phieu-kham/${maPhieuKham}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in deleteToaByPhieuKhamApi:", error);
     throw error;
   }
 };

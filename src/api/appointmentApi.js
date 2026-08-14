@@ -82,6 +82,34 @@ export const updateApi = async (id, data) => {
 };
 
 /**
+ * GET /search?trangThai=&nguonTao=&keyword=
+ * Tìm kiếm & filter lịch khám
+ */
+export const searchApi = async (params = {}) => {
+  try {
+    const query = new URLSearchParams();
+    if (params.trangThai && params.trangThai !== 'ALL') query.append('trangThai', params.trangThai);
+    if (params.nguonTao && params.nguonTao !== 'ALL') query.append('nguonTao', params.nguonTao);
+    if (params.keyword) query.append('keyword', params.keyword);
+    const url = query.toString() ? `${API_URL}/search?${query.toString()}` : `${API_URL}/search`;
+    const response = await fetchClient(url, { method: 'GET' });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : [];
+  } catch (error) {
+    console.error("Error in searchApi:", error);
+    throw error;
+  }
+};
+
+/**
  * DELETE /{id}
  */
 export const deleteApi = async id => {

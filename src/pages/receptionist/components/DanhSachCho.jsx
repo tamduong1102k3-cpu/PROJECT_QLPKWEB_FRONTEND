@@ -1,7 +1,7 @@
 import { getTodayApi as _getTodayDangKy, updateStatusApi } from '../../../api/dangKyKhamBenhApi';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
-const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0 }) => {
+const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0, compact = false }) => {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const isInitialLoad = useRef(true);
@@ -56,7 +56,23 @@ const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0 }) => {
   }
 
   return <>
-    {list.length > 0 && list.map(p => <div key={p.soThuTu} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:border-primary/30 hover:shadow-md transition-all">
+    {list.length > 0 && list.map(p => compact ? (
+      <div key={p.soThuTu} className="flex items-center justify-between px-2 py-1.5 bg-white border border-gray-100 rounded-lg hover:bg-primary/5 hover:border-primary/30 transition-all cursor-default">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-xs shrink-0">
+            {p.soThuTu}
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold text-xs text-gray-800 truncate">{p.hoTen}</p>
+            <p className="text-[10px] text-gray-400">{new Date(p.thoiGian).toLocaleTimeString('vi-VN', {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}</p>
+          </div>
+        </div>
+        <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded uppercase shrink-0">{p.tenChuyenKhoa}</span>
+      </div>
+    ) : <div key={p.soThuTu} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:border-primary/30 hover:shadow-md transition-all">
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold shadow-sm">
           {p.soThuTu}

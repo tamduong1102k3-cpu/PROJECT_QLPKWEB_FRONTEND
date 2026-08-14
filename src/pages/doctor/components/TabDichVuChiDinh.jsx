@@ -16,7 +16,8 @@ const TabDichVuChiDinh = ({
   setSelectedServices,
   isAssistant,
   selectedPatient,
-  user
+  user,
+  readOnly
 }) => {
   const { showWarning } = useNotification();
 
@@ -36,38 +37,41 @@ const TabDichVuChiDinh = ({
           <p className="text-sm text-gray-500">Tìm kiếm và chọn các dịch vụ kỹ thuật cho bệnh nhân</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="material-symbols-outlined text-gray-400">search</span>
-            </div>
-            <input
-              type="text"
-              className="block w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-xl leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm transition-all"
-              placeholder="Tìm tên dịch vụ..."
-              value={serviceSearch}
-              onChange={(e) => { setServiceSearch(e.target.value); setShowServiceList(true); }}
-              onFocus={() => setShowServiceList(true)}
-              onBlur={() => setTimeout(() => setShowServiceList(false), 200)}
-            />
-            {showServiceList && (
-              <div className="absolute z-30 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
-                {allServices.filter(s => !serviceSearch || sqlLikeMatch(s.tenDichVu, serviceSearch)).map(s => (
-                  <div key={s.maDichVu} className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0" onClick={() => handleAddService(s)}>
-                    <div>
-                      <div className="text-sm font-bold text-gray-800">{s.tenDichVu}</div>
-                      <div className="text-xs text-gray-500">{s.maChuyenKhoa ? 'Kỹ thuật chuyên khoa' : 'Dịch vụ chung'}</div>
-                    </div>
-                    <div className="text-sm font-bold text-indigo-600">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.donGia)}</div>
-                  </div>
-                ))}
+          {!readOnly && (
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="material-symbols-outlined text-gray-400">search</span>
               </div>
-            )}
-          </div>
-          <button onClick={handleSaveWithValidation} className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center gap-2">
-            <span className="material-symbols-outlined text-sm">save</span>
-            {isAssistant ? 'LƯU NHÁP CHỈ ĐỊNH' : 'LƯU CHỈ ĐỊNH'}
-          </button>
-
+              <input
+                type="text"
+                className="block w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-xl leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm transition-all"
+                placeholder="Tìm tên dịch vụ..."
+                value={serviceSearch}
+                onChange={(e) => { setServiceSearch(e.target.value); setShowServiceList(true); }}
+                onFocus={() => setShowServiceList(true)}
+                onBlur={() => setTimeout(() => setShowServiceList(false), 200)}
+              />
+              {showServiceList && (
+                <div className="absolute z-30 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
+                  {allServices.filter(s => !serviceSearch || sqlLikeMatch(s.tenDichVu, serviceSearch)).map(s => (
+                    <div key={s.maDichVu} className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0" onClick={() => handleAddService(s)}>
+                      <div>
+                        <div className="text-sm font-bold text-gray-800">{s.tenDichVu}</div>
+                        <div className="text-xs text-gray-500">{s.maChuyenKhoa ? 'Kỹ thuật chuyên khoa' : 'Dịch vụ chung'}</div>
+                      </div>
+                      <div className="text-sm font-bold text-indigo-600">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.donGia)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {!readOnly && (
+            <button onClick={handleSaveWithValidation} className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">save</span>
+              {isAssistant ? 'LƯU NHÁP CHỈ ĐỊNH' : 'LƯU CHỈ ĐỊNH'}
+            </button>
+          )}
           {selectedPatient && selectedServices.length > 0 && (
             <PrintButton 
               targetId="services-print-area" 
@@ -95,6 +99,7 @@ const TabDichVuChiDinh = ({
                   <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-center">SL</th>
                   <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right">Đơn giá</th>
                   <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right">Thành tiền</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-center">Trạng thái</th>
                   <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-center">Xóa</th>
                 </tr>
               </thead>
@@ -117,9 +122,29 @@ const TabDichVuChiDinh = ({
                     <td className="px-4 py-4 text-sm text-right font-medium text-gray-600">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.donGia)}</td>
                     <td className="px-4 py-4 text-sm text-right font-bold text-indigo-600">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.donGia * s.soLuong)}</td>
                     <td className="px-4 py-4 text-center">
-                      <button onClick={() => handleRemoveService(s.maDichVu)} className="text-red-400 hover:text-red-600 transition-colors">
-                        <span className="material-symbols-outlined">delete</span>
-                      </button>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                        s.trangThaiDv === 'DA_THUC_HIEN' 
+                          ? 'bg-green-100 text-green-700' 
+                          : s.trangThaiDv === 'CHUA_THUC_HIEN' 
+                            ? 'bg-gray-100 text-gray-500'
+                            : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          s.trangThaiDv === 'DA_THUC_HIEN' ? 'bg-green-500' : 'bg-gray-400'
+                        }`}></span>
+                        {s.trangThaiDv === 'DA_THUC_HIEN' ? 'Đã thực hiện' : 'Chưa thực hiện'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      {readOnly || s.trangThaiDv === 'DA_THUC_HIEN' ? (
+                        <span className={`${s.trangThaiDv === 'DA_THUC_HIEN' ? 'text-gray-300' : 'text-gray-300'}`}>
+                          <span className="material-symbols-outlined">lock</span>
+                        </span>
+                      ) : (
+                        <button onClick={() => handleRemoveService(s.maDichVu)} className="text-red-400 hover:text-red-600 transition-colors">
+                          <span className="material-symbols-outlined">delete</span>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

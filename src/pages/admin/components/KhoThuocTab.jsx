@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { getAllKhoApi as _getAllKhoApi } from '../../../api/khoThuocApi';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getAllKhoApi } from '../../../api/khoThuocApi';
 import { card, th, td, formatDate } from './styles';
+import usePagination from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 
 const stockBadge = qty => {
   if (qty == null) return { bg: '#f3f4f6', color: '#6b7280', label: '—' };
@@ -12,13 +14,44 @@ const stockBadge = qty => {
 const KhoThuocTab = ({ thuocMap }) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Bọc filter trong useCallback để reference ổn định giữa các render,
+  // tránh bị reset trang về 1 mỗi lần re-render (lỗi không chuyển trang được)
+  const khoFilters = useCallback((item) => {
+    if (!searchTerm) return true;
+    const t = searchTerm.toLowerCase();
+    const tenThuoc = (thuocMap[item.maThuoc]?.tenThuoc || '').toLowerCase();
+    return (
+      String(item.maThuoc).includes(t) ||
+      tenThuoc.includes(t) ||
+      String(item.idKho).includes(t)
+    );
+  }, [searchTerm, thuocMap]);
+
+  const {
+    paginatedData: pagedItems,
+    totalItems,
+    totalPages,
+    currentPage,
+    setCurrentPage,
+    visiblePages,
+    jumpPage,
+    handleJumpPage,
+    handleJumpPageBlur,
+  } = usePagination({
+    data: items,
+    pageSize: 10,
+    searchKeys: [],
+    searchTerm,
+    filters: khoFilters,
+  });
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const data = await _getAllKhoApi();
+        const data = await getAllKhoApi();
         setItems(data || []);
       } catch (e) {
         alert(e.message);
@@ -27,13 +60,6 @@ const KhoThuocTab = ({ thuocMap }) => {
       }
     })();
   }, []);
-
-  const filtered = items.filter(i => {
-    if (!search) return true;
-    const t = search.toLowerCase();
-    const tenThuoc = (thuocMap[i.maThuoc]?.tenThuoc || '').toLowerCase();
-    return String(i.maThuoc).includes(t) || tenThuoc.includes(t) || String(i.idKho).includes(t);
-  });
 
   return <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
     <div style={{ ...card, padding: '20px 24px' }}>
@@ -48,8 +74,8 @@ const KhoThuocTab = ({ thuocMap }) => {
           position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)',
           color: '#9ca3af', fontSize: '20px'
         }}>search</span>
-        <input type="text" placeholder="Tìm theo mã thuốc, tên thuốc..." value={search}
-          onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder="Tìm theo mã thuốc, tên thuốc..." value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
           style={{
             width: '100%', paddingLeft: '38px', paddingRight: '12px', height: '40px',
             border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', outline: 'none'
@@ -73,9 +99,9 @@ const KhoThuocTab = ({ thuocMap }) => {
           <tbody>
             {loading
               ? <tr><td colSpan="6" style={{ ...td, textAlign: 'center', padding: '48px', color: '#9ca3af' }}>Đang tải...</td></tr>
-              : filtered.length === 0
+              : pagedItems.length === 0
                 ? <tr><td colSpan="6" style={{ ...td, textAlign: 'center', padding: '48px', color: '#9ca3af' }}>Không có dữ liệu.</td></tr>
-                : filtered.map(item => {
+                : pagedItems.map(item => {
                     const badge = stockBadge(item.soLuongTon);
                     return <tr key={item.idKho}
                       onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
@@ -101,6 +127,21 @@ const KhoThuocTab = ({ thuocMap }) => {
           </tbody>
         </table>
       </div>
+
+      {!loading && totalItems > 0 && (
+        <Pagination
+          mode="inline"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          label="loại thuốc"
+          visiblePages={visiblePages}
+          onPageChange={setCurrentPage}
+          jumpPage={jumpPage}
+          onJumpPage={handleJumpPage}
+          onJumpBlur={handleJumpPageBlur}
+        />
+      )}
     </div>
   </div>;
 };
