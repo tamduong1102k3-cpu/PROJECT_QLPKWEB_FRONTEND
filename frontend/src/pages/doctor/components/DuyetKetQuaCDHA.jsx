@@ -200,9 +200,9 @@ const DuyetKetQuaCDHA = ({
           Bệnh nhân này chưa có kết quả chỉ định chẩn đoán hình ảnh nào được tải lên.
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
           {/* LEFT: Main Content (4/5) */}
-          <div className="lg:col-span-4 space-y-5">
+          <div className="xl:col-span-4 space-y-5">
             {/* Patient Info + Service Selector */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -355,7 +355,7 @@ const DuyetKetQuaCDHA = ({
           </div>
 
           {/* RIGHT: Mini Sidebar (1/5) */}
-          <div className="lg:col-span-1 space-y-4">
+          <div className="xl:col-span-1 space-y-4">
             {/* Service Info */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
               <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Dịch vụ</h4>

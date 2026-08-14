@@ -79,8 +79,8 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
       )}
     </div>
 
-    <div style={{ ...card, overflow: 'hidden' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <div style={{ ...card, overflowX: 'auto' }}>
+      <table style={{ width: '100%', minWidth: '720px', borderCollapse: 'collapse' }}>
         <thead style={{ background: '#f9fafb' }}>
           <tr>
             <th style={th}>Tên Thuốc / Hoạt Chất</th>

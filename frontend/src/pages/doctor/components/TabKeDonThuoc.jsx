@@ -13,15 +13,15 @@ const isOutOfStock = (tonKho) => {
 
 const getStockBadge = (med) => {
   if (isOutOfStock(med.tonKho)) {
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-full border border-red-200">Hết hàng</span>;
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full border border-red-200">Hết hàng</span>;
   }
   if (med.tonKho < 20) {
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded-full border border-orange-200">Tồn: {med.tonKho}</span>;
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full border border-orange-200">Tồn: {med.tonKho}</span>;
   }
   if (med.tonKho <= 50) {
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full border border-amber-200">Tồn: {med.tonKho}</span>;
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full border border-amber-200">Tồn: {med.tonKho}</span>;
   }
-  return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200">Tồn: {med.tonKho}</span>;
+  return <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">Tồn: {med.tonKho}</span>;
 };
 
 const getExpiryBadge = (med) => {
@@ -51,10 +51,25 @@ const TabKeDonThuoc = ({
   isAssistant,
   selectedPatient,
   user,
-  readOnly
+  readOnly,
+  prescriptionSavedAt
 }) => {
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 animate-fade-in min-h-[500px] flex flex-col w-full">
+      {prescriptionSavedAt && selectedMeds.length > 0 && (
+        <div className="mb-5 flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 animate-fade-in">
+          <span className="w-10 h-10 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-md shadow-emerald-200 shrink-0">
+            <span className="material-symbols-outlined text-[18px]">check</span>
+          </span>
+          <div className="flex-1">
+            <p className="text-emerald-800 font-bold text-sm">Đã lưu toa thuốc thành công</p>
+            <p className="text-emerald-600 text-xs mt-0.5">
+              Toa thuốc đã được lưu vào hệ thống lúc {new Date(prescriptionSavedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày {new Date(prescriptionSavedAt).toLocaleDateString('vi-VN')}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-xl font-bold text-gray-800">Kê đơn thuốc</h3>
@@ -155,8 +170,19 @@ const TabKeDonThuoc = ({
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-2">
                   <h4 className="font-bold text-gray-800">{idx + 1}. {m.tenThuoc} ({m.hoatChat})</h4>
+                  {m.isSaved ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 whitespace-nowrap">
+                      <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                      Đã lưu
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-full border border-amber-200 whitespace-nowrap">
+                      <span className="material-symbols-outlined text-[12px]">schedule</span>
+                      Đã thêm vào danh sách - Chưa lưu
+                    </span>
+                  )}
                   {m.tonKho !== undefined && (
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                       m.tonKho <= 0 ? 'bg-red-100 text-red-700' : 
                       m.tonKho < 20 ? 'bg-orange-100 text-orange-700' :
                       m.tonKho <= 50 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
@@ -182,7 +208,6 @@ const TabKeDonThuoc = ({
                     type="text" 
                     value={m.lieuDung || ''} 
                     onChange={(e) => onUpdateMedField(m.maThuoc, 'lieuDung', e.target.value)}
-                    onBlur={() => handleSavePrescription(true)}
                     placeholder="VD: 1 viên/lần"
                     className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
                     disabled={readOnly}
@@ -194,7 +219,6 @@ const TabKeDonThuoc = ({
                     type="text" 
                     value={m.cachDung || ''} 
                     onChange={(e) => onUpdateMedField(m.maThuoc, 'cachDung', e.target.value)}
-                    onBlur={() => handleSavePrescription(true)}
                     placeholder="VD: Uống sau ăn"
                     className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
                     disabled={readOnly}
@@ -206,7 +230,6 @@ const TabKeDonThuoc = ({
                     type="text" 
                     value={m.thoiDiemDung || ''} 
                     onChange={(e) => onUpdateMedField(m.maThuoc, 'thoiDiemDung', e.target.value)}
-                    onBlur={() => handleSavePrescription(true)}
                     placeholder="VD: Sau bữa ăn sáng"
                     className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
                     disabled={readOnly}
@@ -221,7 +244,6 @@ const TabKeDonThuoc = ({
                       type="text" 
                       value={m[time] || ''} 
                       onChange={(e) => onUpdateMedField(m.maThuoc, time, e.target.value)}
-                      onBlur={() => handleSavePrescription(true)}
                       className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
                       disabled={readOnly}
                     />
@@ -233,7 +255,6 @@ const TabKeDonThuoc = ({
                     type="number" 
                     value={m.soNgay || ''} 
                     onChange={(e) => onUpdateMedField(m.maThuoc, 'soNgay', parseInt(e.target.value) || '')}
-                    onBlur={() => handleSavePrescription(true)}
                     className="w-full p-2 bg-gray-50 border rounded-lg text-sm" 
                     disabled={readOnly}
                   />

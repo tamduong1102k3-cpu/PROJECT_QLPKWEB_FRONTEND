@@ -49,10 +49,10 @@ const DangNhap = ({ onForgotPassword, onLoginSuccess }) => {
 
       <div className="w-full max-w-[850px] z-10 px-6 animate-fade-in">
         {/* Card thiết kế Rộng & Thấp (Side-by-side) */}
-        <div className="bg-white/95 backdrop-blur-2xl rounded-[45px] shadow-[0_40px_100px_rgba(0,0,0,0.08)] border border-white overflow-hidden flex flex-col md:flex-row min-h-[460px]">
+        <div className="bg-white/95 backdrop-blur-2xl rounded-[45px] shadow-[0_40px_100px_rgba(0,0,0,0.08)] border border-white overflow-hidden flex flex-col xl:flex-row min-h-[460px]">
           
           {/* CỘT TRÁI: Thương hiệu (Cực kỳ tối giản) */}
-          <div className="md:w-5/12 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-700 p-12 flex flex-col justify-center items-center text-white relative">
+          <div className="xl:w-5/12 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-700 p-12 flex flex-col justify-center items-center text-white relative">
             {/* Họa tiết chìm */}
             <div className="absolute inset-0 opacity-10 pointer-events-none overflow-hidden">
               <div className="absolute top-[-10%] left-[-10%] w-40 h-40 rounded-full border-[15px] border-white" />
@@ -68,7 +68,7 @@ const DangNhap = ({ onForgotPassword, onLoginSuccess }) => {
           </div>
 
           {/* CỘT PHẢI: Form đăng nhập */}
-          <div className="md:w-7/12 p-12 flex flex-col justify-center bg-white">
+          <div className="xl:w-7/12 p-12 flex flex-col justify-center bg-white">
             <div className="mb-10">
               <h1 className="text-3xl font-black text-slate-800 tracking-tight">Đăng nhập hệ thống</h1>
               <div className="h-1.5 w-16 bg-blue-500 rounded-full mt-3"></div>

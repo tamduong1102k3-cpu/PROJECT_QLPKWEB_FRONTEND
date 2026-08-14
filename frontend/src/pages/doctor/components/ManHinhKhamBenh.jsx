@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNotification } from '../../../components/NotificationContext';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import { getAllApi as _getDichVuAllApi } from '../../../api/dichVuApi';
-import { 
-  getByBenhNhanApi as _getPhieuChiDinhByBenhNhanApi, 
+import {
+  getByBenhNhanApi as _getPhieuChiDinhByBenhNhanApi,
   getDetailsApi as _getPhieuChiDinhDetailsApi,
   getByPhieuKhamApi as _getPhieuChiDinhByPhieuKhamApi,
   createApi as _createPhieuChiDinhApi,
@@ -11,18 +11,19 @@ import {
   getCdhaResultsByPhieuKhamApi
 } from '../../../api/phieuChiDinhApi';
 import { getAllThuocApi as _getAllThuocApi, getKhoCanhBaoApi } from '../../../api/khoThuocApi';
-import { 
-  getByBenhNhanApi as _getToaThuocByBenhNhanApi, 
+import {
+  getByBenhNhanApi as _getToaThuocByBenhNhanApi,
   getDetailsApi as _getToaThuocDetailsApi,
   getByPhieuKhamApi as _getToaThuocByPhieuKhamApi,
-  createApi as _createToaThuocApi
+  createApi as _createToaThuocApi,
+  deleteToaByPhieuKhamApi as _deleteToaByPhieuKhamApi
 } from '../../../api/toaThuocApi';
-import { 
+import {
   getByBenhNhanApi as _getKhamLamSangByBenhNhanApi,
   getByPhieuKhamApi as _getKhamLamSangByPhieuKhamApi
 } from '../../../api/khamLamSangApi';
 import { getByPhieuKhamApi as _getChiSoKhamByPhieuKhamApi } from '../../../api/chiSoKhamTongHopApi';
-import { 
+import {
   finishConsultationApi as _finishKhamApi,
   updateToClsApi as _updateToClsApi,
   getPatientHistoryApi as _getPatientHistoryApi
@@ -43,7 +44,7 @@ import TabHenTaiKham from './TabHenTaiKham';
 
 const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQueue }) => {
   const { showSuccess, showError, showWarning } = useNotification();
-  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
+  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, type: 'primary', icon: '' });
   // Mã chuyên khoa: 1: Nội tổng quát, 3: Nhi khoa, 4: TMH, 5: RHM, 11: Tim mạch
   const isTmhDoc = Number(user?.maChuyenKhoa) === 4;
   const isRhmDoc = Number(user?.maChuyenKhoa) === 5;
@@ -51,7 +52,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const isNhiDoc = Number(user?.maChuyenKhoa) === 3;
 
   const [examSubTab, setExamSubTab] = useState('info');
-  
+
   const [paraclinicalResults, setParaclinicalResults] = useState({
     lab: [],
     imaging: []
@@ -67,6 +68,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const [showMedList, setShowMedList] = useState(false);
   const [prescriptionHistory, setPrescriptionHistory] = useState([]);
   const [examHistory, setExamHistory] = useState([]);
+  const [prescriptionSavedAt, setPrescriptionSavedAt] = useState(null);
 
   // TMH/RHM exam data (loaded from chiSoKhamTongHopApi) - shared with TabKhamTMH / TabKhamRHM
   const [examData, setExamData] = useState({
@@ -126,15 +128,24 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const selectedMedsRef = useRef([]);
   useEffect(() => {
     selectedMedsRef.current = selectedMeds;
+    // Khi xóa sạch danh sách thuốc, reset trạng thái đã lưu để ẩn banner
+    if (selectedMeds.length === 0) {
+      setPrescriptionSavedAt(null);
+    }
   }, [selectedMeds]);
 
   // Fetch initial info for selected patient
   useEffect(() => {
     if (selectedPatient) {
-      // Reset lists
+      // Reset lists when patient changes
       setSelectedServices([]);
       setSelectedMeds([]);
+      setPrescriptionSavedAt(null);
+    }
+  }, [selectedPatient]);
 
+  useEffect(() => {
+    if (selectedPatient) {
       if (selectedPatient.maPhieuKham) {
         // Tải dịch vụ đã chỉ định
         _getPhieuChiDinhByPhieuKhamApi(selectedPatient.maPhieuKham)
@@ -163,8 +174,8 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
             }
           })
           .catch(e => console.error("Lỗi tải dịch vụ:", e));
-        
-        // Tải đơn thuốc đã kê
+
+        // Tải đơn thuốc đã kê (chỉ khi bác sĩ chưa đang chỉnh sửa để tránh ghi đè trạng thái "chưa lưu")
         _getToaThuocByPhieuKhamApi(selectedPatient.maPhieuKham)
           .then(async toasList => {
             if (toasList && toasList.length > 0) {
@@ -174,6 +185,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
                 if (details) {
                   for (const d of details) {
                     if (!loadedMeds.some(m => m.maThuoc === d.maThuoc)) {
+                      const existing = selectedMedsRef.current.find(m => m.maThuoc === d.maThuoc);
                       const catalogMed = allMeds.find(m => m.maThuoc === d.maThuoc);
                       loadedMeds.push({
                         maThuoc: d.maThuoc,
@@ -187,13 +199,19 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
                         soNgay: d.soNgay || 1,
                         cachDung: d.cachDung || '',
                         thoiDiemDung: d.thoiDiemDung || '',
-                        lieuDung: d.lieuDung || ''
+                        lieuDung: d.lieuDung || '',
+                        tonKho: catalogMed?.tonKho,
+                        // Giữ nguyên trạng thái đã lưu/chưa lưu hiện tại nếu có, mặc định là đã lưu (toa từ server)
+                        isSaved: existing ? existing.isSaved : true
                       });
                     }
                   }
                 }
               }
-              setSelectedMeds(loadedMeds);
+              // Chỉ ghi đè danh sách nếu bác sĩ chưa thêm/sửa gì trong phiên này
+              if (selectedMedsRef.current.length === 0) {
+                setSelectedMeds(loadedMeds);
+              }
             }
           })
           .catch(e => console.error("Lỗi tải đơn thuốc:", e));
@@ -280,7 +298,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           let details = [];
           try {
             details = await _getPhieuChiDinhDetailsApi(p.maPhieuChiDinh);
-          } catch (e) {}
+          } catch (e) { }
           return {
             ...p,
             details
@@ -357,7 +375,13 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
         const khoMap = {};
         if (khoData) {
           khoData.forEach(k => {
-            khoMap[k.maThuoc] = { tonKho: k.soLuongTon, trangThai: k.trangThai };
+            // tonKho = số lượng tồn khả dụng = soLuongTon - soLuongDaGiu
+            const soLuongDaGiu = k.soLuongDaGiu || 0;
+            khoMap[k.maThuoc] = {
+              tonKho: (k.soLuongTon || 0) - soLuongDaGiu,
+              soLuongDaGiu,
+              trangThai: k.trangThai
+            };
           });
         }
         const enrichedMeds = thuocData.map(m => ({
@@ -381,7 +405,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           let details = [];
           try {
             details = await _getToaThuocDetailsApi(t.maToaThuoc);
-          } catch (e) {}
+          } catch (e) { }
           return {
             ...t,
             details
@@ -456,6 +480,9 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       };
       await _createToaThuocApi(payload);
       if (!silent) {
+        // Chỉ khi nhấn nút LƯU ĐƠN THUỐC chính thức thì hiển thị banner đã lưu và đánh dấu tất cả thuốc đã lưu
+        setPrescriptionSavedAt(new Date());
+        setSelectedMeds(prev => prev.map(m => ({ ...m, isSaved: true })));
         showSuccess("Đã cập nhật đơn thuốc thành công!");
       }
       fetchPrescriptionHistory();
@@ -469,7 +496,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     }
   };
 
-  const handleAddMed = med => {
+  const handleAddMed = async med => {
     if (selectedMeds.find(m => m.maThuoc === med.maThuoc)) {
       showWarning("Thuốc này đã có trong đơn!");
       return;
@@ -483,21 +510,48 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       soNgay: 3,
       cachDung: 'Uống sau ăn',
       thoiDiemDung: 'Sáng, Tối',
-      lieuDung: 'Ngày uống 2 lần'
+      lieuDung: 'Ngày uống 2 lần',
+      isSaved: false
     }];
     setSelectedMeds(newMeds);
     setShowMedList(false);
     setMedSearch('');
-    handleSavePrescription(true, newMeds);
+    // Lưu ngay để backend cập nhật soLuongDaGiu (số lượng giữ)
+    await handleSavePrescription(true, newMeds);
+    fetchMeds();
   };
 
-  const handleSetSelectedMeds = newMeds => {
-    setSelectedMeds(newMeds);
-    handleSavePrescription(true, newMeds);
+  const handleSetSelectedMeds = async newMeds => {
+    // Khi xóa/thay đổi danh sách, đánh dấu các thuốc còn lại chưa lưu
+    const updatedMeds = newMeds.map(m => ({ ...m, isSaved: false })) || [];
+    setSelectedMeds(updatedMeds);
+    // Nếu xóa sạch -> xóa toa server để hoàn lại toàn bộ số lượng đã giữ
+    if (updatedMeds.length === 0) {
+      try {
+        await _deleteToaByPhieuKhamApi(selectedPatient.maPhieuKham);
+        setPrescriptionSavedAt(null);
+      } catch (e) {
+        console.error("Lỗi xóa toa:", e);
+      }
+    } else {
+      // Còn thuốc -> lưu lại để backend cập nhật đúng soLuongDaGiu
+      await handleSavePrescription(true, updatedMeds);
+    }
+    fetchMeds();
   };
 
   const handleUpdateMedField = (maThuoc, field, value) => {
-    setSelectedMeds(prev => prev.map(m => m.maThuoc === maThuoc ? { ...m, [field]: value } : m));
+    setSelectedMeds(prev => prev.map(m => {
+      if (m.maThuoc !== maThuoc) return m;
+      const updated = { ...m, [field]: value, isSaved: false };
+      // Các trường ảnh hưởng số lượng giữ -> lưu ngay để cập nhật soLuongDaGiu
+      if (['sang', 'trua', 'chieu', 'toi', 'soNgay'].includes(field)) {
+        const newMeds = selectedMedsRef.current.map(x => x.maThuoc === maThuoc ? updated : x);
+        handleSavePrescription(true, newMeds);
+        fetchMeds();
+      }
+      return updated;
+    }));
   };
 
   // Sao chép toa thuốc cũ vào toa đang kê (từ lịch sử khám), rồi chuyển sang tab Kê đơn
@@ -522,12 +576,12 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
         thoiDiemDung: m.thoiDiemDung || 'Sáng, Tối',
         lieuDung: m.lieuDung || 'Ngày uống 2 lần',
         tonKho: catalogMed?.tonKho ?? (m.tonKho ?? 0),
-        trangThaiKho: catalogMed?.trangThaiKho || (m.trangThaiKho || 'BÌNH_THƯỜNG')
+        trangThaiKho: catalogMed?.trangThaiKho || (m.trangThaiKho || 'BÌNH_THƯỜNG'),
+        isSaved: false
       };
     });
     // Thay thế danh sách thuốc đang kê bằng toa cũ
     setSelectedMeds(copiedMeds);
-    handleSavePrescription(true, copiedMeds);
     setExamSubTab('prescription');
     showSuccess(`Đã sao chép ${copiedMeds.length} thuốc từ toa cũ vào đơn kê. Bạn có thể chỉnh sửa trước khi lưu.`);
   };
@@ -546,16 +600,16 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   // Save specialty exam data (TMH, RHM, TimMach, Nhi) before finishing
   const saveSpecialtyExamData = async () => {
     if (!selectedPatient?.maPhieuKham) return true;
-    
+
     const isSpecialtyDoc = isTmhDoc || isRhmDoc || isCardiologyDoc || isNhiDoc;
     if (!isSpecialtyDoc) return true; // Not a specialist, skip
 
     // Check if specialty fields have any data entered
     const hasAnySpecialtyData = Object.entries(examData).some(([key, val]) => {
-      if (key === 'nhietDo' || key === 'nhipTim' || key === 'nhipTho' || 
-          key === 'huyetApTamThu' || key === 'huyetApTamTruong' || 
-          key === 'canNang' || key === 'chieuCao' || key === 'spo2' || 
-          key === 'vongDau' || key === 'ghiChu') return false;
+      if (key === 'nhietDo' || key === 'nhipTim' || key === 'nhipTho' ||
+        key === 'huyetApTamThu' || key === 'huyetApTamTruong' ||
+        key === 'canNang' || key === 'chieuCao' || key === 'spo2' ||
+        key === 'vongDau' || key === 'ghiChu') return false;
       return val && val.toString().trim() !== '';
     });
 
@@ -651,6 +705,22 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
                   </span>
                 </>
               )}
+              {selectedPatient.diUngThuoc && (
+                <>
+                  <span>•</span>
+                  <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-md max-w-[200px] truncate" title={`Dị ứng: ${selectedPatient.diUngThuoc}`}>
+                    ⚠️ Dị ứng: {selectedPatient.diUngThuoc}
+                  </span>
+                </>
+              )}
+              {selectedPatient.tienSuBenh && (
+                <>
+                  <span>•</span>
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md max-w-[200px] truncate" title={`Tiền sử bệnh: ${selectedPatient.tienSuBenh}`}>
+                    🏥 Tiền sử: {selectedPatient.tienSuBenh}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -674,7 +744,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
         </div>
       </div>
 
-      <div className="flex p-1 bg-white rounded-xl border border-gray-100 shadow-sm w-fit overflow-x-auto">
+      <div className="flex p-1 bg-white rounded-xl border border-gray-100 shadow-sm w-full overflow-x-auto">
         {[
           { id: 'info', label: 'Thông Tin Khám', icon: 'description' },
           ...(isTmhDoc ? [{ id: 'tmh_info', label: 'Khám Tai Mũi Họng', icon: 'hearing' }] : []),
@@ -687,10 +757,10 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           { id: 'prescription', label: 'Kê Đơn Thuốc', icon: 'medication' },
           { id: 'appointment', label: 'Hẹn Khám', icon: 'calendar_month' }
         ].map(t => (
-          <button 
-            key={t.id} 
-            onClick={() => handleTabChange(t.id)} 
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${examSubTab === t.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-500 hover:bg-gray-50'}`}
+          <button
+            key={t.id}
+            onClick={() => handleTabChange(t.id)}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${examSubTab === t.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-500 hover:bg-gray-50'}`}
           >
             <span className="material-symbols-outlined text-sm">{t.icon}</span>
             {t.label}
@@ -698,10 +768,10 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 min-w-0">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+        <div className="xl:col-span-8 min-w-0">
           <div style={{ display: examSubTab === 'info' ? 'block' : 'none' }}>
-            <TabKhamLamSang 
+            <TabKhamLamSang
               selectedPatient={selectedPatient}
               user={user}
               ref={tabKhamLamSangRef}
@@ -709,7 +779,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           </div>
 
           {examSubTab === 'tmh_info' && (
-            <TabKhamTMH 
+            <TabKhamTMH
               examData={examData}
               setExamData={setExamData}
               maPhieuKham={selectedPatient.maPhieuKham}
@@ -717,7 +787,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           )}
 
           {examSubTab === 'rhm_info' && (
-            <TabKhamRHM 
+            <TabKhamRHM
               examData={examData}
               setExamData={setExamData}
               maPhieuKham={selectedPatient.maPhieuKham}
@@ -725,7 +795,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           )}
 
           {examSubTab === 'cardio_info' && (
-            <TabKhamTimMach 
+            <TabKhamTimMach
               examData={examData}
               setExamData={setExamData}
               maPhieuKham={selectedPatient.maPhieuKham}
@@ -733,7 +803,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           )}
 
           {examSubTab === 'nhi_info' && (
-            <TabKhamNhi 
+            <TabKhamNhi
               examData={examData}
               setExamData={setExamData}
               maPhieuKham={selectedPatient.maPhieuKham}
@@ -743,17 +813,17 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           {examSubTab === 'results' && <TabKetQuaCLS maPhieuKham={selectedPatient.maPhieuKham} />}
 
           {examSubTab === 'services' && (
-            <TabDichVuChiDinh 
-              serviceSearch={serviceSearch} 
-              setServiceSearch={setServiceSearch} 
-              showServiceList={showServiceList} 
-              setShowServiceList={setShowServiceList} 
-              allServices={allServices} 
-              handleAddService={handleAddService} 
-              handleRemoveService={handleRemoveService} 
-              handleSaveReferral={handleSaveReferral} 
-              selectedServices={selectedServices} 
-              setSelectedServices={setSelectedServices} 
+            <TabDichVuChiDinh
+              serviceSearch={serviceSearch}
+              setServiceSearch={setServiceSearch}
+              showServiceList={showServiceList}
+              setShowServiceList={setShowServiceList}
+              allServices={allServices}
+              handleAddService={handleAddService}
+              handleRemoveService={handleRemoveService}
+              handleSaveReferral={handleSaveReferral}
+              selectedServices={selectedServices}
+              setSelectedServices={setSelectedServices}
               selectedPatient={selectedPatient}
               user={user}
             />
@@ -769,17 +839,18 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           )}
 
           {examSubTab === 'prescription' && (
-            <TabKeDonThuoc 
-              medSearch={medSearch} 
-              setMedSearch={setMedSearch} 
-              showMedList={showMedList} 
-              setShowMedList={setShowMedList} 
-              allMeds={allMeds} 
-              handleAddMed={handleAddMed} 
-              handleSavePrescription={handleSavePrescription} 
-              selectedMeds={selectedMeds} 
-              setSelectedMeds={handleSetSelectedMeds} 
+            <TabKeDonThuoc
+              medSearch={medSearch}
+              setMedSearch={setMedSearch}
+              showMedList={showMedList}
+              setShowMedList={setShowMedList}
+              allMeds={allMeds}
+              handleAddMed={handleAddMed}
+              handleSavePrescription={handleSavePrescription}
+              selectedMeds={selectedMeds}
+              setSelectedMeds={handleSetSelectedMeds}
               onUpdateMedField={handleUpdateMedField}
+              prescriptionSavedAt={prescriptionSavedAt}
             />
           )}
 
@@ -788,7 +859,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           )}
         </div>
 
-        <div className="lg:col-span-4 space-y-6">
+        <div className="xl:col-span-4 space-y-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Chỉ Số Sinh Hiệu</h3>
             <HienThiSinhHieu phieuKhamId={selectedPatient.maPhieuKham} />

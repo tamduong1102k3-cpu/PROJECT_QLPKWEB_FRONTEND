@@ -87,8 +87,8 @@ const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
         </h3>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-7 space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+        <div className="xl:col-span-7 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border">
             <div>
               <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Sâu răng</label>
@@ -163,7 +163,7 @@ const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
           </div>
         </div>
 
-        <div className="lg:col-span-5 space-y-6">
+        <div className="xl:col-span-5 space-y-6">
           <div className="bg-slate-900 p-5 rounded-2xl shadow-xl border border-slate-800">
             <h4 className="font-bold text-white mb-4 text-sm uppercase">Sơ Đồ Răng (Odontogram)</h4>
             <div className="overflow-x-auto pb-2">

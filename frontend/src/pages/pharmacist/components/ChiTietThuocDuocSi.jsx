@@ -97,6 +97,14 @@ const ChiTietThuocDuocSi = ({ patient, onBack, formatCurrency, formatDateTime })
         </span>
       );
     }
+    if (trangThai === 'HET_HAN_NHAN_THUOC') {
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-500 text-xs font-bold rounded-lg border border-gray-200">
+          <span className="material-symbols-outlined text-[14px]">schedule</span>
+          Hết hạn nhận thuốc
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg border border-amber-200">
         <span className="material-symbols-outlined text-[14px]">pending</span>
@@ -111,7 +119,8 @@ const ChiTietThuocDuocSi = ({ patient, onBack, formatCurrency, formatDateTime })
 
   const totalPrescriptions = prescriptions.length;
   const capXongCount = prescriptions.filter(p => p.trangThai === 'DA_CAP_THUOC').length;
-  const dangChoCount = totalPrescriptions - capXongCount;
+  const hetHanCount = prescriptions.filter(p => p.trangThai === 'HET_HAN_NHAN_THUOC').length;
+  const dangChoCount = totalPrescriptions - capXongCount - hetHanCount;
 
   return (
     <div className="animate-fade-in">
@@ -229,7 +238,7 @@ const ChiTietThuocDuocSi = ({ patient, onBack, formatCurrency, formatDateTime })
                 </p>
               </div>
             </div>
-            {toa.trangThai !== 'DA_CAP_THUOC' && (
+            {toa.trangThai !== 'DA_CAP_THUOC' && toa.trangThai !== 'HET_HAN_NHAN_THUOC' && (
               <button
                 onClick={() => handleXacNhanCapThuoc(toa.maToaThuoc)}
                 disabled={confirming === toa.maToaThuoc}
@@ -256,6 +265,12 @@ const ChiTietThuocDuocSi = ({ patient, onBack, formatCurrency, formatDateTime })
               <span className="text-xs text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg font-medium inline-flex items-center gap-1">
                 <span className="material-symbols-outlined text-[16px]">task_alt</span>
                 Hoàn thành
+              </span>
+            )}
+            {toa.trangThai === 'HET_HAN_NHAN_THUOC' && (
+              <span className="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg font-medium inline-flex items-center gap-1">
+                <span className="material-symbols-outlined text-[16px]">schedule</span>
+                Quá hạn - đã giải phóng thuốc
               </span>
             )}
           </div>
