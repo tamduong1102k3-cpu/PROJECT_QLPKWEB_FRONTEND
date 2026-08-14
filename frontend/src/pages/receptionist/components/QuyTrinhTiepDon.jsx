@@ -468,7 +468,8 @@ const QuyTrinhTiepDon = ({
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
             width: '480px',
             maxWidth: 'calc(100vw - 32px)',
-            overflow: 'hidden',
+            maxHeight: 'calc(100vh - 32px)',
+            overflowY: 'auto',
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
@@ -477,22 +478,22 @@ const QuyTrinhTiepDon = ({
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-primary to-indigo-600 p-6 text-white text-center">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="material-symbols-outlined text-4xl">print</span>
+          <div className="bg-gradient-to-r from-primary to-indigo-600 p-4 sm:p-6 text-white text-center flex-shrink-0">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
+              <span className="material-symbols-outlined text-3xl sm:text-4xl">print</span>
             </div>
-            <h2 className="text-2xl font-black mb-1">TIẾP ĐÓN THÀNH CÔNG</h2>
+            <h2 className="text-xl sm:text-2xl font-black mb-1">TIẾP ĐÓN THÀNH CÔNG</h2>
             <p className="text-white/80 text-sm">Phiếu đăng ký khám bệnh</p>
           </div>
 
           {/* Số thứ tự */}
-          <div className="px-6 py-6 text-center border-b border-gray-100">
+          <div className="px-4 py-4 sm:px-6 sm:py-6 text-center border-b border-gray-100 flex-shrink-0">
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Số Thứ Tự</p>
-            <div className="text-6xl font-black text-primary">#{printData.soThuTu}</div>
+            <div className="text-5xl sm:text-6xl font-black text-primary">#{printData.soThuTu}</div>
           </div>
 
           {/* Thông tin chi tiết */}
-          <div className="p-6 space-y-4">
+          <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
             <div className="flex justify-between items-center pb-3 border-b border-gray-50">
               <span className="text-sm text-gray-500">Bệnh nhân</span>
               <span className="text-sm font-bold text-gray-800">{printData.benhNhan.hoTen}</span>
@@ -532,19 +533,19 @@ const QuyTrinhTiepDon = ({
           </div>
 
           {/* Nút hành động */}
-          <div className="p-6 pt-0 flex gap-3">
+          <div className="p-4 pt-0 sm:p-6 sm:pt-0 flex gap-3 flex-shrink-0">
             <button
               onClick={() => {
                 setShowPrintModal(false);
                 onSuccess();
               }}
-              className="flex-1 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl hover:bg-gray-200 transition-all"
+              className="flex-1 py-3 sm:py-4 text-sm sm:text-base bg-gray-100 text-gray-600 font-bold rounded-2xl hover:bg-gray-200 transition-all"
             >
               Đóng
             </button>
             <InPhieuTiepDon
               printData={printData}
-              className="flex-1 py-4 bg-primary text-white font-black rounded-2xl hover:bg-primary-dark shadow-lg shadow-primary/20 transition-all"
+              className="flex-1 py-3 sm:py-4 text-sm sm:text-base bg-primary text-white font-black rounded-2xl hover:bg-primary-dark shadow-lg shadow-primary/20 transition-all"
             />
           </div>
         </div>

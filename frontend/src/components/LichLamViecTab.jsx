@@ -210,26 +210,26 @@ export default function LichLamViecTab({ user }) {
             {/* WEEK VIEW */}
             {!loading && !error && (
               <div className="animate-fade-in-scale overflow-x-auto custom-scroll">
-                <div className="grid grid-cols-7 gap-4 min-w-[1400px]">
+                <div className="grid grid-cols-7 gap-2 min-w-[900px]">
                   {groupedByDay.map((day, dayIdx) => (
                     <div
                       key={day.key}
                       className={`glass-card rounded-3xl overflow-hidden flex flex-col hover:shadow-lg transition-all duration-300 group ${day.isToday ? 'ring-2 ring-blue-500/30' : ''}`}
                       style={{ animationDelay: `${dayIdx * 0.05}s` }}
                     >
-                      <div className={`px-4 py-3.5 border-b flex items-center justify-between ${day.isToday ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white' : 'bg-slate-50/80'}`}>
+                      <div className={`px-2 py-2 border-b flex items-center justify-between ${day.isToday ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white' : 'bg-slate-50/80'}`}>
                         <div>
-                          <p className={`text-[10px] font-bold uppercase ${day.isToday ? 'text-blue-100' : 'text-slate-400'}`}>{day.label}</p>
-                          <p className={`text-xl font-extrabold ${day.isToday ? 'text-white' : (day.isWeekend ? 'text-rose-500' : 'text-slate-800')}`}>{day.dateObj.getDate()}</p>
+                          <p className={`text-[9px] font-bold uppercase ${day.isToday ? 'text-blue-100' : 'text-slate-400'}`}>{day.label}</p>
+                          <p className={`text-base font-extrabold ${day.isToday ? 'text-white' : (day.isWeekend ? 'text-rose-500' : 'text-slate-800')}`}>{day.dateObj.getDate()}</p>
                         </div>
-                        {day.isToday && <span className="px-2 py-1 rounded-lg bg-white/20 text-[9px] font-bold uppercase">Hôm nay</span>}
+                        {day.isToday && <span className="px-1.5 py-0.5 rounded-lg bg-white/20 text-[8px] font-bold uppercase">Hôm nay</span>}
                       </div>
 
-                      <div className="flex-1 p-2.5 space-y-2 min-h-[240px]">
+                      <div className="flex-1 p-1.5 space-y-1.5 min-h-[120px]">
                         {day.shifts.length === 0 ? (
                           <div className="h-full flex flex-col items-center justify-center gap-1 text-slate-300 border-2 border-dashed border-slate-100 rounded-2xl">
-                            <span className="material-symbols-outlined text-[20px]">event_busy</span>
-                            <p className="text-[10px] font-medium">Nghỉ</p>
+                            <span className="material-symbols-outlined text-[16px]">event_busy</span>
+                            <p className="text-[9px] font-medium">Nghỉ</p>
                           </div>
                         ) : (
                           day.shifts.map((shift, idx) => {
@@ -238,10 +238,10 @@ export default function LichLamViecTab({ user }) {
                               <button
                                 key={idx}
                                 onClick={() => setSelectedShift(shift)}
-                                className={`w-full text-left rounded-2xl p-3 text-white transition-transform hover:-translate-y-1 bg-gradient-to-br ${style.gradient} shadow-sm`}
+                                className={`w-full text-left rounded-xl p-2 text-white transition-transform hover:-translate-y-1 bg-gradient-to-br ${style.gradient} shadow-sm`}
                               >
-                                <p className="text-[13px] font-extrabold mb-2 truncate">{shift.phong || 'Phòng trực'}</p>
-                                <div className="inline-flex items-center gap-1 bg-black/10 px-2 py-0.5 rounded-lg text-[10px] font-bold">
+                                <p className="text-[11px] font-extrabold mb-1 truncate">{shift.phong || 'Phòng trực'}</p>
+                                <div className="inline-flex items-center gap-1 bg-black/10 px-1.5 py-0.5 rounded-lg text-[9px] font-bold">
                                   <span className="material-symbols-outlined text-[12px]">schedule</span>
                                   {shift.gioLam} - {shift.gioKetThuc}
                                 </div>
