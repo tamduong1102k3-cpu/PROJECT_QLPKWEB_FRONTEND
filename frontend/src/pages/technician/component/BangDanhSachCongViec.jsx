@@ -176,8 +176,8 @@ const BangDanhSachCongViec = ({
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-[11px]">
               <th className="py-5 px-6 w-16">STT</th>
               <th className="py-5 px-6">Bệnh nhân</th>
-              <th className="py-5 px-6">SĐT</th>
-              <th className="py-5 px-6">CCCD</th>
+              <th className="py-5 px-6 hidden lg:table-cell">SĐT</th>
+              <th className="py-5 px-6 hidden xl:table-cell">CCCD</th>
               <th className="py-5 px-6">Dịch vụ</th>
               <th className="py-5 px-6 text-center w-56">Thao tác</th>
             </tr>
@@ -221,10 +221,10 @@ const BangDanhSachCongViec = ({
                     </div>
                   </div>
                 </td>
-                <td className="py-4 px-6">
+                <td className="py-4 px-6 hidden lg:table-cell">
                   <span className="font-bold text-slate-700">{item.soDienThoai || item.sdt || '-'}</span>
                 </td>
-                <td className="py-4 px-6">
+                <td className="py-4 px-6 hidden xl:table-cell">
                   <span className="font-bold text-slate-700">{item.cccd || '-'}</span>
                 </td>
                 <td className="py-4 px-6">
@@ -235,7 +235,7 @@ const BangDanhSachCongViec = ({
                 </td>
                 <td className="py-4 px-6 text-center">
                   {worklistTab === 'pending' ? (
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex flex-col items-center justify-center gap-1.5">
                       {item.trangThai === 'VANG_MAT' ? (
                         <button 
                           onClick={() => {
@@ -255,12 +255,12 @@ const BangDanhSachCongViec = ({
                                 onOpenVitals(item);
                               }
                             }} 
-                            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-indigo-600 shadow-md shadow-indigo-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
+                            className="w-full px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-indigo-600 shadow-md shadow-indigo-500/20 text-xs flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
                           >
                             <span className="material-symbols-outlined text-[18px]">stethoscope</span> KHÁM BỆNH
                           </button>
                           {onMarkAbsent && (
-                            <button onClick={() => setAbsentDropdown({ open: true, patient: item })} className="px-3 py-2.5 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center gap-1.5 transition-all">
+                            <button onClick={() => setAbsentDropdown({ open: true, patient: item })} className="w-full px-3 py-2 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center justify-center gap-1.5 transition-all">
                               <span className="material-symbols-outlined text-[18px]">person_off</span> VẮNG
                             </button>
                           )}
@@ -268,15 +268,15 @@ const BangDanhSachCongViec = ({
                       )}
                     </div>
                   ) : worklistTab === 'reception' ? (
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex flex-col items-center justify-center gap-1.5">
                       <button 
                         onClick={() => onAcceptPatient && onAcceptPatient(item)} 
-                        className="px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold rounded-xl hover:from-sky-600 hover:to-blue-700 shadow-md shadow-sky-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
+                        className="w-full px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold rounded-xl hover:from-sky-600 hover:to-blue-700 shadow-md shadow-sky-500/20 text-xs flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
                       >
                         <span className="material-symbols-outlined text-[18px]">stethoscope_arrow</span> KHÁM
                       </button>
                       {onMarkAbsent && (
-                        <button onClick={() => setAbsentDropdown({ open: true, patient: item })} className="px-3 py-2.5 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center gap-1.5 transition-all">
+                        <button onClick={() => setAbsentDropdown({ open: true, patient: item })} className="w-full px-3 py-2 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center justify-center gap-1.5 transition-all">
                           <span className="material-symbols-outlined text-[18px]">person_off</span> VẮNG
                         </button>
                       )}

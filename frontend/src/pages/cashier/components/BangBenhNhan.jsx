@@ -22,14 +22,14 @@ const BangBenhNhan = ({
       </div>
 
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-        <div className="flex gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/50 w-fit backdrop-blur-sm">
-          <button onClick={() => { setWorklistTab('pending'); setSelectedPatient(null); }} className={`flex-1 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'pending' ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-            <span>CHỜ THANH TOÁN</span>
-            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'pending' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{pendingCount}</span>
+        <div className="flex gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/50 w-fit backdrop-blur-sm">
+          <button onClick={() => { setWorklistTab('pending'); setSelectedPatient(null); }} className={`flex-1 flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-bold transition-all duration-300 ${worklistTab === 'pending' ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+<span className="whitespace-nowrap">Chờ thanh toán</span>
+            <span className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[9px] sm:text-[10px] font-black ${worklistTab === 'pending' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>{pendingCount}</span>
           </button>
-          <button onClick={() => { setWorklistTab('completed'); setSelectedPatient(null); }} className={`flex-1 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${worklistTab === 'completed' ? 'bg-white text-teal-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-            <span>ĐÃ THANH TOÁN</span>
-            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${worklistTab === 'completed' ? 'bg-teal-100 text-teal-700' : 'bg-slate-200 text-slate-600'}`}>{paidCount}</span>
+          <button onClick={() => { setWorklistTab('completed'); setSelectedPatient(null); }} className={`flex-1 flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-bold transition-all duration-300 ${worklistTab === 'completed' ? 'bg-white text-teal-700 shadow-sm ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+<span className="whitespace-nowrap">Đã thanh toán</span>
+            <span className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[9px] sm:text-[10px] font-black ${worklistTab === 'completed' ? 'bg-teal-100 text-teal-700' : 'bg-slate-200 text-slate-600'}`}>{paidCount}</span>
           </button>
         </div>
 

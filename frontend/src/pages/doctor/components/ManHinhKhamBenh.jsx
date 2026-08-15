@@ -476,7 +476,9 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           soNgay: m.soNgay || 1,
           cachDung: m.cachDung || 'Uống sau ăn',
           thoiDiemDung: m.thoiDiemDung || 'Sáng, Tối'
-        }))
+        })),
+        // Optimistic Check: gửi kèm version của từng thuốc (song song với chiTietList)
+        versionThuocList: targetMeds.map(m => m.version ?? null)
       };
       await _createToaThuocApi(payload);
       if (!silent) {
@@ -489,8 +491,20 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       return true;
     } catch (error) {
       console.error("Lỗi khi kê đơn thuốc:", error);
-      if (!silent) {
-        showError("Không thể lưu đơn thuốc: " + error.message);
+      const errorMsg = error.message || '';
+      const status = error.status || error.response?.status;
+      const isConflict = status === 409
+        || errorMsg.includes('409')
+        || errorMsg.includes('người dùng khác cập nhật')
+        || errorMsg.includes('Vui lòng tải lại');
+      if (isConflict) {
+        // Thuốc đã bị thay đ giá/phiên bản -> tải lại danh sách thuốc mới nhất
+        fetchMeds();
+        if (!silent) {
+          showWarning('Danh sách thuốc đã được cập nhật. Vui lòng tải lại và chọn lại thuốc!');
+        }
+      } else if (!silent) {
+        showError("Không thể lưu đơn thuốc: " + errorMsg);
       }
       return false;
     }
@@ -769,7 +783,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <div className="xl:col-span-8 min-w-0">
+        <div className={`min-w-0 ${examSubTab === 'appointment' ? 'xl:col-span-12' : 'xl:col-span-8'}`}>
           <div style={{ display: examSubTab === 'info' ? 'block' : 'none' }}>
             <TabKhamLamSang
               selectedPatient={selectedPatient}
@@ -859,6 +873,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           )}
         </div>
 
+        {examSubTab !== 'appointment' && (
         <div className="xl:col-span-4 space-y-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Chỉ Số Sinh Hiệu</h3>
@@ -873,6 +888,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
             <p className="text-xs text-indigo-200 mt-3 font-medium opacity-90">Mã phiếu: #{selectedPatient.maPhieuKham}</p>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

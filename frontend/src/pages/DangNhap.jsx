@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { loginApi } from '../api/accountApi';
 import { useGlobalLoading } from '../components/LoadingContext';
+import { setAccessToken, cleanupLegacyTokens } from '../api/tokenStore';
 
 const DangNhap = ({ onForgotPassword, onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -23,10 +24,12 @@ const DangNhap = ({ onForgotPassword, onLoginSuccess }) => {
     try {
       const data = await loginApi({ identity, password });
       if (data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('refreshToken', data.refreshToken || '');
-        // Lưu mã nhân viên để sử dụng khi làm thủ tục tiếp đón,
-        // tránh phụ thuộc vào JWT decode (vì token refresh có thể mất maNhanVien)
+        // Access token -> memory (KHÔNG localStorage) để tránh XSS đánh cắp
+        setAccessToken(data.token);
+        // Refresh token (web) nằm trong HttpOnly cookie backend tự quản lý
+        // Xóa token cũ còn sót trong localStorage (migration 1 lần)
+        cleanupLegacyTokens();
+        // Lưu mã nhân viên để sử dụng khi làm thủ tục tiếp đón
         if (data.maNhanVien) {
           localStorage.setItem('maNhanVien', data.maNhanVien);
         }

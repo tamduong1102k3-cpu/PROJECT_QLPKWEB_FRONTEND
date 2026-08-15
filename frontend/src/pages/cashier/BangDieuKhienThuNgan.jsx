@@ -9,10 +9,13 @@ import LichSuThanhToan from './components/LichSuThanhToan';
 import useWebSocket from '../../hooks/useWebSocket';
 import NotificationBell from '../../components/NotificationBell';
 import { useNotification } from '../../components/NotificationContext';
+import { getAccessToken } from '../../api/tokenStore';
 
 const BangDieuKhienThuNgan = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('payment');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1280);
+  const [sidebarWidth, setSidebarWidth] = useState(256); // w-64 is 256px
+  const isResizing = useRef(false);
   const [stats, setStats] = useState({
     hoaDonHomNay: 0,
     choThanhToan: 0,
@@ -20,10 +23,24 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
     doanhThuHomNay: 0,
   });
 
-  const [notifications, setNotifications] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const { showSuccess } = useNotification();
+  const { showSuccess, bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
   const lastHandledRef = useRef({ maHoaDon: null, ts: 0 });
+
+  // Lấy maTaiKhoan của nhân viên (bảng tai_khoan) từ token
+  const getMaTaiKhoanNhanVien = () => {
+    const token = getAccessToken();
+    if (!token) return null;
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(window.atob(base64));
+      return payload.maTaiKhoan || payload.userId || null;
+    } catch (e) {
+      console.error('Error decoding token:', e);
+      return null;
+    }
+  };
 
   const fetchStats = useCallback(async () => {
     try {
@@ -59,26 +76,24 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
     }
   }, []);
 
-  // Fetch tất cả thông báo có referenceType = "HOA_DON" từ bảng thong_bao
+  // Fetch tất cả thông báo HOA_DON dành cho NHÂN VIÊN (chỉ của chính nhân viên đang đăng nhập)
   const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
   const fetchAllHoaDonNotifications = useCallback(async () => {
     try {
-      const response = await fetchClient(`${baseUrl}/api/thong-bao/reference-type/HOA_DON`);
+      const maTaiKhoan = getMaTaiKhoanNhanVien();
+      const url = `${baseUrl}/api/thong-bao/reference-type/HOA_DON?loaiNguoiNhan=NHAN_VIEN${maTaiKhoan ? `&maTaiKhoan=${maTaiKhoan}` : ''}`;
+      const response = await fetchClient(url);
       const result = await response.json();
       if (result?.success && Array.isArray(result.data)) {
-        setNotifications(prev => {
-          const existingIds = new Set(prev.map(n => n.id));
-          const newNotifs = result.data
-            .filter(tb => !existingIds.has(tb.id))
-            .map(tb => ({
-              id: tb.id,
-              title: tb.tieuDe || 'Thông báo hóa đơn',
-              message: tb.noiDung || '',
-              type: 'success',
-              createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
-              read: tb.daDoc || false
-            }));
-          return [...newNotifs, ...prev];
+        result.data.forEach(tb => {
+          addBellNotification({
+            id: tb.id,
+            title: tb.tieuDe || 'Thông báo hóa đơn',
+            message: tb.noiDung || '',
+            type: 'success',
+            createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
+            read: tb.daDoc || false
+          });
         });
       }
     } catch (error) {
@@ -114,38 +129,23 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
   // Gọi API thật từ bảng thong_bao, không dùng local notification
   const fetchPaymentNotifications = useCallback(async () => {
     try {
-      // Lấy mã nhân viên từ token
-      const token = localStorage.getItem('token');
-      let maNhanVien = null;
-      if (token) {
-        try {
-          const base64Url = token.split('.')[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const payload = JSON.parse(window.atob(base64));
-          maNhanVien = payload.maNhanVien || payload.userId;
-        } catch (e) { console.error('Error decoding token:', e); }
-      }
+      const maTaiKhoanNhanVien = getMaTaiKhoanNhanVien();
+      if (!maTaiKhoanNhanVien) return;
 
-      if (!maNhanVien) return;
-
-      // Gọi API lấy thông báo chưa đọc cho thu ngân (loaiNguoiNhan = "BENH_NHAN" vì thu ngân dùng chung)
-      const response = await fetchClient(`${baseUrl}/api/thong-bao/${maNhanVien}/BENH_NHAN?chiChuaDoc=true`);
+      // Gọi API lấy thông báo chưa đọc dành cho nhân viên (loaiNguoiNhan = "NHAN_VIEN")
+      const response = await fetchClient(`${baseUrl}/api/thong-bao/${maTaiKhoanNhanVien}/NHAN_VIEN?chiChuaDoc=true`);
       const result = await response.json();
 
       if (result?.success && Array.isArray(result.data)) {
-        setNotifications(prev => {
-          const existingIds = new Set(prev.map(n => n.id));
-          const newNotifs = result.data
-            .filter(tb => !existingIds.has(tb.id))
-            .map(tb => ({
-              id: tb.id,
-              title: tb.tieuDe,
-              message: tb.noiDung,
-              type: 'success',
-              createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
-              read: tb.daDoc || false
-            }));
-          return [...newNotifs, ...prev];
+        result.data.forEach(tb => {
+          addBellNotification({
+            id: tb.id,
+            title: tb.tieuDe,
+            message: tb.noiDung,
+            type: 'success',
+            createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
+            read: tb.daDoc || false
+          });
         });
       }
     } catch (error) {
@@ -153,27 +153,19 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
     }
   }, []);
 
-  // Lấy mã nhân viên từ token để subscribe WebSocket topic thông báo
-  const [maNhanVien, setMaNhanVien] = useState(null);
+  // Lấy maTaiKhoan của nhân viên (bảng tai_khoan) từ token để subscribe WebSocket topic thông báo
+  const [maTaiKhoanNhanVien, setMaTaiKhoanNhanVien] = useState(null);
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const payload = JSON.parse(window.atob(base64));
-        setMaNhanVien(payload.maNhanVien || payload.userId);
-      } catch (e) { console.error('Error decoding token:', e); }
-    }
+    setMaTaiKhoanNhanVien(getMaTaiKhoanNhanVien());
   }, []);
 
-  // Build danh sách topics WebSocket, bao gồm topic thông báo riêng cho thu ngân
+  // Build danh sách topics WebSocket, bao gồm topic thông báo riêng cho thu ngân (theo maTaiKhoan nhân viên)
   const wsTopics = [
     '/topic/payment',
     '/topic/hoa-don',
     '/topic/phieu-kham',
     '/topic/dang-ky-kham',
-    ...(maNhanVien ? [`/topic/thong-bao/${maNhanVien}`] : [])
+    ...(maTaiKhoanNhanVien ? [`/topic/thong-bao/${maTaiKhoanNhanVien}`] : [])
   ];
 
   // WebSocket subscription for realtime payment notifications and invoice updates
@@ -198,37 +190,19 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
       } else if (topic === '/topic/hoa-don' || topic === '/topic/phieu-kham' || topic === '/topic/dang-ky-kham') {
         fetchStats();
         setRefreshTrigger(prev => prev + 1);
-      } else if (topic.startsWith('/topic/thong-bao/') && data) {
-        // Nhận thông báo realtime từ WebSocket
-        setNotifications(prev => {
-          const existingIds = new Set(prev.map(n => n.id));
-          if (existingIds.has(data.id)) return prev;
-          return [{
-            id: data.id,
-            title: data.tieuDe || 'Thông báo',
-            message: data.noiDung || '',
-            type: 'success',
-            createdAt: new Date(),
-            read: false
-          }, ...prev];
+      } else if (topic.startsWith('/topic/thong-bao/') && data && data.loaiNguoiNhan === 'NHAN_VIEN') {
+        // Nhận thông báo realtime từ WebSocket - chỉ dành cho nhân viên (NHAN_VIEN)
+        addBellNotification({
+          id: data.id,
+          title: data.tieuDe || 'Thông báo',
+          message: data.noiDung || '',
+          type: 'success',
+          createdAt: new Date(),
+          read: false
         });
       }
     }
   });
-
-  const handleMarkAsRead = (id) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    );
-  };
-
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
-  const handleClearAll = () => {
-    setNotifications([]);
-  };
 
   const navItems = [
     { id: 'payment', label: 'Thanh Toán', icon: 'payments' },
@@ -247,9 +221,34 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
     <div className="flex h-screen bg-[#f3f4f6] font-body-md text-on-background overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`${isSidebarOpen ? 'w-64' : 'w-20'
-          } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20`}
+        style={{ width: isSidebarOpen ? sidebarWidth : 80 }}
+        className="relative bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20"
       >
+        {/* Handle kéo dãn sidebar */}
+        {isSidebarOpen && (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              isResizing.current = true;
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+              const onMouseMove = (ev) => {
+                if (!isResizing.current) return;
+                const newWidth = Math.min(Math.max(startWidth + (ev.clientX - startX), 200), 480);
+                setSidebarWidth(newWidth);
+              };
+              const onMouseUp = () => {
+                isResizing.current = false;
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+              };
+              window.addEventListener('mousemove', onMouseMove);
+              window.addEventListener('mouseup', onMouseUp);
+            }}
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-emerald-400/50 active:bg-emerald-500/60 transition-colors z-30"
+            title="Kéo để thay đổi kích thước sidebar"
+          />
+        )}
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white shadow-sm shadow-emerald-600/30">
@@ -286,25 +285,6 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
           </ul>
         </nav>
 
-        {/* Summary section in sidebar */}
-        {isSidebarOpen && (
-          <div className="px-4 py-4 border-t border-gray-100 bg-gray-50/50">
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Chờ thanh toán:</span>
-                <span className="font-bold text-amber-600">
-                  {stats.choThanhToan}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Hôm nay:</span>
-                <span className="font-bold text-emerald-600">
-                  {formatCurrency(stats.doanhThuHomNay)}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
       </aside>
 
       {/* Main Content */}
@@ -323,10 +303,10 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
           </div>
           <div className="flex items-center gap-4">
             <NotificationBell
-              notifications={notifications}
-              onMarkAsRead={handleMarkAsRead}
-              onMarkAllAsRead={handleMarkAllAsRead}
-              onClearAll={handleClearAll}
+              notifications={bellNotifications}
+              onMarkAsRead={markBellAsRead}
+              onMarkAllAsRead={markAllBellAsRead}
+              onClearAll={clearAllBell}
             />
             <UserMenu
               user={user}

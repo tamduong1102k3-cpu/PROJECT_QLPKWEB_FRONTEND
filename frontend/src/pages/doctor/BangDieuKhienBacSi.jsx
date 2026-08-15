@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
 import BangDieuKhienChanDoan from './components/BangDieuKhienChanDoan';
@@ -23,7 +23,9 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
   const isLabDoctor = isXetNghiemDoc || isCdhaDoc;
 
   const [activeTab, setActiveTab] = useState(isLabDoctor ? 'examination' : 'dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1280);
+  const [sidebarWidth, setSidebarWidth] = useState(256); // w-64 is 256px
+  const isResizing = useRef(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
 
@@ -153,7 +155,35 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
           setRefreshTrigger(prev => prev + 1);
         }}
       />
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20`}>
+      <aside 
+        style={{ width: isSidebarOpen ? sidebarWidth : 80 }}
+        className="relative bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20"
+      >
+        {/* Handle kéo dãn sidebar */}
+        {isSidebarOpen && (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              isResizing.current = true;
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+              const onMouseMove = (ev) => {
+                if (!isResizing.current) return;
+                const newWidth = Math.min(Math.max(startWidth + (ev.clientX - startX), 200), 480);
+                setSidebarWidth(newWidth);
+              };
+              const onMouseUp = () => {
+                isResizing.current = false;
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+              };
+              window.addEventListener('mousemove', onMouseMove);
+              window.addEventListener('mouseup', onMouseUp);
+            }}
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-400/50 active:bg-indigo-500/60 transition-colors z-30"
+            title="Kéo để thay đổi kích thước sidebar"
+          />
+        )}
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-sm shadow-indigo-200">

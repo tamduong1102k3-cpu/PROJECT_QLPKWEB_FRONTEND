@@ -64,14 +64,14 @@ const ChiTietHoaDon = ({ invoice, selectedPatient, invoiceDetails, onPay }) => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left min-w-[500px]">
               <thead>
                 <tr className="bg-gray-50 text-[10px] text-gray-500 uppercase tracking-wider">
-                  <th className="py-2.5 px-4 font-semibold">Nội dung</th>
-                  <th className="py-2.5 px-4 font-semibold">Loại</th>
-                  <th className="py-2.5 px-4 font-semibold text-right">SL</th>
-                  <th className="py-2.5 px-4 font-semibold text-right">Đơn giá</th>
-                  <th className="py-2.5 px-4 font-semibold text-right">Thành tiền</th>
+                  <th className="py-2.5 px-3 font-semibold">Nội dung</th>
+                  <th className="py-2.5 px-3 font-semibold">Loại</th>
+                  <th className="py-2.5 px-3 font-semibold text-right">SL</th>
+                  <th className="py-2.5 px-3 font-semibold text-right">Đơn giá</th>
+                  <th className="py-2.5 px-3 font-semibold text-right">Thành tiền</th>
                 </tr>
               </thead>
               <tbody>
@@ -81,21 +81,21 @@ const ChiTietHoaDon = ({ invoice, selectedPatient, invoiceDetails, onPay }) => {
                     : { bg: 'bg-green-50', text: 'text-green-700', label: 'Thuốc' };
                   return (
                     <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="py-2.5 px-4 text-sm text-gray-700">{item.noiDung}</td>
-                      <td className="py-2.5 px-4">
+                      <td className="py-2.5 px-3 text-sm text-gray-700 whitespace-nowrap">{item.noiDung}</td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold ${lBadge.bg} ${lBadge.text}`}>{lBadge.label}</span>
                       </td>
-                      <td className="py-2.5 px-4 text-sm text-gray-600 text-right">{item.soLuong}</td>
-                      <td className="py-2.5 px-4 text-sm text-gray-600 text-right">{formatCurrency(item.donGia)}</td>
-                      <td className="py-2.5 px-4 text-sm font-bold text-emerald-600 text-right">{formatCurrency(item.thanhTien)}</td>
+                      <td className="py-2.5 px-3 text-sm text-gray-600 text-right whitespace-nowrap">{item.soLuong}</td>
+                      <td className="py-2.5 px-3 text-sm text-gray-600 text-right whitespace-nowrap">{formatCurrency(item.donGia)}</td>
+                      <td className="py-2.5 px-3 text-sm font-bold text-emerald-600 text-right whitespace-nowrap">{formatCurrency(item.thanhTien)}</td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50">
-                  <td colSpan="4" className="py-2.5 px-4 text-sm font-bold text-gray-700 text-right">Tổng cộng:</td>
-                  <td className="py-2.5 px-4 font-bold text-emerald-600 text-right">{formatCurrency(invoice.tongTien)}</td>
+                  <td colSpan="4" className="py-2.5 px-3 text-sm font-bold text-gray-700 text-right whitespace-nowrap">Tổng cộng:</td>
+                  <td className="py-2.5 px-3 font-bold text-emerald-600 text-right whitespace-nowrap">{formatCurrency(invoice.tongTien)}</td>
                 </tr>
               </tfoot>
             </table>

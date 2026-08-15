@@ -1,4 +1,5 @@
 import fetchClient from './fetchClient';
+import { setAccessToken, clearAccessToken, cleanupLegacyTokens } from './tokenStore';
 
 const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/taikhoan';
 
@@ -115,14 +116,96 @@ export const loginApi = async data => {
   try {
     const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // để browser nhận Set-Cookie refresh token (HttpOnly)
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
       body: JSON.stringify(data)
     });
     if (!response.ok) await handleError(response);
-    return await handleResponse(response);
+    const result = await handleResponse(response);
+    if (result && result.token) {
+      setAccessToken(result.token); // access token -> memory
+    }
+    return result;
   } catch (error) {
     console.error("Error in loginApi:", error);
     throw error;
+  }
+};
+
+/**
+ * POST /logout
+ * Gọi backend qua cookie (HttpOnly refresh token). Browser tự gửi cookie.
+ */
+export const logoutApi = async () => {
+  try {
+    const response = await fetch(`${API_URL}/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    clearAccessToken();
+    cleanupLegacyTokens();
+    if (!response.ok) {
+      // Không ném lỗi - đăng xuất cục bộ vẫn nên xảy ra
+      console.warn("Logout API không thành công:", response.status);
+    }
+    return { ok: true };
+  } catch (error) {
+    clearAccessToken();
+    cleanupLegacyTokens();
+    console.error("Error in logoutApi:", error);
+    return { ok: true };
+  }
+};
+
+/**
+ * ensureAuthenticated()
+ * Khi F5/reload, access token trong memory mất.
+ * Gọi refresh qua HttpOnly cookie để lấy access token mới trước khi dùng app.
+ * Trả về access token mới, hoặc null nếu không có phiên (chưa đăng nhập).
+ */
+export const ensureAuthenticated = async () => {
+  try {
+    // Xóa token cũ trong localStorage (migration 1 lần)
+    cleanupLegacyTokens();
+
+    // Nếu đã có access token trong memory (cùng tab), không cần refresh
+    // tuy nhiên sau F5 memory trống nên luôn gọi refresh
+
+    const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
+    const response = await fetch(`${baseUrl}/api/taikhoan/refresh-token`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+      // Không body - refresh token trong HttpOnly cookie
+    });
+
+    if (!response.ok) {
+      // Không có phiên hợp lệ
+      clearAccessToken();
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.token) {
+      setAccessToken(data.token);
+      return data.token;
+    }
+    clearAccessToken();
+    return null;
+  } catch (error) {
+    console.error("ensureAuthenticated error:", error);
+    clearAccessToken();
+    return null;
   }
 };
 

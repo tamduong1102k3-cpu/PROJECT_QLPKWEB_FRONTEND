@@ -8,6 +8,7 @@ import ModalThanhToan from './ModalThanhToan';
 import InHoaDon from './InHoaDon';
 import SockJS from 'sockjs-client/dist/sockjs.min.js';
 import Stomp from 'stompjs';
+import { getAccessToken } from '../../../api/tokenStore';
 
 const API_NHAN_VIEN = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
 const API_PHIEU_KHAM = 'https://qlpk-backend-spring-boot.onrender.com/api/phieu-kham';
@@ -18,13 +19,13 @@ const formatCurrency = (amount) => {
 };
 
 const TheThongKe = ({ title, value, icon, color, shadowColor }) => (
-  <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex items-center gap-5 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 transition-all duration-300 group">
-    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white bg-gradient-to-br ${color} shadow-lg ${shadowColor} group-hover:scale-110 transition-transform duration-300`}>
-      <span className="material-symbols-outlined text-[32px]">{icon}</span>
+  <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-3 sm:p-4 flex items-center gap-3 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 group">
+    <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${color} shadow-lg ${shadowColor} group-hover:scale-110 transition-transform duration-300 flex-shrink-0`}>
+      <span className="material-symbols-outlined text-xl sm:text-2xl">{icon}</span>
     </div>
-    <div>
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">{title}</p>
-      <h3 className="text-3xl font-black text-slate-800">{value}</h3>
+    <div className="min-w-0">
+      <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5 truncate">{title}</p>
+      <h3 className="text-lg sm:text-xl font-black text-slate-800 truncate">{value}</h3>
     </div>
   </div>
 );
@@ -64,7 +65,7 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const getMaNhanVien = () => {
-    const token = localStorage.getItem('token');
+    const token = getAccessToken();
     if (token) {
       try {
         const base64Url = token.split('.')[1];
@@ -74,6 +75,21 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
       } catch (e) { console.error('Error decoding token:', e); }
     }
     return 1;
+  };
+
+  // Đọc ma_tai_khoan của nhân viên đang đăng nhập từ JWT token trong localStorage.
+  // Tránh phụ thuộc vào claim có sẵn trong token cũ đăng nhập trước khi backend thêm claim này.
+  const getMaTaiKhoanNhanVien = () => {
+    const token = getAccessToken();
+    if (token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(window.atob(base64));
+        return payload.maTaiKhoan || null;
+      } catch (e) { console.error('Error decoding token for maTaiKhoan:', e); }
+    }
+    return null;
   };
 
   const fetchData = useCallback(async (keyword = '') => {
@@ -236,7 +252,7 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
     try {
       const autoAmount = tongTien;
       const autoTransId = method === 'chuyen_khoan' ? `CK_${Date.now()}` : `TM_${Date.now()}`;
-      await thanhToanApi(currentInvoice.maHoaDon, { maNhanVien, phuongThuc: method, soTienNhan: autoAmount, maGiaoDich: autoTransId });
+      await thanhToanApi(currentInvoice.maHoaDon, { maNhanVien, maTaiKhoan: getMaTaiKhoanNhanVien(), phuongThuc: method, soTienNhan: autoAmount, maGiaoDich: autoTransId });
       showSuccess(`Thanh toán hóa đơn #${currentInvoice.maHoaDon?.toString().padStart(4, '0')} thành công!`);
       setShowPaymentModal(false);
       setSelectedPatient(null);
@@ -278,15 +294,15 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {STATS_NHOM.map(s => (
           <TheThongKe key={s.id} title={s.title} value={s.id === 'pending' ? pendingPaymentPatients.length : s.id === 'paid' ? paidPatients.length : completedPatients.length} icon={s.icon} color={s.color} shadowColor={s.shadow} />
         ))}
       </div>
 
-      <div className="flex gap-6 h-full items-start">
+      <div className="flex gap-4 xl:gap-6 h-full items-start">
         {/* LEFT: Patient List */}
-        <div className={`flex flex-col gap-4 ${selectedPatient ? 'w-[60%]' : 'w-full'} transition-all duration-300 bg-white/80 backdrop-blur-xl p-6 rounded-3xl shadow-sm border border-slate-200/60`}>
+        <div className={`flex flex-col gap-4 w-full transition-all duration-300 bg-white/80 backdrop-blur-xl p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-200/60`}>
           <BangBenhNhan
             worklistTab={worklistTab}
             setWorklistTab={setWorklistTab}
@@ -306,9 +322,10 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
 
         {/* RIGHT: Patient Detail & Invoice */}
         {selectedPatient && (
-          <div className="w-[40%] flex flex-col gap-4 animate-in slide-in-from-right duration-300">
+          <div className="payment-panel-overlay" onClick={() => { setSelectedPatient(null); setBillingItems(null); setCurrentInvoice(null); setInvoiceDetails([]); }}>
+          <div className="payment-panel w-full xl:w-[40%] flex flex-col animate-in slide-in-from-right duration-300" onClick={e => e.stopPropagation()}>
             {/* Patient info */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-5">
+            <div className="payment-box bg-white p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-sm">
@@ -333,7 +350,7 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
                 Đang tải...
               </div>
             ) : billingItems && !hasInvoiceForSelected ? (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
+              <div className="payment-box bg-white overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                   <h4 className="font-bold text-gray-700 text-sm">Danh sách cần thanh toán</h4>
                   <button onClick={handleCreateInvoice} disabled={creatingInvoice}
@@ -379,16 +396,47 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
 
             {/* Invoice detail */}
             {hasInvoiceForSelected && (
-              <ChiTietHoaDon
-                invoice={currentInvoice}
-                selectedPatient={selectedPatient}
-                invoiceDetails={invoiceDetails}
-                onPay={handlePay}
-              />
+              <div className="payment-box bg-white">
+                <ChiTietHoaDon
+                  invoice={currentInvoice}
+                  selectedPatient={selectedPatient}
+                  invoiceDetails={invoiceDetails}
+                  onPay={handlePay}
+                />
+              </div>
             )}
+          </div>
           </div>
         )}
       </div>
+
+      <style>{`
+        .payment-panel-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 60;
+          background: rgba(15, 23, 42, 0.45);
+          backdrop-filter: blur(4px);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 16px;
+        }
+        .payment-panel {
+          width: min(540px, 94vw) !important;
+          background: white;
+          border-radius: 24px;
+          overflow-y: auto;
+          max-height: 100%;
+          box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);
+        }
+        .payment-panel > * { border-radius: 0 !important; box-shadow: none !important; }
+        .payment-panel > div:first-child { border-top-left-radius: 24px !important; border-top-right-radius: 24px !important; }
+        .payment-panel > div:last-child { border-bottom-left-radius: 24px !important; border-bottom-right-radius: 24px !important; }
+        .payment-panel > div + div { border-top: 1px solid #f1f5f9; }
+        .payment-panel > div > div[class*="rounded"] { border-left: none !important; border-right: none !important; box-shadow: none !important; border-radius: 0 !important; }
+        .payment-panel > div > div[class*="rounded"] + div[class*="rounded"] { border-top: 1px solid #f1f5f9; }
+      `}</style>
 
       {/* Payment Modal */}
       <ModalThanhToan

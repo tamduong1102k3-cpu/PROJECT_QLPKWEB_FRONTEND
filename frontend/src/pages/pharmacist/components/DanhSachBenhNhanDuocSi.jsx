@@ -6,21 +6,31 @@ import Pagination from '../../../components/Pagination';
 const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, formatDateTime }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('cho_cap');
+  const [dateFilter, setDateFilter] = useState('today'); // 'today' | 'all'
 
-  // Tách bệnh nhân theo trạng thái toa thuốc
-  const { choCapList, daCapList } = useMemo(() => {
+  // Tách bệnh nhân theo trạng thái toa thuốc và bộ lọc ngày
+  const { choCapList, daCapList, todayPatients } = useMemo(() => {
     const list = patients || [];
-    const choCap = list.filter(p => p.tinhTrangCapThuoc === 'CHO_CAP');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const isToday = (p) => {
+      if (!p.ngayThanhToan) return false;
+      return new Date(p.ngayThanhToan) >= today;
+    };
+
+    const choCap = list.filter(p => p.tinhTrangCapThuoc === 'CHO_CAP' && (dateFilter === 'all' || isToday(p)));
     const daCap = list.filter(p => {
       if (p.tinhTrangCapThuoc === 'CHO_CAP') return false;
-      if (!p.ngayThanhToan) return false;
-      const date = new Date(p.ngayThanhToan);
-      return date >= today;
+      if (dateFilter === 'all') return true;
+      return isToday(p);
     });
-    return { choCapList: choCap, daCapList: daCap };
-  }, [patients]);
+    return {
+      choCapList: choCap,
+      daCapList: daCap,
+      todayPatients: list.filter(isToday),
+    };
+  }, [patients, dateFilter]);
 
   const activeList = activeTab === 'cho_cap' ? choCapList : daCapList;
 
@@ -66,18 +76,7 @@ const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, for
   return (
     <div className="animate-fade-in">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-              <span className="material-symbols-outlined text-blue-600">group</span>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Có thuốc</p>
-              <p className="text-xl font-bold text-gray-800">{patients?.length || 0}</p>
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
@@ -107,41 +106,59 @@ const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, for
             </div>
             <div>
               <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Hôm nay</p>
-              <p className="text-xl font-bold text-gray-800">
-                {patients?.filter(p => {
-                  if (!p.ngayThanhToan) return false;
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  const date = new Date(p.ngayThanhToan);
-                  return date >= today;
-                }).length || 0}
-              </p>
+              <p className="text-xl font-bold text-gray-800">{todayPatients.length || 0}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar + Date Filter */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
-        <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
-            search
-          </span>
-          <input
-            type="text"
-            placeholder="Tìm kiếm bệnh nhân theo tên, số điện thoại, mã BN hoặc mã hóa đơn..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all"
-          />
-          {searchTerm && (
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <div className="relative flex-1">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder="Tìm kiếm bệnh nhân theo tên, số điện thoại, mã BN hoặc mã hóa đơn..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
+          </div>
+          <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit flex-shrink-0">
             <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              onClick={() => setDateFilter('today')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                dateFilter === 'today'
+                  ? 'bg-white text-purple-600 shadow-sm ring-1 ring-gray-200'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
             >
-              <span className="material-symbols-outlined text-[18px]">close</span>
+              <span className="material-symbols-outlined text-[16px]">today</span>
+              Hôm nay
             </button>
-          )}
+            <button
+              onClick={() => setDateFilter('all')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                dateFilter === 'all'
+                  ? 'bg-white text-purple-600 shadow-sm ring-1 ring-gray-200'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+              Tất cả ngày
+            </button>
+          </div>
         </div>
       </div>
 
@@ -184,8 +201,12 @@ const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, for
               {searchTerm
                 ? 'Không tìm thấy bệnh nhân phù hợp'
                 : activeTab === 'cho_cap'
-                  ? 'Không có bệnh nhân chờ cấp thuốc'
-                  : 'Chưa có bệnh nhân nào đã cấp thuốc'}
+                  ? dateFilter === 'today'
+                    ? 'Không có bệnh nhân chờ cấp thuốc hôm nay'
+                    : 'Không có bệnh nhân chờ cấp thuốc'
+                  : dateFilter === 'today'
+                    ? 'Chưa có bệnh nhân nào đã cấp thuốc hôm nay'
+                    : 'Chưa có bệnh nhân nào đã cấp thuốc'}
             </p>
           </div>
         ) : (
