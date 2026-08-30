@@ -17,15 +17,21 @@ export const clearAccessToken = () => {
   accessToken = null;
 };
 
-/**
- * Xóa toàn bộ token cũ còn sót trong localStorage (migration 1 lần).
- * Sau kiến trúc mới, token/refreshToken KHÔNG còn được lưu ở đây.
- */
-export const cleanupLegacyTokens = () => {
+export const decodeTokenPayload = (token) => {
+  if (!token) return null;
   try {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-  } catch (e) {
-    // ignore
+    const b = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(escape(window.atob(b)));
+    return JSON.parse(json);
+  } catch {
+    return null;
   }
+};
+
+export const getRoleFromAccessToken = () => decodeTokenPayload(getAccessToken())?.role || null;
+export const getHoTenFromAccessToken = () => decodeTokenPayload(getAccessToken())?.hoTen || null;
+export const getLanDauDangNhapFromAccessToken = () => decodeTokenPayload(getAccessToken())?.lanDauDangNhap ?? false;
+export const getMaNhanVienFromAccessToken = () => {
+  const v = decodeTokenPayload(getAccessToken())?.maNhanVien;
+  return (typeof v === 'number' ? v : Number(v)) || null;
 };

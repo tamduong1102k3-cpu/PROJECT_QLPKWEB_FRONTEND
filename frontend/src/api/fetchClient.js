@@ -7,7 +7,7 @@
  * - Mọi request dùng credentials: 'include' để browser tự gửi cookie (chỉ với backend origin).
  */
 import { loadingManager } from './loadingManager';
-import { getAccessToken, setAccessToken, clearAccessToken, cleanupLegacyTokens } from './tokenStore';
+import { getAccessToken, setAccessToken, clearAccessToken } from './tokenStore';
 
 let isRefreshing = false;
 let refreshSubscribers = [];
@@ -27,25 +27,7 @@ const getAuthHeaders = () => {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
-/**
- * Xác định endpoint refresh dựa trên loại user trong localStorage.
- * - Bệnh nhân (có maTaiKhoanBn / vaiTro = BENH_NHAN) -> tai-khoan-benh-nhan
- * - Nhân viên -> taikhoan
- */
 const getRefreshEndpoint = () => {
-  try {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      const role = user.role || user.vaiTro;
-      if (role === 'BENH_NHAN' || user.maTaiKhoanBn !== undefined || user.maBenhNhan !== undefined) {
-        return '/api/tai-khoan-benh-nhan/refresh-token';
-      }
-    }
-  } catch (e) {
-    // fallback employee
-  }
-  // Cũng kiểm tra quick flag nếu cần
   return '/api/taikhoan/refresh-token';
 };
 
@@ -53,8 +35,17 @@ const getRefreshEndpoint = () => {
  * Gọi refresh qua HttpOnly cookie (web).
  * Không gửi refresh token trong body - browser tự đính cookie.
  * Thêm X-Requested-With cho CSRF protection.
+ *
+ * Timeout 30s: đủ lâu để chờ backend phản hồi (kể cả Render.com cold start),
+ * tránh treo vô hạn. Không dùng timeout ngắn (3s) vì sẽ cắt ngang request
+ * hợp lệ khi mạng chậm, gây refresh thất bại sai.
  */
+const REFRESH_TIMEOUT_MS = 30000;
+
 const refreshTokenRequest = async () => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
+
   try {
     const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
     const endpoint = getRefreshEndpoint();
@@ -65,7 +56,8 @@ const refreshTokenRequest = async () => {
       headers: {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
-      }
+      },
+      signal: controller.signal
       // Không body - refresh token nằm trong HttpOnly cookie
     });
 
@@ -79,12 +71,13 @@ const refreshTokenRequest = async () => {
     return null;
   } catch (error) {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
 const clearSession = () => {
   clearAccessToken();
-  cleanupLegacyTokens();
 };
 
 const handleUnauthorized = () => {

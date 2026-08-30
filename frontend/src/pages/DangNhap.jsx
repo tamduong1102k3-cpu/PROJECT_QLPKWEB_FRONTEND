@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { loginApi } from '../api/accountApi';
 import { useGlobalLoading } from '../components/LoadingContext';
-import { setAccessToken, cleanupLegacyTokens } from '../api/tokenStore';
 
 const DangNhap = ({ onForgotPassword, onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -24,17 +23,8 @@ const DangNhap = ({ onForgotPassword, onLoginSuccess }) => {
     try {
       const data = await loginApi({ identity, password });
       if (data.token) {
-        // Access token -> memory (KHÔNG localStorage) để tránh XSS đánh cắp
-        setAccessToken(data.token);
-        // Refresh token (web) nằm trong HttpOnly cookie backend tự quản lý
-        // Xóa token cũ còn sót trong localStorage (migration 1 lần)
-        cleanupLegacyTokens();
-        // Lưu mã nhân viên để sử dụng khi làm thủ tục tiếp đón
-        if (data.maNhanVien) {
-          localStorage.setItem('maNhanVien', data.maNhanVien);
-        }
+        if (onLoginSuccess) onLoginSuccess({ ...data, vaiTro: data.role });
       }
-      if (onLoginSuccess) onLoginSuccess({ ...data, vaiTro: data.role });
     } catch (error) {
       setErrorMessage(error.message || 'Đăng nhập thất bại.');
     } finally {

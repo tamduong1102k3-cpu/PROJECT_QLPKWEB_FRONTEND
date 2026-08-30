@@ -19,10 +19,12 @@ import BangDieuKhienDuocSi from './pages/pharmacist/BangDieuKhienDuocSi';
 import BangDieuKhienKho from './pages/warehouse/BangDieuKhienKho';
 import PaymentResult from './pages/cashier/components/PaymentResult';
 import { logoutApi } from './api/accountApi';
-import { clearAccessToken, cleanupLegacyTokens } from './api/tokenStore';
+import { clearAccessToken, getAccessToken, getRoleFromAccessToken, decodeTokenPayload } from './api/tokenStore';
 import './App.css';
 
-/** Map vaiTro -> tên view dashboard. Dùng chung cho login + khôi phục phiên sau F5. */
+// Role hợp lệ nhưng UI chưa triển khai -> dành riêng cho under-development
+const UNIMPLEMENTED_ROLES = [];
+
 const getViewForRole = (vaiTro) => {
   if (vaiTro === 'QUAN_TRI_VIEN' || vaiTro === 'ADMIN') return 'admin';
   if (vaiTro === 'LE_TAN') return 'receptionist';
@@ -32,72 +34,109 @@ const getViewForRole = (vaiTro) => {
   if (vaiTro === 'DUOC_SI' || vaiTro.startsWith('DUOC_') || vaiTro === 'NHAN_VIEN_NHA_THUOC') return 'pharmacist';
   if (vaiTro === 'NHAN_VIEN_KHO' || vaiTro === 'NHAN_VIEN_NHAP_KHO') return 'warehouse';
   if (vaiTro.startsWith('KY_THUAT_VIEN_') || vaiTro.startsWith('KTV_') || vaiTro === 'KY_THUAT_VIEN_XET_NGHIEM') return 'technician';
-  return 'under-development';
+  if (UNIMPLEMENTED_ROLES.includes(vaiTro)) return 'under-development';
+  return 'DangNhap'; // role bất thường -> không vào dashboard/under-development
 };
 
-/** Đọc user từ localStorage (không nhạy cảm) - dùng để khôi phục phiên sau F5. */
-const getStoredUser = () => {
-  try {
-    const str = localStorage.getItem('user');
-    if (!str) return null;
-    const user = JSON.parse(str);
-    // Phải có vai trò mới đủ để xác định view
-    if (!user || (!user.role && !user.vaiTro)) return null;
-    return user;
-  } catch (e) {
-    return null;
+/**
+ * Xác định session tại mount. Nguyên tắc BẮT BUỘC: role lấy từ JWT (token trong memory),
+ * KHÔNG bao giờ fallback localStorage. localStorage chỉ là cache hiển thị.
+ *  - Không có token: DangNhap.
+ *  - Có token nhưng decode fail / thiếu claim role: token hỏng -> DangNhap.
+ *  - Có token, role hợp lệ nhưng không map view: DangNhap.
+ */
+const resolveSession = () => {
+  const token = getAccessToken();
+
+  if (!token) {
+    clearAccessToken();
+    return { user: null, view: 'DangNhap' };
   }
+
+  const decodedRole = getRoleFromAccessToken();
+  if (!decodedRole) {
+    clearAccessToken();
+    return { user: null, view: 'DangNhap' };
+  }
+
+  const view = getViewForRole(decodedRole);
+  if (view === 'DangNhap') {
+    clearAccessToken();
+    return { user: null, view: 'DangNhap' };
+  }
+
+  const payload = decodeTokenPayload(token) || {};
+  const user = {
+    username: payload.sub,
+    email: payload.email || null,
+    role: decodedRole,
+    vaiTro: decodedRole,
+    maNhanVien: payload.maNhanVien ?? null,
+    maTaiKhoan: payload.maTaiKhoan ?? null,
+    hoTen: payload.hoTen ?? null,
+    lanDauDangNhap: payload.lanDauDangNhap ?? false,
+    maChuyenKhoa: payload.maChuyenKhoa ?? null,
+    tenChuyenKhoa: payload.tenChuyenKhoa ?? null,
+    userType: 'NHAN_VIEN',
+  };
+  return { user, view };
 };
 
 function App() {
-  // Khôi phục phiên từ localStorage ngay khi mount.
+  // Khôi phục phiên từ token (trong memory) ngay khi mount.
   // main.jsx đã gọi ensureAuthenticated() trước khi render để access token vào memory
-  // (nếu có HttpOnly refresh cookie hợp lệ).
-  const [currentUser, setCurrentUser] = useState(getStoredUser());
-  const [currentView, setCurrentView] = useState(() => {
-    const user = getStoredUser();
-    if (!user) return 'DangNhap';
-    const vt = user.vaiTro || user.role || '';
-    return getViewForRole(vt);
-  });
+  // (nếu có HttpOnly refresh cookie hợp lệ). Role BẮT BUỘC lấy từ token, không từ localStorage.
+  const initialSession = resolveSession();
+  const [currentUser, setCurrentUser] = useState(initialSession.user);
+  const [currentView, setCurrentView] = useState(initialSession.view);
 
-  /** Đăng xuất: gọi backend xóa cookie/revoke, xóa access token memory + user localStorage. */
+  /** Đăng xuất: gọi backend xóa cookie/revoke, xóa access token memory. */
   const handleLogout = async () => {
     try {
-      await logoutApi(); // gọi /logout qua cookie -> revoke DB + xóa HttpOnly cookie
+      await logoutApi();
     } catch (e) {
       console.warn('Logout API error:', e);
     }
     clearAccessToken();
-    cleanupLegacyTokens();
-    localStorage.removeItem('user');
-    localStorage.removeItem('maNhanVien');
     setCurrentUser(null);
     setCurrentView('DangNhap');
-    // Reset toàn bộ state (access token trong memory sẽ mất khi reload)
     window.location.href = '/';
   };
 
   const handleLoginSuccess = (user) => {
-    setCurrentUser(user);
-    // Lưu user (không nhạy cảm) vào localStorage để ensureAuthenticated nhận diện phiên khi F5
-    try {
-      localStorage.setItem('user', JSON.stringify({
-        username: user.username,
-        email: user.email,
-        role: user.role || user.vaiTro,
-        vaiTro: user.vaiTro || user.role,
-        maNhanVien: user.maNhanVien,
-        hoTen: user.hoTen
-      }));
-    } catch (e) { /* ignore */ }
+    const loginRole = getRoleFromAccessToken() || user.vaiTro || user.role || '';
+    const view = getViewForRole(loginRole);
 
-    if (user.lanDauDangNhap) {
+    if (view === 'DangNhap') {
+      clearAccessToken();
+      setCurrentUser(null);
+      setCurrentView('DangNhap');
+      return;
+    }
+
+    const payload = decodeTokenPayload(getAccessToken()) || {};
+    const resolvedUser = {
+      username: payload.sub || user.username,
+      email: payload.email || user.email,
+      role: loginRole,
+      vaiTro: loginRole,
+      maNhanVien: payload.maNhanVien ?? user.maNhanVien ?? null,
+      maTaiKhoan: payload.maTaiKhoan ?? user.maTaiKhoan ?? null,
+      hoTen: payload.hoTen || user.hoTen || null,
+      lanDauDangNhap: payload.lanDauDangNhap ?? user.lanDauDangNhap ?? false,
+      maChuyenKhoa: payload.maChuyenKhoa ?? user.maChuyenKhoa ?? null,
+      tenChuyenKhoa: payload.tenChuyenKhoa ?? user.tenChuyenKhoa ?? null,
+      userType: 'NHAN_VIEN',
+    };
+
+    setCurrentUser(resolvedUser);
+
+    if (resolvedUser.lanDauDangNhap) {
       setCurrentView('force-change-password');
       return;
     }
 
-    setCurrentView(getViewForRole(user.vaiTro || ''));
+    setCurrentView(view);
   };
 
   const renderMainContent = () => {

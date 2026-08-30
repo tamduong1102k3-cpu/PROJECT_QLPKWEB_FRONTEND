@@ -14,7 +14,7 @@ export const getAllChucVuApi = async () => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -38,7 +38,7 @@ export const getAllChuyenKhoaApi = async () => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -62,7 +62,7 @@ export const getAllVaiTroApi = async () => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -86,7 +86,7 @@ export const getAllPhongApi = async () => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -110,7 +110,7 @@ export const getPhongByChucVuApi = async maChucVu => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -138,7 +138,7 @@ export const createPhongApi = async data => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -166,7 +166,7 @@ export const updatePhongApi = async (id, data) => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -190,7 +190,7 @@ export const deletePhongApi = async id => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();

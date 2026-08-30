@@ -7,6 +7,7 @@ import { getAllApi as getAllServicesApi } from '../../api/dichVuApi';
 import { removeVietnameseTones } from './component/TienIchKyThuatVien';
 import BangDanhSachCongViec from './component/BangDanhSachCongViec';
 import ModalNhapKetQua from './component/ModalNhapKetQua';
+import ModalNhapKetQuaXetNghiem from './component/ModalNhapKetQuaXetNghiem';
 import ModalXemKetQua from './component/ModalXemKetQua';
 import ModalKhamSinhHieu from './component/ModalKhamSinhHieu';
 import ModalNhapTiepNhanCls from './component/ModalNhapTiepNhanCls';
@@ -462,8 +463,9 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
         </main>
       </div>
 
-      {/* Modal nhập kết quả chuyên môn */}
-      {selectedTest && <ModalNhapKetQua test={selectedTest} user={user} isImaging={isImaging} onClose={() => setSelectedTest(null)} onSuccess={() => { setSelectedTest(null); fetchWorklist(); }} />}
+      {/* Modal nhập kết quả chuyên môn - XÉT NGHIỆM dùng ModalNhapKetQuaXetNghiem, CĐHA dùng ModalNhapKetQua */}
+      {selectedTest && !isImaging && <ModalNhapKetQuaXetNghiem test={selectedTest} user={user} servicesList={servicesList} onClose={() => setSelectedTest(null)} onSuccess={() => { setSelectedTest(null); fetchWorklist(); }} />}
+      {selectedTest && isImaging && <ModalNhapKetQua test={selectedTest} user={user} isImaging={isImaging} onClose={() => setSelectedTest(null)} onSuccess={() => { setSelectedTest(null); fetchWorklist(); }} />}
 
       {/* Modal xem kết quả */}
       {viewingResult && <ModalXemKetQua viewingResult={viewingResult} user={user} isImaging={isImaging} onClose={() => setViewingResult(null)} />}

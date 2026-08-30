@@ -13,16 +13,6 @@ const DAY_ORDER = [
   { key: 'chu-nhat', label: 'Chủ Nhật' }
 ];
 
-const DAY_INDEX_MAP = {
-  'thu-2': 0,
-  'thu-3': 1,
-  'thu-4': 2,
-  'thu-5': 3,
-  'thu-6': 4,
-  'thu-7': 5,
-  'chu-nhat': 6
-};
-
 function classifyShift(gioLam = '', gioKetThuc = '') {
   const startHour = parseInt((gioLam || '08').split(':')[0], 10) || 8;
   if (startHour >= 5 && startHour < 12) return { type: 'sang', label: 'Ca sáng' };
@@ -63,15 +53,16 @@ const SHIFT_STYLE = {
   }
 };
 
-function getMondayOfCurrentWeek() {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(now);
-  monday.setDate(diff);
-  monday.setHours(0, 0, 0, 0);
-  return monday;
-}
+// Ánh xạ JS getDay() (CN=0 ... T7=6) sang key "thu" của hệ thống
+const JS_DAY_TO_THU = {
+  0: 'chu-nhat',
+  1: 'thu-2',
+  2: 'thu-3',
+  3: 'thu-4',
+  4: 'thu-5',
+  5: 'thu-6',
+  6: 'thu-7'
+};
 
 function formatDate(d) {
   const y = d.getFullYear();
@@ -99,7 +90,7 @@ export default function LichLamViecTab({ user }) {
   const [error, setError] = useState(null);
   const [selectedShift, setSelectedShift] = useState(null);
 
-  const maNhanVien = user?.maNhanVien || user?.id || localStorage.getItem('maNhanVien');
+  const maNhanVien = user?.maNhanVien || user?.id;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -121,36 +112,51 @@ export default function LichLamViecTab({ user }) {
     fetchData();
   }, [maNhanVien]);
 
-  const monday = useMemo(() => getMondayOfCurrentWeek(), []);
   const today = new Date();
+  const currentMonth = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), []);
 
-  const groupedByDay = useMemo(() => {
-    return DAY_ORDER.map(day => {
-      const dayShifts = shifts
-        .filter(s => normalizeDayKey(s.thu) === normalizeDayKey(day.key))
-        .map(s => {
-          const classified = classifyShift(s.gioLam, s.gioKetThuc);
-          const dateObj = new Date(monday);
-          dateObj.setDate(monday.getDate() + DAY_INDEX_MAP[day.key]);
-          return {
-            ...s,
-            type: classified.type,
-            dateObj,
-            isToday: formatDate(dateObj) === formatDate(today),
-            gioLam: (s.gioLam || '').substring(0, 5) || '08:00',
-            gioKetThuc: (s.gioKetThuc || '').substring(0, 5) || '17:00'
-          };
-        });
-      const dateObj = new Date(monday.getTime() + DAY_INDEX_MAP[day.key] * 86400000);
-      return { 
-        ...day, 
-        dateObj, 
-        shifts: dayShifts, 
-        isToday: formatDate(dateObj) === formatDate(today), 
-        isWeekend: day.key === 'thu-7' || day.key === 'chu-nhat' 
+  // Nhóm shifts theo thứ để tra cứu nhanh: { thuKey: [shift, ...] }
+  const shiftsByThu = useMemo(() => {
+    const map = {};
+    shifts.forEach(s => {
+      const key = normalizeDayKey(s.thu);
+      if (!map[key]) map[key] = [];
+      map[key].push(s);
+    });
+    return map;
+  }, [shifts]);
+
+  // Các ô ngày của tháng hiện tại (null = ô trống để giữ căn lưới, chỉ hiện ngày thuộc tháng này)
+  const monthCells = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const first = new Date(year, month, 1);
+    const startOffset = (first.getDay() + 6) % 7; // Thứ 2 = 0
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < startOffset; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [currentMonth]);
+
+  const monthLabel = currentMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+
+  // Lấy danh sách ca của một ngày cụ thể (đã gán dateObj)
+  const getShiftsForDate = (dateObj) => {
+    const thuKey = JS_DAY_TO_THU[dateObj.getDay()];
+    const list = shiftsByThu[normalizeDayKey(thuKey)] || [];
+    return list.map(s => {
+      const classified = classifyShift(s.gioLam, s.gioKetThuc);
+      return {
+        ...s,
+        type: classified.type,
+        dateObj,
+        gioLam: (s.gioLam || '').substring(0, 5) || '08:00',
+        gioKetThuc: (s.gioKetThuc || '').substring(0, 5) || '17:00'
       };
     });
-  }, [shifts, monday]);
+  };
 
   return (
     <div className="min-h-screen relative">
@@ -187,6 +193,7 @@ export default function LichLamViecTab({ user }) {
             <div className="relative flex flex-col items-center gap-1.5">
               <span className="material-symbols-outlined text-white text-[22px]">calendar_month</span>
               <h2 className="text-lg font-black uppercase tracking-[0.2em] text-white">Lịch làm việc</h2>
+              <p className="text-xs font-semibold text-white/80 capitalize tracking-wide">Tháng {monthLabel}</p>
             </div>
           </div>
 
@@ -207,51 +214,86 @@ export default function LichLamViecTab({ user }) {
               </div>
             )}
 
-            {/* WEEK VIEW */}
+            {/* MONTH VIEW */}
             {!loading && !error && (
               <div className="animate-fade-in-scale overflow-x-auto custom-scroll">
-                <div className="grid grid-cols-7 gap-2 min-w-[900px]">
-                  {groupedByDay.map((day, dayIdx) => (
-                    <div
-                      key={day.key}
-                      className={`glass-card rounded-3xl overflow-hidden flex flex-col hover:shadow-lg transition-all duration-300 group ${day.isToday ? 'ring-2 ring-blue-500/30' : ''}`}
-                      style={{ animationDelay: `${dayIdx * 0.05}s` }}
-                    >
-                      <div className={`px-2 py-2 border-b flex items-center justify-between ${day.isToday ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white' : 'bg-slate-50/80'}`}>
-                        <div>
-                          <p className={`text-[9px] font-bold uppercase ${day.isToday ? 'text-blue-100' : 'text-slate-400'}`}>{day.label}</p>
-                          <p className={`text-base font-extrabold ${day.isToday ? 'text-white' : (day.isWeekend ? 'text-rose-500' : 'text-slate-800')}`}>{day.dateObj.getDate()}</p>
-                        </div>
-                        {day.isToday && <span className="px-1.5 py-0.5 rounded-lg bg-white/20 text-[8px] font-bold uppercase">Hôm nay</span>}
+                <div className="min-w-[820px]">
+                  {/* Weekday header */}
+                  <div className="grid grid-cols-7 gap-2 mb-2">
+                    {DAY_ORDER.map((day) => (
+                      <div
+                        key={day.key}
+                        className={`text-center py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wide ${
+                          day.key === 'thu-7' || day.key === 'chu-nhat'
+                            ? 'text-rose-500 bg-rose-50'
+                            : 'text-slate-500 bg-slate-50'
+                        }`}
+                      >
+                        {day.label}
                       </div>
+                    ))}
+                  </div>
 
-                      <div className="flex-1 p-1.5 space-y-1.5 min-h-[120px]">
-                        {day.shifts.length === 0 ? (
-                          <div className="h-full flex flex-col items-center justify-center gap-1 text-slate-300 border-2 border-dashed border-slate-100 rounded-2xl">
-                            <span className="material-symbols-outlined text-[16px]">event_busy</span>
-                            <p className="text-[9px] font-medium">Nghỉ</p>
+                  {/* Day cells */}
+                  <div className="grid grid-cols-7 gap-2">
+                    {monthCells.map((cell, idx) => {
+                      if (!cell) {
+                        return <div key={`empty-${idx}`} className="min-h-[110px] rounded-2xl" />;
+                      }
+                      const isToday = formatDate(cell) === formatDate(today);
+                      const isWeekend = cell.getDay() === 0 || cell.getDay() === 6;
+                      const dayShifts = getShiftsForDate(cell);
+                      const shownShifts = dayShifts.slice(0, 3);
+                      const extraCount = dayShifts.length - shownShifts.length;
+
+                      return (
+                        <div
+                          key={formatDate(cell)}
+                          className={`glass-card rounded-2xl overflow-hidden flex flex-col hover:shadow-lg transition-all duration-300 group ${isToday ? 'ring-2 ring-blue-500/40' : ''}`}
+                          style={{ animationDelay: `${idx * 0.01}s` }}
+                        >
+                          <div className={`px-2 py-1.5 border-b flex items-center justify-between ${isToday ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white' : 'bg-slate-50/80'}`}>
+                            <p className={`text-sm font-extrabold ${isToday ? 'text-white' : (isWeekend ? 'text-rose-500' : 'text-slate-800')}`}>{cell.getDate()}</p>
+                            {isToday && <span className="px-1.5 py-0.5 rounded-lg bg-white/20 text-[8px] font-bold uppercase">Hôm nay</span>}
                           </div>
-                        ) : (
-                          day.shifts.map((shift, idx) => {
-                            const style = SHIFT_STYLE[shift.type] || SHIFT_STYLE.chieu;
-                            return (
+
+                          <div className="flex-1 p-1.5 space-y-1 min-h-[90px]">
+                            {dayShifts.length === 0 ? (
+                              <div className="h-full flex flex-col items-center justify-center gap-1 text-slate-300">
+                                <span className="material-symbols-outlined text-[14px]">event_busy</span>
+                                <p className="text-[9px] font-medium">Nghỉ</p>
+                              </div>
+                            ) : (
+                              shownShifts.map((shift, sIdx) => {
+                                const style = SHIFT_STYLE[shift.type] || SHIFT_STYLE.chieu;
+                                return (
+                                  <button
+                                    key={sIdx}
+                                    onClick={() => setSelectedShift(shift)}
+                                    className={`w-full text-left rounded-lg px-1.5 py-1 text-white transition-transform hover:-translate-y-0.5 bg-gradient-to-br ${style.gradient} shadow-sm`}
+                                  >
+                                    <p className="text-[10px] font-extrabold leading-snug break-words">{shift.phong || 'Phòng trực'}</p>
+                                    <div className="inline-flex items-center gap-0.5 bg-black/10 px-1 py-0.5 rounded text-[8px] font-bold">
+                                      <span className="material-symbols-outlined text-[10px]">schedule</span>
+                                      {shift.gioLam} - {shift.gioKetThuc}
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
+                            {extraCount > 0 && (
                               <button
-                                key={idx}
-                                onClick={() => setSelectedShift(shift)}
-                                className={`w-full text-left rounded-xl p-2 text-white transition-transform hover:-translate-y-1 bg-gradient-to-br ${style.gradient} shadow-sm`}
+                                onClick={() => setSelectedShift({ ...dayShifts[3], _more: dayShifts.slice(3) })}
+                                className="w-full text-center text-[9px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg py-0.5"
                               >
-                                <p className="text-[11px] font-extrabold mb-1 leading-snug break-words">{shift.phong || 'Phòng trực'}</p>
-                                <div className="inline-flex items-center gap-1 bg-black/10 px-1.5 py-0.5 rounded-lg text-[9px] font-bold">
-                                  <span className="material-symbols-outlined text-[12px]">schedule</span>
-                                  {shift.gioLam} - {shift.gioKetThuc}
-                                </div>
+                                +{extraCount} ca khác
                               </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
@@ -264,7 +306,11 @@ export default function LichLamViecTab({ user }) {
       {/* DETAIL MODAL */}
       {selectedShift && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={() => setSelectedShift(null)}>
-          <div className="animate-fade-in-scale relative w-full max-w-sm glass-card rounded-[28px] overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div
+            className="animate-fade-in-scale relative overflow-hidden rounded-[28px] bg-white shadow-2xl border border-white/60"
+            style={{ width: '100%', maxWidth: '384px' }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className={`bg-gradient-to-br ${SHIFT_STYLE[selectedShift.type]?.gradient} p-6 text-white`}>
               <div className="flex justify-between items-start">
                 <div>

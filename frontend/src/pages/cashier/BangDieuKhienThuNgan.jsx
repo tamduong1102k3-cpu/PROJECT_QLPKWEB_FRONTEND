@@ -24,8 +24,9 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
   });
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const { showSuccess, bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
+  const { showSuccess, showError, bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
   const lastHandledRef = useRef({ maHoaDon: null, ts: 0 });
+  const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
 
   // Lấy maTaiKhoan của nhân viên (bảng tai_khoan) từ token
   const getMaTaiKhoanNhanVien = () => {
@@ -77,7 +78,6 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
   }, []);
 
   // Fetch tất cả thông báo HOA_DON dành cho NHÂN VIÊN (chỉ của chính nhân viên đang đăng nhập)
-  const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
   const fetchAllHoaDonNotifications = useCallback(async () => {
     try {
       const maTaiKhoan = getMaTaiKhoanNhanVien();
@@ -124,6 +124,31 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
     fetchStats();
     fetchAllHoaDonNotifications();
   }, [fetchStats, fetchAllHoaDonNotifications]);
+
+  // Đánh dấu TẤT CẢ thông báo của nhân viên (NHAN_VIEN) là đã đọc (da_doc = 1) trên backend
+  // Duyệt từng thông báo chưa đọc theo id (id lấy trực tiếp từ DB) để cập nhật đúng bản ghi.
+  // KHÔNG phụ thuộc maTaiKhoan từ JWT (hệ thống chưa đưa ma_tai_khoan vào token).
+  const handleMarkAllBellAsRead = useCallback(async () => {
+    // Cập nhật local state NGAY LẬP TỨC để badge biến mất (UX không bị kẹt)
+    markAllBellAsRead();
+
+    // Lấy danh sách id thông báo chưa đọc hiện có trong chuông để gọi API mark-read theo id
+    const unreadIds = bellNotifications
+      .filter(n => !n.read && n.id != null)
+      .map(n => n.id);
+
+    if (unreadIds.length === 0) return;
+
+    try {
+      // Gọi API đánh dấu đã đọc cho từng thông báo theo id (đảm bảo update da_doc = 1 đúng bản ghi)
+      await Promise.all(unreadIds.map(id =>
+        fetchClient(`${baseUrl}/api/thong-bao/${id}/mark-read`, { method: 'PUT', skipLoading: true })
+      ));
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      showError('Không thể cập nhật trạng thái đã đọc');
+    }
+  }, [baseUrl, markAllBellAsRead, bellNotifications, showError]);
 
   // Fetch thong_bao từ backend cho thu ngân
   // Gọi API thật từ bảng thong_bao, không dùng local notification
@@ -305,7 +330,7 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
             <NotificationBell
               notifications={bellNotifications}
               onMarkAsRead={markBellAsRead}
-              onMarkAllAsRead={markAllBellAsRead}
+              onMarkAllAsRead={handleMarkAllBellAsRead}
               onClearAll={clearAllBell}
             />
             <UserMenu

@@ -1,6 +1,9 @@
 import { apiClient } from "../../api/apiClient";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import UserMenu from '../../components/UserMenu';
+import NotificationBell from '../../components/NotificationBell';
+import { useNotification } from '../../components/NotificationContext';
+import useWebSocket from '../../hooks/useWebSocket';
 import QuanLyNhanVien from './components/QuanLyNhanVien';
 import QuanLyTaiKhoan from './components/QuanLyTaiKhoan';
 import QuanLyNhaThuoc from './components/QuanLyNhaThuoc';
@@ -9,7 +12,6 @@ import QuanLyThongKe from './components/QuanLyThongKe';
 import QuanLyPhong from './components/QuanLyPhong';
 import QuanLyDichVu from './components/QuanLyDichVu';
 import QuanLyBenhNhan from './components/QuanLyBenhNhan';
-import QuanLyCauHinh from './components/QuanLyCauHinh';
 import QuanLyCaiDat from './components/QuanLyCaiDat';
 import QuanLyChuyenKhoa from './components/QuanLyChuyenKhoa';
 const BangDieuKhienAdmin = ({
@@ -26,10 +28,41 @@ const BangDieuKhienAdmin = ({
     tongBenhNhan: 0,
     lichKhamHomNay: 0,
     doanhThuThang: 0,
-    doanhThu7Ngay: [],
     luotKhamTuan: 0,
     topDichVu: []
   });
+
+  const { bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
+  const lastHandledRef = useRef({ key: null, ts: 0 });
+
+  // WebSocket subscription for realtime admin notifications
+  useWebSocket({
+    topics: ['/topic/phieu-kham', '/topic/hoa-don', '/topic/dang-ky-kham', '/topic/payment'],
+    onMessage: (topic, data) => {
+      const now = Date.now();
+      const eventKey = `${topic}:${data?.maPhieu || data?.maHoaDon || data?.id || ''}`;
+      if (lastHandledRef.current.key === eventKey && now - lastHandledRef.current.ts < 2000) {
+        return;
+      }
+      lastHandledRef.current = { key: eventKey, ts: now };
+
+      const titleMap = {
+        '/topic/phieu-kham': 'Phiếu khám mới',
+        '/topic/hoa-don': 'Hóa đơn cập nhật',
+        '/topic/dang-ky-kham': 'Đăng ký khám mới',
+        '/topic/payment': 'Thanh toán mới',
+      };
+      addBellNotification({
+        id: `${topic}-${Date.now()}-${Math.random()}`,
+        title: titleMap[topic] || 'Thông báo mới',
+        message: data?.message || 'Có hoạt động mới trên hệ thống.',
+        type: 'info',
+        createdAt: new Date(),
+        read: false,
+      });
+    },
+  });
+
   useEffect(() => {
     // Fetch thuốc sắp hết
     apiClient('https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc/sap-het?threshold=20').then(r => r.ok ? r.json() : []).then(data => {
@@ -44,7 +77,6 @@ const BangDieuKhienAdmin = ({
           tongBenhNhan: data.tongBenhNhan ?? 0,
           lichKhamHomNay: data.lichKhamHomNay ?? 0,
           doanhThuThang: data.doanhThuThang ?? 0,
-          doanhThu7Ngay: data.doanhThu7Ngay ?? [],
           luotKhamTuan: data.luotKhamTuan ?? 0,
           topDichVu: data.topDichVu ?? []
         });
@@ -74,31 +106,6 @@ const BangDieuKhienAdmin = ({
     icon: 'payments',
     color: 'bg-orange-500',
     trend: ''
-  }];
-  const recentAppointments = [{
-    id: '1',
-    patient: 'Nguyễn Văn A',
-    doctor: 'Dr. Trần B',
-    time: '08:00 AM',
-    status: 'Đã hoàn thành'
-  }, {
-    id: '2',
-    patient: 'Lê Thị C',
-    doctor: 'Dr. Phạm D',
-    time: '09:30 AM',
-    status: 'Đang chờ'
-  }, {
-    id: '3',
-    patient: 'Trần Văn E',
-    doctor: 'Dr. Trần B',
-    time: '10:15 AM',
-    status: 'Đang khám'
-  }, {
-    id: '4',
-    patient: 'Phạm Thị F',
-    doctor: 'Dr. Lê G',
-    time: '11:00 AM',
-    status: 'Sắp tới'
   }];
   const navItems = [{
     id: 'dashboard',
@@ -213,11 +220,12 @@ const BangDieuKhienAdmin = ({
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-gray-400 hover:text-gray-500">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-            
+              <NotificationBell
+              notifications={bellNotifications}
+              onMarkAsRead={markBellAsRead}
+              onMarkAllAsRead={markAllBellAsRead}
+              onClearAll={clearAllBell}
+            />
             <UserMenu
               user={user || { username: 'admin', email: 'admin@medcore.com', hoTen: 'Admin User' }}
               onLogout={onLogout}
@@ -251,49 +259,8 @@ const BangDieuKhienAdmin = ({
                   </div>)}
               </div>
 
-                {/* Charts and Lists Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  
-                  {/* Doanh thu 7 ngày gần nhất (Bar Chart) */}
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <div className="flex justify-between items-center mb-6">
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-800">Doanh Thu 7 Ngày Gần Nhất</h2>
-                        <p className="text-xs text-gray-400">Thống kê theo ngày thanh toán</p>
-                      </div>
-                      <span className="material-symbols-outlined text-primary">bar_chart</span>
-                    </div>
-                    
-                    <div className="h-64 flex items-end justify-between gap-2 px-2">
-                      {summary.doanhThu7Ngay.length === 0 ? <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm italic">
-                          Chưa có dữ liệu doanh thu
-                        </div> : summary.doanhThu7Ngay.map((item, idx) => {
-                  const date = new Date(item[0]).toLocaleDateString('vi-VN', {
-                    day: '2-digit',
-                    month: '2-digit'
-                  });
-                  const value = item[1];
-                  const maxVal = Math.max(...summary.doanhThu7Ngay.map(i => i[1]), 1);
-                  const height = value / maxVal * 100;
-                  return <div key={idx} className="flex-1 flex flex-col items-center group relative">
-                              {/* Tooltip */}
-                              <div className="absolute bottom-full mb-2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                                {new Intl.NumberFormat('vi-VN').format(value)} đ
-                              </div>
-                              <div className="w-full bg-primary/20 rounded-t-md group-hover:bg-primary transition-all duration-500" style={{
-                      height: `${height}%`,
-                      minHeight: '4px'
-                    }}></div>
-                              <span className="text-[10px] text-gray-500 mt-2 rotate-[-45deg] origin-top-left translate-x-2">
-                                {date}
-                              </span>
-                            </div>;
-                })}
-                    </div>
-                  </div>
-
-                  {/* Top Dịch Vụ & Luợt Khám Tuần */}
-                  <div className="space-y-6">
+                {/* Top Dịch Vụ & Luợt Khám Tuần */}
+                <div className="space-y-6">
                     {/* Luợt khám tuần */}
                     <div className="bg-gradient-to-br from-primary to-primary-dark rounded-xl shadow-md p-6 text-white">
                       <div className="flex justify-between items-center mb-2">
@@ -312,8 +279,8 @@ const BangDieuKhienAdmin = ({
                       <h2 className="text-lg font-bold text-gray-800 mb-4">Top Dịch Vụ Sử Dụng</h2>
                       <div className="space-y-4">
                         {summary.topDichVu.length === 0 ? <p className="text-sm text-gray-400 italic text-center py-4">Chưa có dữ liệu dịch vụ</p> : summary.topDichVu.map((item, idx) => {
-                    const name = item[0];
-                    const count = item[1];
+                    let name = item[0];
+                    let count = item[1];
                     const maxCount = summary.topDichVu[0][1];
                     const percent = count / maxCount * 100;
                     return <div key={idx} className="space-y-1">
@@ -330,12 +297,9 @@ const BangDieuKhienAdmin = ({
                   })}
                       </div>
                     </div>
-                  </div>
-
                 </div>
 
-
-              {/* ── Thuốc Sắp Hết Widget (full width) ─────────────── */}
+              {/* ─n Thuốc Sắp Hết Widget (full width) ─────────────── */}
               <div className="bg-white rounded-xl shadow-sm border border-orange-100 p-6">
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center gap-3">

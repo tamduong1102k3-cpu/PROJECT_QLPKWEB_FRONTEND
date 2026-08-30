@@ -81,9 +81,9 @@ const TroLyTMHForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals', o
       examData={examData}
       setExamData={setExamData}
       validateExamData={validateTmhExam}
-      specialtyForm={
-        <TabKhamTMH maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} isAssistant={true} />
-      }
+        specialtyForm={
+          <TabKhamTMH maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} isAssistant={true} user={user} />
+        }
     />
   );
 };

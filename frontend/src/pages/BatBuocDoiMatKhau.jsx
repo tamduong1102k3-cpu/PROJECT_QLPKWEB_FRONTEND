@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { firstTimeChangePasswordApi } from '../api/accountApi';
+import { firstTimeChangePasswordApi, ensureAuthenticated } from '../api/accountApi';
 
 const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
   const [newPassword, setNewPassword] = useState('');
@@ -25,7 +25,8 @@ const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
     try {
       await firstTimeChangePasswordApi({ email: user.email, newPassword });
 
-      alert('Đổi mật khẩu thành công! Vui lòng đăng nhập lại với mật khẩu mới.');
+      await ensureAuthenticated();
+      alert('Đổi mật khẩu thành công!');
       onBackToLogin();
     } catch (err) {
       setError(err.message);

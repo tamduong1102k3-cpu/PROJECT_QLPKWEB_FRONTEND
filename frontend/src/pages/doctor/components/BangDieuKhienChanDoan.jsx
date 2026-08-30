@@ -6,6 +6,7 @@ import {
 import DuyetKetQuaXetNghiem from './DuyetKetQuaXetNghiem';
 import DuyetKetQuaCDHA from './DuyetKetQuaCDHA';
 import { toast } from 'react-toastify';
+import formatGender from '../../../utils/formatGender';
 
 const TABS = [
   { key: 'pending',     label: 'Chờ duyệt',   icon: 'pending_actions' },
@@ -69,10 +70,12 @@ const BangDieuKhienChanDoan = ({ user, onBack }) => {
   const handleBack = () => { setSelectedPatient(null); setSelectedLoai(null); fetchData(); };
 
   if (selectedPatient && selectedLoai) {
+    // Khi mở từ tab "Đã duyệt" (approvedList), set readOnly=true để chỉ cập nhật nội dung, không đổi trạng thái
+    const isReviewingApproved = activeTab === 'approved';
     if (selectedLoai === 'xet_nghiem')
-      return <DuyetKetQuaXetNghiem patient={selectedPatient} user={user} onBack={handleBack} />;
+      return <DuyetKetQuaXetNghiem patient={selectedPatient} user={user} onBack={handleBack} readOnly={isReviewingApproved} />;
     if (selectedLoai === 'cdha')
-      return <DuyetKetQuaCDHA patient={selectedPatient} user={user} onBack={handleBack} />;
+      return <DuyetKetQuaCDHA patient={selectedPatient} user={user} onBack={handleBack} readOnly={isReviewingApproved} />;
   }
 
   const currentList = activeTab === 'pending' ? pendingList : approvedList;
@@ -254,7 +257,7 @@ const BangDieuKhienChanDoan = ({ user, onBack }) => {
                             </div>
                             <div>
                               <span className="font-bold text-slate-800 text-sm block mb-0.5 group-hover:text-indigo-600 transition-colors">{item.hoTen}</span>
-                              <span className="text-[11px] font-semibold text-slate-400">{item.gioiTinh || 'N/A'}</span>
+                              <span className="text-[11px] font-semibold text-slate-400">{formatGender(item.gioiTinh)}</span>
                             </div>
                           </div>
                         </td>

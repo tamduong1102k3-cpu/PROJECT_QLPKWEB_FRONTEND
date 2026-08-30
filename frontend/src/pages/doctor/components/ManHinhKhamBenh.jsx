@@ -29,6 +29,7 @@ import {
   getPatientHistoryApi as _getPatientHistoryApi
 } from '../../../api/phieuKhamApi';
 import { saveAndUpdateApi as _saveChiSoKhamTongHopApi } from '../../../api/chiSoKhamTongHopApi';
+import { getByIdApi as _getBenhNhanByIdApi } from '../../../api/benhNhanApi';
 
 import HienThiSinhHieu from './HienThiSinhHieu';
 import TabKhamLamSang from './TabKhamLamSang';
@@ -42,7 +43,35 @@ import TabKhamTimMach from './TabKhamTimMach';
 import TabKhamNhi from './TabKhamNhi';
 import TabHenTaiKham from './TabHenTaiKham';
 
-const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQueue }) => {
+// Ô thông tin bệnh nhân trong lưới header
+const InfoBlock = ({ icon, label, value, href, alert = false }) => {
+  const hasValue = value !== undefined && value !== null && String(value).trim() !== '';
+  const iconWrap = alert
+    ? 'bg-red-100 text-red-600'
+    : hasValue
+      ? 'bg-indigo-50 text-indigo-600'
+      : 'bg-gray-100 text-gray-300';
+  const valueCls = hasValue ? 'text-gray-800' : 'text-gray-300';
+  const inner = (
+    <>
+      <span className={`w-7 h-7 shrink-0 rounded-lg flex items-center justify-center ${iconWrap}`}>
+        <span className="material-symbols-outlined text-[17px]">{icon}</span>
+      </span>
+      <div className="min-w-0">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{label}</div>
+        <div className={`text-[13px] font-bold truncate ${valueCls}`} title={hasValue ? value : undefined}>
+          {hasValue ? value : '—'}
+        </div>
+      </div>
+    </>
+  );
+  const box = `flex items-center gap-2 px-3 py-2 rounded-xl border ${alert && hasValue ? 'border-red-200 bg-red-50/60' : 'border-gray-100 bg-white'} transition-colors`;
+  return href && hasValue
+    ? <a href={href} className={`${box} hover:border-indigo-200 hover:bg-indigo-50/30`}>{inner}</a>
+    : <div className={box}>{inner}</div>;
+};
+
+const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQueue, readOnly = false }) => {
   const { showSuccess, showError, showWarning } = useNotification();
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, type: 'primary', icon: '' });
   // Mã chuyên khoa: 1: Nội tổng quát, 3: Nhi khoa, 4: TMH, 5: RHM, 11: Tim mạch
@@ -50,6 +79,30 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const isRhmDoc = Number(user?.maChuyenKhoa) === 5;
   const isCardiologyDoc = Number(user?.maChuyenKhoa) === 11;
   const isNhiDoc = Number(user?.maChuyenKhoa) === 3;
+
+  const [patientDetails, setPatientDetails] = useState(selectedPatient);
+
+  useEffect(() => {
+    setPatientDetails(selectedPatient);
+    if (selectedPatient?.maBenhNhan) {
+      _getBenhNhanByIdApi(selectedPatient.maBenhNhan)
+        .then(data => {
+          if (data) {
+            // Merge toàn bộ thông tin chi tiết bệnh nhân (ngaySinh, diaChi, soDienThoai,
+            // ngheNghiep, nhomMau, nguoiGiamHo, soDienThoaiNguoiGiamHo...),
+            // bỏ qua các trường null/rỗng để không ghi đè dữ liệu đã có từ hàng đợi
+            setPatientDetails(prev => {
+              const merged = { ...prev };
+              Object.entries(data).forEach(([key, value]) => {
+                if (value !== null && value !== undefined && value !== '') merged[key] = value;
+              });
+              return merged;
+            });
+          }
+        })
+        .catch(err => console.error("Lỗi lấy thông tin bệnh nhân chi tiết:", err));
+    }
+  }, [selectedPatient]);
 
   const [examSubTab, setExamSubTab] = useState('info');
 
@@ -128,11 +181,46 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const selectedMedsRef = useRef([]);
   useEffect(() => {
     selectedMedsRef.current = selectedMeds;
-    // Khi xóa sạch danh sách thuốc, reset trạng thái đã lưu để ẩn banner
+    // Khi xóa danh sách thuốc, reset trạng thái đã lưu để ẩn banner
     if (selectedMeds.length === 0) {
       setPrescriptionSavedAt(null);
     }
   }, [selectedMeds]);
+
+  // Gộp thông tin & version mới nhất từ danh mục thuốc vào danh sách thuốc đang kê
+  // Khắc phục: tên thuốc hiển thị "Thuốc #N", thiếu version (gây lỗi 409 khi lưu lại)
+  const enrichMedsWithCatalog = useCallback((meds, catalog) => {
+    if (!meds) return meds;
+    return meds.map(m => {
+      const cat = catalog.find(c => c.maThuoc === m.maThuoc);
+      if (!cat) return m;
+      return {
+        ...m,
+        tenThuoc: cat.tenThuoc || m.tenThuoc,
+        hoatChat: cat.hoatChat || m.hoatChat,
+        donViTinh: cat.donViTinh || m.donViTinh,
+        tonKho: cat.tonKho ?? m.tonKho,
+        trangThaiKho: cat.trangThaiKho || m.trangThaiKho,
+        // Luôn giữ version mới nhất từ catalog để không bị lỗi 409 khi lưu lặp lại
+        version: cat.version ?? m.version
+      };
+    });
+  }, []);
+
+  // Khi danh mục thuốc vừa tải xong, cập nhật tên thuốc & version cho các thuốc đã chọn
+  useEffect(() => {
+    if (allMeds && allMeds.length > 0) {
+      setSelectedMeds(prev => {
+        const enriched = enrichMedsWithCatalog(prev, allMeds);
+        // Nếu danh sách thay đổi giá trị thì mới cập nhật state để tránh render vòng lặp
+        const changed = enriched.some((m, i) => {
+          const old = prev[i];
+          return !old || old.tenThuoc !== m.tenThuoc || old.version !== m.version || (old.tonKho ?? -1) !== (m.tonKho ?? -1);
+        });
+        return changed ? enriched : prev;
+      });
+    }
+  }, [allMeds, enrichMedsWithCatalog]);
 
   // Fetch initial info for selected patient
   useEffect(() => {
@@ -354,10 +442,13 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       fetchPrescribedHistory();
 
       // Sau khi lưu chỉ định dịch vụ CLS, chuyển trạng thái phiếu khám sang CHO_CLS
-      try {
-        await _updateToClsApi(selectedPatient.maPhieuKham);
-      } catch (err) {
-        console.error("Lỗi khi chuyển trạng thái CHO_CLS:", err);
+      // CHỈ khi đang khám thực tế. Khi xem lại (readOnly) tuyệt đối không đổi trạng thái.
+      if (!readOnly) {
+        try {
+          await _updateToClsApi(selectedPatient.maPhieuKham);
+        } catch (err) {
+          console.error("Lỗi khi chuyển trạng thái CHO_CLS:", err);
+        }
       }
     } catch (error) {
       console.error("Lỗi khi lưu chỉ định:", error);
@@ -634,6 +725,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       const payload = {
         ...examData,
         maPhieuKham: selectedPatient.maPhieuKham,
+        maChuyenKhoa: userData?.maChuyenKhoa,
         maNhanVienNhap: userData?.maNhanVien
       };
       await _saveChiSoKhamTongHopApi(payload);
@@ -696,45 +788,72 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     });
   };
 
+  // --- Helpers hiển thị thông tin bệnh nhân trên header ---
+  const isMale = patientDetails?.gioiTinh === 1 || patientDetails?.gioiTinh === true;
+
+  const formatNgaySinh = (val) => {
+    if (!val) return '';
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return val;
+    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const calcAge = (val) => {
+    if (!val) return null;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const m = now.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+    return age >= 0 ? age : null;
+  };
+
+  const patientAge = calcAge(patientDetails?.ngaySinh);
+
   return (
     <div className="animate-scale-up space-y-6">
+      {readOnly && (
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-xl px-5 py-3 flex items-center gap-3 text-amber-800">
+          <span className="material-symbols-outlined text-amber-600">visibility</span>
+          <span className="font-bold text-sm">
+            ĐANG XEM LẠI CA KHÁM — Mọi thay đổi chỉ cập nhật thông tin, KHÔNG thay đổi trạng thái phiếu khám.
+          </span>
+        </div>
+      )}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between bg-gradient-to-r from-white to-indigo-50/30">
         <div className="flex items-center gap-6">
           <div className="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg shadow-indigo-200">
-            {selectedPatient.hoTen?.[0] || 'BN'}
+            {patientDetails?.hoTen?.[0] || 'BN'}
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-gray-800">{selectedPatient.hoTen}</h2>
-            <div className="flex items-center gap-4 mt-1 text-sm font-medium text-gray-500">
-              <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md">#{selectedPatient.maBenhNhan}</span>
-              <span>•</span>
-              <span>{selectedPatient.gioiTinh === 1 ? 'Nam' : 'Nữ'}</span>
-              <span>•</span>
-              <span>{selectedPatient.ngaySinh ? new Date(selectedPatient.ngaySinh).toLocaleDateString('vi-VN') : 'N/A'}</span>
-              {selectedPatient.ghiChu && (
-                <>
-                  <span>•</span>
-                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md max-w-[200px] truncate" title={selectedPatient.ghiChu}>
-                    📝 {selectedPatient.ghiChu}
-                  </span>
-                </>
-              )}
-              {selectedPatient.diUngThuoc && (
-                <>
-                  <span>•</span>
-                  <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-md max-w-[200px] truncate" title={`Dị ứng: ${selectedPatient.diUngThuoc}`}>
-                    ⚠️ Dị ứng: {selectedPatient.diUngThuoc}
-                  </span>
-                </>
-              )}
-              {selectedPatient.tienSuBenh && (
-                <>
-                  <span>•</span>
-                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md max-w-[200px] truncate" title={`Tiền sử bệnh: ${selectedPatient.tienSuBenh}`}>
-                    🏥 Tiền sử: {selectedPatient.tienSuBenh}
-                  </span>
-                </>
-              )}
+          <div className="min-w-0 flex-1">
+            <h2 className="text-2xl font-black text-gray-800">{patientDetails?.hoTen}</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 mt-3">
+              <InfoBlock icon="badge" label="Mã bệnh nhân" value={patientDetails?.maBenhNhan ? `#${patientDetails.maBenhNhan}` : ''} />
+              <InfoBlock icon={isMale ? 'male' : 'female'} label="Giới tính" value={isMale ? 'Nam' : 'Nữ'} />
+              <InfoBlock icon="cake" label="Ngày sinh" value={patientDetails?.ngaySinh
+                ? `${formatNgaySinh(patientDetails.ngaySinh)}${patientAge !== null ? ` (${patientAge} tuổi)` : ''}`
+                : ''} />
+              <InfoBlock icon="call" label="Số điện thoại" value={patientDetails?.soDienThoai} href={patientDetails?.soDienThoai ? `tel:${patientDetails.soDienThoai}` : undefined} />
+              <InfoBlock icon="mail" label="Email" value={patientDetails?.email} href={patientDetails?.email ? `mailto:${patientDetails.email}` : undefined} />
+              <InfoBlock icon="work" label="Nghề nghiệp" value={patientDetails?.ngheNghiep} />
+              <InfoBlock icon="bloodtype" label="Nhóm máu" value={patientDetails?.nhomMau} />
+              <InfoBlock icon="location_on" label="Địa chỉ" value={patientDetails?.diaChi} />
+              <InfoBlock
+                icon="supervisor_account"
+                label="Người giám hộ"
+                value={patientDetails?.nguoiGiamHo
+                  ? `${patientDetails.nguoiGiamHo}${patientDetails.soDienThoaiNguoiGiamHo ? ` (${patientDetails.soDienThoaiNguoiGiamHo})` : ''}`
+                  : ''}
+              />
+              {[patientDetails?.diUngThuoc, patientDetails?.ghiChu].some(Boolean) && [
+                patientDetails?.diUngThuoc && (
+                  <InfoBlock icon="warning" label="Dị ứng thuốc" value={patientDetails.diUngThuoc} alert />
+                ),
+                patientDetails?.ghiChu && (
+                  <InfoBlock icon="sticky_note_2" label="Ghi chú" value={patientDetails.ghiChu} />
+                )
+              ]}
             </div>
           </div>
         </div>
@@ -748,10 +867,12 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
             onConfirm={confirmState.onConfirm}
             onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
           />
-          <button onClick={handleFinishExam} className="px-6 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-100 flex items-center gap-2">
-            <span className="material-symbols-outlined text-sm">done_all</span>
-            KẾT THÚC KHÁM
-          </button>
+          {!readOnly && (
+            <button onClick={handleFinishExam} className="px-6 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-100 flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">done_all</span>
+              KẾT THÚC KHÁM
+            </button>
+          )}
           <button onClick={() => { setSelectedPatient(null); onBackToQueue(); }} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-xl transition-all">
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -786,7 +907,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
         <div className={`min-w-0 ${examSubTab === 'appointment' ? 'xl:col-span-12' : 'xl:col-span-8'}`}>
           <div style={{ display: examSubTab === 'info' ? 'block' : 'none' }}>
             <TabKhamLamSang
-              selectedPatient={selectedPatient}
+              selectedPatient={patientDetails}
               user={user}
               ref={tabKhamLamSangRef}
             />
@@ -797,6 +918,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
               examData={examData}
               setExamData={setExamData}
               maPhieuKham={selectedPatient.maPhieuKham}
+              user={user}
             />
           )}
 
@@ -805,6 +927,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
               examData={examData}
               setExamData={setExamData}
               maPhieuKham={selectedPatient.maPhieuKham}
+              user={user}
             />
           )}
 
@@ -813,6 +936,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
               examData={examData}
               setExamData={setExamData}
               maPhieuKham={selectedPatient.maPhieuKham}
+              user={user}
             />
           )}
 
@@ -821,6 +945,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
               examData={examData}
               setExamData={setExamData}
               maPhieuKham={selectedPatient.maPhieuKham}
+              user={user}
             />
           )}
 

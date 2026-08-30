@@ -1,4 +1,5 @@
 import React from 'react';
+import formatGender from '../../../utils/formatGender';
 
 const BangBenhNhan = ({ 
   worklistTab, setWorklistTab, setSelectedPatient,
@@ -88,7 +89,7 @@ const BangBenhNhan = ({
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-4">
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black shadow-sm flex-shrink-0 ${item.gioiTinh === 'Nam' || item.gioiTinh === 1 ? 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 border border-blue-200/50' : 'bg-gradient-to-br from-rose-100 to-pink-100 text-rose-700 border border-rose-200/50'}`}>
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black shadow-sm flex-shrink-0 ${formatGender(item.gioiTinh) === 'Nam' ? 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 border border-blue-200/50' : 'bg-gradient-to-br from-rose-100 to-pink-100 text-rose-700 border border-rose-200/50'}`}>
                           {item.hoTen ? item.hoTen[0].toUpperCase() : 'BN'}
                         </div>
                         <div className="min-w-0">

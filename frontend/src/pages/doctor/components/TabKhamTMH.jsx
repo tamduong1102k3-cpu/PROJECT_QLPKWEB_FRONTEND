@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { getByPhieuKhamApi, saveAndUpdateApi } from '../../../api/chiSoKhamTongHopApi';
 import { useNotification } from '../../../components/NotificationContext';
 
-const TabKhamTMH = ({ examData, setExamData, maPhieuKham, isAssistant }) => {
+const TabKhamTMH = ({ examData, setExamData, maPhieuKham, isAssistant, user }) => {
   const { showSuccess, showError } = useNotification();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -31,12 +31,13 @@ const TabKhamTMH = ({ examData, setExamData, maPhieuKham, isAssistant }) => {
     }
 
     setLoading(true);
-    const user = JSON.parse(localStorage.getItem('user'));
+    const u = user || {};
     
     // Combine only TMH fields
     const payload = {
       maPhieuKham: maPhieuKham,
-      maNhanVienNhap: user?.maNhanVien || user?.id,
+      maChuyenKhoa: u.maChuyenKhoa,
+      maNhanVienNhap: u.maNhanVien || u.id,
       tinhTrangMui: examData.tinhTrangMui || null,
       tinhTrangHong: examData.tinhTrangHong || null,
       soiTaiMuiHong: examData.soiTaiMuiHong || null,

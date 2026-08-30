@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getToaThuocByPhieuKhamApi, xacNhanCapThuocApi } from '../../../api/duocSiApi';
 import InDonThuoc from './InDonThuoc';
+import formatGender from '../../../utils/formatGender';
 
 const ChiTietThuocDuocSi = ({ patient, onBack, formatCurrency, formatDateTime }) => {
   const [prescriptions, setPrescriptions] = useState([]);
@@ -150,7 +151,7 @@ const ChiTietThuocDuocSi = ({ patient, onBack, formatCurrency, formatDateTime })
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg">
-              Giới tính: <strong>{patient.gioiTinh || 'N/A'}</strong>
+              Giới tính: <strong>{formatGender(patient.gioiTinh)}</strong>
             </span>
             <span className="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg">
               SĐT: <strong>{patient.soDienThoai || 'N/A'}</strong>

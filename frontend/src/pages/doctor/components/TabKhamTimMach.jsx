@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { saveAndUpdateApi as saveAndUpdatePhieuKhamApi } from '../../../api/chiSoKhamTongHopApi';
 import { useNotification } from '../../../components/NotificationContext';
 
-const TabKhamTimMach = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
+const TabKhamTimMach = ({ examData, setExamData, isAssistant, maPhieuKham, user }) => {
   const { showSuccess, showError } = useNotification();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -58,13 +58,14 @@ const TabKhamTimMach = ({ examData, setExamData, isAssistant, maPhieuKham }) => 
     }
 
     setLoading(true);
-    const user = JSON.parse(localStorage.getItem('user'));
+    const u = user || {};
     
     // Đảm bảo Payload đầy đủ thông tin
     const payload = {
       ...examData,
       maPhieuKham: maPhieuKham,
-      maNhanVienNhap: user?.maNhanVien || user?.id
+      maChuyenKhoa: u.maChuyenKhoa,
+      maNhanVienNhap: u.maNhanVien || u.id
     };
 
     // Parse floats if they exist

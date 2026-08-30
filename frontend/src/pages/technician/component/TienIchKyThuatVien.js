@@ -33,34 +33,27 @@ export const getValueStatus = (field, value) => {
   return 'normal';
 };
 
-export const LAB_TEMPLATES = {
-  HEMATOLOGY: {
-    key: 'HEMATOLOGY',
-    title: 'Xét nghiệm Huyết học (Công thức máu)',
-    fields: [
-      { key: 'rbc', label: 'Hồng cầu (RBC)', unit: 'T/L', min: 3.8, max: 5.8, defaultValue: '4.5' },
-      { key: 'wbc', label: 'Bạch cầu (WBC)', unit: 'G/L', min: 4.0, max: 10.0, defaultValue: '6.5' },
-      { key: 'hgb', label: 'Hemoglobin (HGB)', unit: 'g/dL', min: 12.0, max: 16.5, defaultValue: '14.2' },
-      { key: 'plt', label: 'Tiểu cầu (PLT)', unit: 'G/L', min: 150, max: 400, defaultValue: '260' }
-    ]
-  },
-  BIOCHEMISTRY: {
-    key: 'BIOCHEMISTRY',
-    title: 'Xét nghiệm Sinh hóa máu',
-    fields: [
-      { key: 'glucose', label: 'Glucose', unit: 'mmol/L', min: 3.9, max: 6.4, defaultValue: '5.2' },
-      { key: 'ure', label: 'Ure', unit: 'mmol/L', min: 2.5, max: 7.5, defaultValue: '4.8' },
-      { key: 'creatinin', label: 'Creatinin', unit: 'µmol/L', min: 44, max: 106, defaultValue: '76' }
-    ]
-  },
-  URINALYSIS: {
-    key: 'URINALYSIS',
-    title: 'Xét nghiệm Nước tiểu',
-    fields: [
-      { key: 'ph', label: 'Độ pH', unit: '', min: 5.0, max: 8.5, defaultValue: '6.0' },
-      { key: 'glucose_uri', label: 'Glucose', type: 'select', options: ['Negative', 'Positive'], defaultValue: 'Negative' }
-    ]
-  }
+/**
+ * Chuyển danh sách field của form dịch vụ (từ labForms/*.js) thành template render
+ * @param {Array} fields - Danh sách field (key, label, type, options, donVi, giaTriBinhThuong, maChiSo)
+ * @param {String} serviceName - Tên dịch vụ xét nghiệm
+ */
+export const buildTemplateFromIndicators = (fields, serviceName) => {
+  if (!fields || fields.length === 0) return null;
+  return {
+    key: `LAB_${serviceName || 'XN'}`,
+    title: serviceName || 'Xét nghiệm',
+    fields: fields.map((f) => ({
+      key: f.key,
+      label: f.label || '',
+      type: f.type || 'text',
+      options: (f.options || []),
+      unit: f.donVi || '',
+      giaTriBinhThuong: f.giaTriBinhThuong || '',
+      maChiTiet: f.maChiSo || null,
+      defaultValue: ''
+    }))
+  };
 };
 
 export const IMAGING_TEMPLATES = {
@@ -73,10 +66,15 @@ export const IMAGING_TEMPLATES = {
   }
 };
 
+/**
+ * Template fallback cho dịch vụ chưa có form cấu hình trong labForms/*
+ * - CĐHA/imaging → textarea mô tả
+ * - Xét nghiệm chưa có form → textarea kết quả tự do
+ */
 export const getTemplateForService = (serviceName, isImaging) => {
   if (!serviceName) return null;
   const nameLower = removeVietnameseTones(serviceName.toLowerCase());
-  
+
   if (isImaging || nameLower.includes('sieu am') || nameLower.includes('x quang') || nameLower.includes('ct') || nameLower.includes('mri') || nameLower.includes('noi soi')) {
     return {
       key: 'CDHA_GENERIC',
@@ -86,10 +84,15 @@ export const getTemplateForService = (serviceName, isImaging) => {
       ]
     };
   }
-  
-  if (nameLower.includes('mau') || nameLower.includes('sinh hoa')) return LAB_TEMPLATES.BIOCHEMISTRY;
-  if (nameLower.includes('nuoc tieu')) return LAB_TEMPLATES.URINALYSIS;
-  return null;
+
+  // Mặc định: dịch vụ xét nghiệm chưa có chỉ số → form chỉ gồm textarea tự do
+  return {
+    key: 'LAB_GENERIC',
+    title: serviceName,
+    fields: [
+      { key: 'ket_qua', label: 'Kết quả xét nghiệm', type: 'textarea', defaultValue: '' }
+    ]
+  };
 };
 
 export const generateTextFromTemplate = (template, values, serviceName) => {

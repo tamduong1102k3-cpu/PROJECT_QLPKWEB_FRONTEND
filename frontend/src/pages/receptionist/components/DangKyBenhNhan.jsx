@@ -1,9 +1,10 @@
-import { createApi, searchApi } from '../../../api/benhNhanApi';
-import React, { useState, useRef } from 'react';
+import { createApi, searchApi, updateApi } from '../../../api/benhNhanApi';
+import React, { useState, useRef, useEffect } from 'react';
 
 const DangKyBenhNhan = ({
   onCancel,
-  onSuccess
+  onSuccess,
+  editPatient = null
 }) => {
   const [formData, setFormData] = useState({
     hoTen: '',
@@ -19,10 +20,36 @@ const DangKyBenhNhan = ({
     nguoiGiamHo: '',
     soDienThoaiNguoiGiamHo: '',
     ngheNghiep: '',
+    tienSuBenh: '',
     ghiChu: ''
   });
   const [errors, setErrors] = useState({});
   const dateInputRef = useRef(null);
+
+  useEffect(() => {
+    if (editPatient) {
+      setFormData({
+        hoTen: editPatient.hoTen || '',
+        ngaySinh: editPatient.ngaySinh || '',
+        ngaySinhDisplay: editPatient.ngaySinh ? (() => {
+          const d = new Date(editPatient.ngaySinh);
+          return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+        })() : '',
+        gioiTinh: editPatient.gioiTinh !== false, // Default to true if not strictly false
+        soDienThoai: editPatient.soDienThoai || '',
+        cccd: editPatient.cccd || '',
+        email: editPatient.email || '',
+        diaChi: editPatient.diaChi || '',
+        nhomMau: editPatient.nhomMau || '',
+        diUngThuoc: editPatient.diUngThuoc || '',
+        nguoiGiamHo: editPatient.nguoiGiamHo || '',
+        soDienThoaiNguoiGiamHo: editPatient.soDienThoaiNguoiGiamHo || '',
+        ngheNghiep: editPatient.ngheNghiep || '',
+        tienSuBenh: editPatient.tienSuBenh || '',
+        ghiChu: editPatient.ghiChu || ''
+      });
+    }
+  }, [editPatient]);
 
   // Format DD/MM/YYYY khi gõ
   const formatDateDisplay = (val) => {
@@ -90,6 +117,9 @@ const DangKyBenhNhan = ({
     }
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Định dạng email không hợp lệ';
+    }
+    if (!formData.tienSuBenh.trim()) {
+      newErrors.tienSuBenh = 'Tiền sử bệnh không được để trống';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -173,17 +203,22 @@ const DangKyBenhNhan = ({
     e.preventDefault();
     if (!validate()) return;
     try {
-      const data = await createApi(formData);
+      let data;
+      if (editPatient) {
+        data = await updateApi(editPatient.maBenhNhan, formData);
+      } else {
+        data = await createApi(formData);
+      }
       onSuccess(data);
     } catch (error) {
-      alert(`Lỗi đăng ký: ${error.message}`);
+      alert(`Lỗi ${editPatient ? 'cập nhật' : 'đăng ký'}: ${error.message}`);
     }
   };
   return <div className="bg-white rounded-3xl">
       <div className="p-8 border-b border-gray-100 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-black text-gray-800">Đăng ký Hồ sơ mới</h2>
-          <p className="text-sm text-gray-400 font-medium">Vui lòng nhập chính xác thông tin để tránh trùng lặp</p>
+          <h2 className="text-2xl font-black text-gray-800">{editPatient ? 'Cập nhật Thông tin Bệnh nhân' : 'Đăng ký Hồ sơ mới'}</h2>
+          <p className="text-sm text-gray-400 font-medium">Vui lòng nhập chính xác thông tin để tránh sai sót</p>
         </div>
         <button onClick={onCancel} className="w-10 h-10 flex items-center justify-center text-gray-300 hover:bg-gray-100 rounded-xl transition-colors hover:text-gray-500">
           <span className="material-symbols-outlined">close</span>
@@ -288,6 +323,18 @@ const DangKyBenhNhan = ({
                 <input name="soDienThoaiNguoiGiamHo" value={formData.soDienThoaiNguoiGiamHo} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300" placeholder="09xxxxxxxx" />
               </div>
             </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tiền sử bệnh *</label>
+              <textarea
+                name="tienSuBenh"
+                value={formData.tienSuBenh}
+                onChange={handleChange}
+                rows="3"
+                className={`w-full px-5 py-3.5 bg-white border-2 ${errors.tienSuBenh ? 'border-red-400' : 'border-gray-200'} rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300 resize-none`}
+                placeholder="Tiểu đường, cao huyết áp, chưa phát hiện bệnh nền..."
+              />
+              {errors.tienSuBenh && <p className="text-red-500 text-[10px] mt-1 font-bold italic">{errors.tienSuBenh}</p>}
+            </div>
             <div className={formData.diUngThuoc ? 'p-3 -mx-3 bg-red-50 rounded-2xl border border-red-200' : ''}>
               <label className={`block text-[10px] font-black ${formData.diUngThuoc ? 'text-red-600' : 'text-gray-400'} uppercase tracking-widest mb-1.5`}>
                 {formData.diUngThuoc ? '⚠ Dị ứng thuốc' : 'Dị ứng thuốc'}
@@ -302,7 +349,7 @@ const DangKyBenhNhan = ({
             Quay lại
           </button>
           <button type="submit" className="px-10 py-3.5 bg-primary text-white font-black rounded-2xl hover:bg-primary-dark shadow-lg shadow-primary/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0">
-            TIẾP TỤC ĐẾN CHECK-IN →
+            {editPatient ? 'CẬP NHẬT THÔNG TIN' : 'TIẾP TỤC ĐẾN CHECK-IN →'}
           </button>
         </div>
       </form>

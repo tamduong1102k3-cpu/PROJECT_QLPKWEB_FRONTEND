@@ -1,6 +1,7 @@
 import React from 'react';
 import PrintButton from '../../../components/PrintButton';
 import { sqlLikeMatch } from '../../../utils/searchUtils';
+import formatGender from '../../../utils/formatGender';
 
 const isExpired = (hanSuDung) => {
   if (!hanSuDung) return false;
@@ -284,7 +285,7 @@ const TabKeDonThuoc = ({
             <div>
               <p><strong>Họ tên bệnh nhân:</strong> {selectedPatient.hoTen}</p>
               <p><strong>Ngày sinh:</strong> {selectedPatient.ngaySinh ? new Date(selectedPatient.ngaySinh).toLocaleDateString('vi-VN') : 'N/A'}</p>
-              <p><strong>Giới tính:</strong> {selectedPatient.gioiTinh === 1 ? 'Nam' : 'Nữ'}</p>
+              <p><strong>Giới tính:</strong> {formatGender(selectedPatient.gioiTinh)}</p>
             </div>
             <div>
               <p><strong>Mã bệnh nhân:</strong> #{selectedPatient.maBenhNhan}</p>

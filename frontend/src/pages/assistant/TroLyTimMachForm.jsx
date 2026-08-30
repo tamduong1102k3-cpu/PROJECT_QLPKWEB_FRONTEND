@@ -78,9 +78,9 @@ const TroLyTimMachForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals
         if (examData.duongHuyet !== '') p.duongHuyet = parseFloat(examData.duongHuyet) || null;
         return p;
       }}
-      specialtyForm={
-        <TabKhamTimMach maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} isAssistant={true} />
-      }
+        specialtyForm={
+          <TabKhamTimMach maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} isAssistant={true} user={user} />
+        }
     />
   );
 };

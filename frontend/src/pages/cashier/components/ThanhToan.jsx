@@ -423,12 +423,32 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
           padding: 16px;
         }
         .payment-panel {
-          width: min(540px, 94vw) !important;
+          width: min(720px, 94vw) !important;
           background: white;
           border-radius: 24px;
           overflow-y: auto;
           max-height: 100%;
           box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);
+        }
+        @media (min-width: 1280px) {
+          .payment-panel {
+            width: min(820px, 94vw) !important;
+          }
+        }
+        @media (max-width: 767px) {
+          .payment-panel {
+            width: 100% !important;
+            max-width: 100vw !important;
+          }
+          .payment-panel-overlay {
+            padding: 0;
+            align-items: flex-end;
+          }
+          .payment-panel {
+            max-height: 92vh;
+            border-radius: 20px 20px 0 0;
+          }
+          .payment-panel > div:last-child { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
         }
         .payment-panel > * { border-radius: 0 !important; box-shadow: none !important; }
         .payment-panel > div:first-child { border-top-left-radius: 24px !important; border-top-right-radius: 24px !important; }

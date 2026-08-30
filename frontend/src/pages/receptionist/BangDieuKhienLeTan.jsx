@@ -75,7 +75,7 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
   const navItems = [
     { id: 'dashboard', label: 'Tổng Quan', icon: 'dashboard' },
     { id: 'checkin', label: 'Tiếp Đón', icon: 'person_add' },
-    { id: 'waitingList', label: 'Danh Sách Chờ', icon: 'format_list_numbered' },
+    { id: 'waitingList', label: 'Đăng Ký Hôm Nay', icon: 'format_list_numbered' },
     { id: 'patients', label: 'Thông Tin Bệnh Nhân', icon: 'patient_list' },
     { id: 'invoices', label: 'Thanh Toán', icon: 'payments' },
     { id: 'services', label: 'Bảng Giá Dịch Vụ', icon: 'medical_services' },
@@ -108,14 +108,17 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
           presetDepartment={quickCheckInAppt ? quickCheckInAppt.maChuyenKhoa : undefined}
           presetDoctor={quickCheckInAppt ? quickCheckInAppt.maNhanVien : undefined}
           appointmentId={quickCheckInAppt ? quickCheckInAppt.id : undefined}
+          needsIdentityVerification={quickCheckInAppt
+            ? (quickCheckInAppt.nguonTao || '').toUpperCase() === 'DAT_LICH_APP' && !quickCheckInAppt.daXacMinhDanhTinh
+            : false}
         />;
       case 'waitingList':
         return (
           <div className="animate-fade-in space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[500px]">
               <div className="mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Danh Sách Bệnh Nhân đã đăng ký khám bệnh</h2>
-                <p className="text-sm text-gray-500">Danh sách bệnh nhân đã tiếp đón và đang xếp hàng chờ vào phòng khám</p>
+                <h2 className="text-xl font-bold text-gray-800">Danh Sách Bệnh Nhân Đăng Ký Hôm Nay</h2>
+                <p className="text-sm text-gray-500">Danh sách tất cả bệnh nhân đã đăng ký khám bệnh trong ngày hôm nay</p>
               </div>
               <div className="space-y-4">
                 <DanhSachCho type="waiting" refreshTrigger={refreshTrigger} />

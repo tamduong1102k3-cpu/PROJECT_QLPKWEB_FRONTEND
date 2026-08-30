@@ -139,7 +139,7 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
           </>
         )}
         {activeTab === 'appointments' && !isLabDoctor && <TabHenTaiKham user={user} />}
-        {activeTab === 'history' && <LichSuChuyenKhoa user={user} onReview={handleSelectPatient} />}
+        {activeTab === 'history' && <LichSuChuyenKhoa user={user} onReview={(item) => { setSelectedPatient(item); setIsReadOnly(true); setActiveTab('examination'); }} />}
         {activeTab === 'patients' && <QuanLyBenhNhan />}
         {activeTab === 'lichlamviec' && <LichLamViecTab user={user} />}
         

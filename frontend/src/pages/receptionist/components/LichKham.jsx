@@ -47,6 +47,7 @@ const LichKham = ({ onCheckIn, compact, simple }) => {
     HOAN_THANH: { label: 'Hoàn thành', color: 'bg-green-100 text-green-700' },
     HUY: { label: 'Đã hủy', color: 'bg-red-100 text-red-700' },
     KHONG_DEN: { label: 'Không đến', color: 'bg-gray-100 text-gray-700' },
+    QUA_HEN: { label: 'Quá hẹn', color: 'bg-orange-100 text-orange-700' },
   };
 
   const getStatus = (status) => statusLabels[status] || { label: status || 'Chưa xác định', color: 'bg-gray-100 text-gray-700' };
@@ -74,7 +75,7 @@ const LichKham = ({ onCheckIn, compact, simple }) => {
           </div>
           {isPending ? (
             <button onClick={() => {
-              onCheckIn && onCheckIn({ id: a.id, maBenhNhan: a.maBenhNhan, tenBenhNhan: a.tenBenhNhan, maChuyenKhoa: a.maChuyenKhoa, maBacSi: a.maBacSi });
+              onCheckIn && onCheckIn({ id: a.id, maBenhNhan: a.maBenhNhan, tenBenhNhan: a.tenBenhNhan, maChuyenKhoa: a.maChuyenKhoa, maBacSi: a.maBacSi, nguonTao: a.nguonTao || a.nguon_tao, daXacMinhDanhTinh: a.daXacMinhDanhTinh });
             }} className="text-[11px] font-bold bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 shadow-sm shadow-green-500/20 transition-all">Check-in</button>
           ) : (
             <span className="text-[11px] text-gray-400">{getStatus(a.trangThai).label}</span>
@@ -141,6 +142,7 @@ const LichKham = ({ onCheckIn, compact, simple }) => {
                 <option value="HOAN_THANH">Hoàn thành</option>
                 <option value="HUY">Đã hủy</option>
                 <option value="KHONG_DEN">Không đến</option>
+                <option value="QUA_HEN">Quá hẹn</option>
               </select>
             </div>
           </div>
@@ -191,13 +193,22 @@ const LichKham = ({ onCheckIn, compact, simple }) => {
                     <td className="px-4 py-4 text-sm text-gray-600">{getTenDichVu(a)}</td>
                     <td className="px-4 py-4 text-sm text-gray-600">{a.tenBacSi || '--'}</td>
                     <td className="px-4 py-4 text-sm text-gray-600 font-medium">{a.ngayKham ? new Date(a.ngayKham).toLocaleDateString('vi-VN') : '--'}</td>
-                    <td className="px-4 py-4">{getSourceBadge(a.nguonTao || a.nguon_tao)}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-1">
+                        {getSourceBadge(a.nguonTao || a.nguon_tao)}
+                        {(a.nguonTao || a.nguon_tao) === 'DAT_LICH_APP' && !a.daXacMinhDanhTinh && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[10px] font-bold w-fit">
+                            <span className="material-symbols-outlined text-[11px]">gpp_maybe</span>Chưa XM
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-4"><span className={`px-3 py-1 rounded-full text-xs font-semibold ${status.color}`}>{status.label}</span></td>
                     <td className="px-4 py-4 text-sm text-gray-400 max-w-[200px] truncate">{a.ghiChu || '--'}</td>
                     <td className="px-4 py-4 text-right">
                       {isPending ? (
                         <button onClick={() => {
-                          onCheckIn && onCheckIn({ id: a.id, maBenhNhan: a.maBenhNhan, tenBenhNhan: a.tenBenhNhan, maChuyenKhoa: a.maChuyenKhoa, maBacSi: a.maBacSi });
+                          onCheckIn && onCheckIn({ id: a.id, maBenhNhan: a.maBenhNhan, tenBenhNhan: a.tenBenhNhan, maChuyenKhoa: a.maChuyenKhoa, maBacSi: a.maBacSi, nguonTao: a.nguonTao || a.nguon_tao, daXacMinhDanhTinh: a.daXacMinhDanhTinh });
                         }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-sm shadow-emerald-200 hover:shadow-md font-semibold text-xs">
                           <span className="material-symbols-outlined text-sm">assignment_turned_in</span>Tiếp đón
                         </button>

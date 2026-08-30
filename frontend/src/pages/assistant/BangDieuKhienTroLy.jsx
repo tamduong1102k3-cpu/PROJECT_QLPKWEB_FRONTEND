@@ -11,6 +11,7 @@ import { sqlLikeMatch } from '../../utils/searchUtils';
 import VitalSignsFormComponent from '../../components/VitalSignsForm';
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import TroLyRHMForm from './TroLyRHMForm';
+import formatGender from '../../utils/formatGender';
 import TroLyTMHForm from './TroLyTMHForm';
 import TroLyTimMachForm from './TroLyTimMachForm';
 import TroLyNhiForm from './TroLyNhiForm';
@@ -63,7 +64,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
         }
       const choKhamOrDangKham = filteredData.filter(r => r.trangThai === 'CHO_KHAM' || r.trangThai === 'DANG_KHAM');
       const absentList = filteredData.filter(r => r.trangThai === 'VANG_MAT');
-      const completedList = filteredData.filter(r => r.trangThai === 'CHO_BAC_SI' || r.trangThai === 'HOAN_THANH');
+      const completedList = filteredData.filter(r => r.trangThai === 'CHO_BAC_SI');
       // Gộp bệnh nhân VANG_MAT vào danh sách pending để không bị mất khỏi danh sách
       const pending = [...choKhamOrDangKham, ...absentList];
       
@@ -264,7 +265,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
                       <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
                         <span>#{selectedPatient.maBenhNhan}</span>
                         <span>•</span>
-                        <span>{selectedPatient.gioiTinh ? 'Nam' : 'Nữ'}</span>
+                        <span>{formatGender(selectedPatient.gioiTinh)}</span>
                         <span>•</span>
                         <span>{new Date(selectedPatient.ngaySinh).toLocaleDateString("vi-VN")}</span>
                       </div>

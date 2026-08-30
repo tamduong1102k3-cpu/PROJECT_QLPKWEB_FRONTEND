@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { formatDateOfBirth, calculateAge, formatDateTime } from './TienIchKyThuatVien';
+import formatGender from '../../../utils/formatGender';
 
 // Sort patients: normal order by soThuTu ASC, but xepCuoi=true patients go to the end
 function sortPatientList(patients) {
@@ -199,7 +200,7 @@ const BangDanhSachCongViec = ({
                 </td>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-4">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black shadow-sm flex-shrink-0 ${item.gioiTinh === 'Nam' || item.gioiTinh === 1 ? 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 border border-blue-200/50' : 'bg-gradient-to-br from-rose-100 to-pink-100 text-rose-700 border border-rose-200/50'}`}>
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black shadow-sm flex-shrink-0 ${formatGender(item.gioiTinh) === 'Nam' ? 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 border border-blue-200/50' : 'bg-gradient-to-br from-rose-100 to-pink-100 text-rose-700 border border-rose-200/50'}`}>
                       {item.hoTen ? item.hoTen[0].toUpperCase() : 'BN'}
                     </div>
                     <div className="min-w-0">
@@ -213,7 +214,7 @@ const BangDanhSachCongViec = ({
                         )}
                       </h4>
                       <div className="flex items-center gap-2 mt-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${item.gioiTinh === 'Nam' || item.gioiTinh === 1 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>{item.gioiTinh === 1 || item.gioiTinh === 'Nam' ? 'Nam' : 'Nữ'}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${formatGender(item.gioiTinh) === 'Nam' ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>{formatGender(item.gioiTinh)}</span>
                         <span>•</span>
                         <span>{formatDateOfBirth(item.ngaySinh)}</span>
                         <span className="text-slate-400">({calculateAge(item.ngaySinh)})</span>
@@ -318,9 +319,6 @@ const BangDanhSachCongViec = ({
                             title={item.hasVitals ? 'Nhập kết quả chuyên môn' : 'Cần nhập chỉ số sinh hiệu trước'}
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span> KẾT QUẢ
-                          </button>
-                          <button onClick={() => onOpenView(item)} className="px-3 py-2.5 bg-gradient-to-r from-slate-600 to-slate-500 text-white font-bold rounded-xl hover:from-slate-700 hover:to-slate-600 shadow-md shadow-slate-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
-                            <span className="material-symbols-outlined text-[18px]">visibility</span> XEM
                           </button>
                         </>
                       ) : (

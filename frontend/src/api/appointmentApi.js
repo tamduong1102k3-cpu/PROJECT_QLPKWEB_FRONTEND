@@ -14,7 +14,7 @@ export const getAllApi = async () => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -42,7 +42,7 @@ export const createApi = async (data) => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -70,7 +70,7 @@ export const updateApi = async (id, data) => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -98,7 +98,7 @@ export const searchApi = async (params = {}) => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();
@@ -122,7 +122,7 @@ export const deleteApi = async id => {
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
+      } catch { /* ignore parse error */ }
       throw new Error(errorMsg);
     }
     const text = await response.text();

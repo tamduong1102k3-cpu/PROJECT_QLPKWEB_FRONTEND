@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { saveAndUpdateApi } from '../../../api/chiSoKhamTongHopApi';
 import { useNotification } from '../../../components/NotificationContext';
 
-const TabKhamNhi = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
+const TabKhamNhi = ({ examData, setExamData, isAssistant, maPhieuKham, user }) => {
   const { showSuccess, showError } = useNotification();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -38,11 +38,12 @@ const TabKhamNhi = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
     }
 
     setLoading(true);
-    const user = JSON.parse(localStorage.getItem('user'));
+    const u = user || {};
 
     const payload = {
       maPhieuKham: maPhieuKham,
-      maNhanVienNhap: user?.maNhanVien || user?.id,
+      maChuyenKhoa: u.maChuyenKhoa,
+      maNhanVienNhap: u.maNhanVien || u.id,
       tinhTrangDinhDuong: examData.tinhTrangDinhDuong || null,
       tamLyHanhVi: examData.tamLyHanhVi || null,
       khamTaiMuiHongNhi: examData.khamTaiMuiHongNhi || null,
