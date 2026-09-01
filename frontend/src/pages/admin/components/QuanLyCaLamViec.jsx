@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   createShiftApi,
+  createDefaultShiftMonthApi,
+  deleteDefaultShiftByWeekdayApi,
   getMonthScheduleApi,
   createExceptionApi,
   updateExceptionApi,
@@ -17,6 +19,7 @@ import {
 import { getAllNhanVienApi as getAllEmployeesApi } from "../../../api/employeeApi";
 import {
   getAllChucVuApi as getChucVuApi,
+  getAllChuyenKhoaApi as getChuyenKhoaApi,
   getAllPhongApi as getPhongApi,
 } from "../../../api/danhMucApi";
 import { useNotification } from "../../../components/NotificationContext";
@@ -33,7 +36,7 @@ const THU_ORDER = [
 
 const TIEU_DE_THEO_LOAI = {
   NGHI_PHEP: "Nghỉ phép",
-  THEM_CA: "Thêm ca",
+  THEM_CA: "Thêm ca thường ngoại lệ",
 };
 
 const TH = {
@@ -46,6 +49,7 @@ const TH = {
   background: "#f1f5f9",
   whiteSpace: "nowrap",
 };
+
 const TD = {
   border: "1px solid #e5e7eb",
   padding: "6px 8px",
@@ -54,67 +58,238 @@ const TD = {
   verticalAlign: "top",
 };
 
+const emptyCalForm = () => ({
+  loai: null,
+  id: null,
+  phong: "",
+  gioLam: "",
+  gioKetThuc: "",
+  lyDo: "",
+  maCaMacDinh: null,
+  caIds: [""],
+});
+
+const emptyDefaultForm = () => ({
+  phong: "",
+  caIds: [""],
+});
+
+const emptyCaLamForm = () => ({
+  tenCa: "",
+  gioBatDau: "",
+  gioKetThuc: "",
+});
+
+const getEmployeeId = (s) => s?.maNhanVien ?? s?.ma_nhan_vien;
+const getEmployeeName = (s) => s?.hoTen ?? s?.ho_ten ?? "";
+const getPhongName = (p) => p?.ten_phong ?? p?.tenPhong ?? "";
+const normalizeFilterText = (value) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+const getShiftTimeValue = (entry) =>
+  entry?.ca?.gioBatDau || entry?.gioLam || "";
+
+const getShiftDisplayName = (entry) => {
+  const ca = entry?.ca;
+  const timeValue = getShiftTimeValue(entry);
+  const hour = Number(String(timeValue).split(":")[0] || 0);
+  return ca?.tenCa || (hour < 12 ? "ca sáng" : "ca chiều");
+};
+
+function EmployeeSearchField({
+  items,
+  value,
+  selectedId,
+  open,
+  onOpen,
+  onClose,
+  onSearch,
+  onSelect,
+  onClear,
+}) {
+  const normalizeSearchText = (v) =>
+    String(v || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+  const labelOf = (s) => {
+    const id = s.maNhanVien || s.ma_nhan_vien;
+    return `${s.hoTen || s.ho_ten} (NV${String(id).padStart(3, "0")})`;
+  };
+
+  const filtered = useMemo(() => {
+    const q = normalizeSearchText(value.trim());
+    if (!q) return items;
+    return items.filter((s) => {
+      const name = normalizeSearchText(s.hoTen || s.ho_ten);
+      const code = normalizeSearchText(s.maNhanVien || s.ma_nhan_vien);
+      return (
+        name.includes(q) ||
+        code.includes(q) ||
+        labelOf(s).toLowerCase().includes(q)
+      );
+    });
+  }, [items, value]);
+
+  return (
+    <div style={{ position: "relative", minWidth: "260px" }}>
+      <input
+        type="text"
+        value={value}
+        onFocus={() => onOpen?.()}
+        onChange={(e) => onSearch?.(e.target.value)}
+        placeholder="Tìm nhân viên..."
+        style={{
+          width: "100%",
+          padding: "8px 12px",
+          paddingRight: "32px",
+          border: "1px solid #ddd",
+          borderRadius: "6px",
+          fontSize: "13px",
+          outline: "none",
+          boxSizing: "border-box",
+        }}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onClear?.()}
+          style={{
+            position: "absolute",
+            right: "8px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            border: "none",
+            background: "transparent",
+            color: "#64748b",
+            cursor: "pointer",
+            fontSize: "16px",
+            lineHeight: 1,
+          }}
+          aria-label="Xóa tìm kiếm nhân viên"
+        >
+          ×
+        </button>
+      )}
+      {open && filtered.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            maxHeight: "220px",
+            overflowY: "auto",
+            background: "#fff",
+            border: "1px solid #ddd",
+            borderRadius: "6px",
+            boxShadow: "0 8px 20px rgba(0,0,0,0.12)",
+            zIndex: 20,
+          }}
+        >
+          {filtered.slice(0, 40).map((s) => {
+            const id = s.maNhanVien || s.ma_nhan_vien;
+            const label = labelOf(s);
+            return (
+              <div
+                key={id}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onSelect?.(String(id), label);
+                  onClose?.();
+                }}
+                style={{
+                  padding: "8px 10px",
+                  cursor: "pointer",
+                  borderBottom: "1px solid #f1f5f9",
+                  fontSize: "13px",
+                  background:
+                    String(id) === String(selectedId) ? "#eff6ff" : "#fff",
+                }}
+              >
+                {label}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function QuanLyCaLamViec() {
+  /* ============================================================
+     1) DATA STATE
+     ============================================================ */
   const [staff, setStaff] = useState([]);
   const [chucVuList, setChucVuList] = useState([]);
+  const [chuyenKhoaList, setChuyenKhoaList] = useState([]);
   const [phongList, setPhongList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const [filterChucVu, setFilterChucVu] = useState("");
+  const [filterChuyenKhoa, setFilterChuyenKhoa] = useState("");
+  const [filterPhong, setFilterPhong] = useState("");
 
+  /* ============================================================
+     2) CALENDAR STATE
+     ============================================================ */
   const [viewMode, setViewMode] = useState("calendar");
   const [calSelectedMaNV, setCalSelectedMaNV] = useState("");
+  const [calEmployeeSearch, setCalEmployeeSearch] = useState("");
+  const [calEmpOpen, setCalEmpOpen] = useState(false);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
   const [calData, setCalData] = useState(null);
   const [calLoading, setCalLoading] = useState(false);
   const [calError, setCalError] = useState(null);
   const [calSelectedDay, setCalSelectedDay] = useState(null);
-  const [calForm, setCalForm] = useState({
-    loai: null,
-    id: null,
-    phong: "",
-    gioLam: "08:00",
-    gioKetThuc: "17:00",
-    lyDo: "",
-    maCaMacDinh: null,
-  });
-  const [calDefaultForm, setCalDefaultForm] = useState({ phong: "", caIds: [""] });
+  const [calForm, setCalForm] = useState(emptyCalForm());
+  const [calDefaultForm, setCalDefaultForm] = useState(emptyDefaultForm());
   const [calDeleteConfirmId, setCalDeleteConfirmId] = useState(null);
   const [calSaving, setCalSaving] = useState(false);
   const [calShowAddDefault, setCalShowAddDefault] = useState(false);
   const [calEditingDefaultId, setCalEditingDefaultId] = useState(null);
-  const [calEditDefaultForm, setCalEditDefaultForm] = useState({ phong: "", caIds: [""] });
+  const [calEditDefaultForm, setCalEditDefaultForm] =
+    useState(emptyDefaultForm());
+
+  /* ============================================================
+     3) SHIFT CATEGORY STATE
+     ============================================================ */
   const [caLamList, setCaLamList] = useState([]);
   const [caLamLoading, setCaLamLoading] = useState(false);
   const [caLamError, setCaLamError] = useState(null);
-  const [caLamForm, setCaLamForm] = useState({
-    tenCa: "",
-    gioBatDau: "",
-    gioKetThuc: "",
-  });
+  const [caLamForm, setCaLamForm] = useState(emptyCaLamForm());
   const [editingCaLamId, setEditingCaLamId] = useState(null);
   const [openCaLamModal, setOpenCaLamModal] = useState(false);
   const [caLamSaving, setCaLamSaving] = useState(false);
 
   const { showSuccess, showError } = useNotification();
 
+  /* ============================================================
+     SECTION: DATA FETCH
+     ============================================================ */
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     setCaLamLoading(true);
     setCaLamError(null);
     try {
-      const [nvData, cvData, phData, caLamData] =
-        await Promise.all([
-          getAllEmployeesApi(),
-          getChucVuApi(),
-          getPhongApi(),
-          getAllCaLamDanhMucApi(),
-        ]);
+      const [nvData, cvData, ckData, phData, caLamData] = await Promise.all([
+        getAllEmployeesApi(),
+        getChucVuApi(),
+        getChuyenKhoaApi(),
+        getPhongApi(),
+        getAllCaLamDanhMucApi(),
+      ]);
       setStaff(nvData || []);
       setChucVuList(cvData || []);
+      setChuyenKhoaList(ckData || []);
       setPhongList(phData || []);
       setCaLamList(caLamData || []);
     } catch (e) {
@@ -127,11 +302,12 @@ export default function QuanLyCaLamViec() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, []);
 
-  // ============== CALENDAR LOGIC ==============
+  /* ============================================================
+     SECTION: CALENDAR LOGIC
+     ============================================================ */
   const fmtGio = (s) => (s || "").substring(0, 5) || "--:--";
 
   const fetchCalMonth = useCallback(async () => {
@@ -158,7 +334,6 @@ export default function QuanLyCaLamViec() {
   }, [calSelectedMaNV, calYear, calMonth]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCalMonth();
   }, [fetchCalMonth]);
 
@@ -177,21 +352,20 @@ export default function QuanLyCaLamViec() {
     setCalYear(y);
   };
 
+  /* ============================================================
+     SECTION: CALENDAR HANDLERS
+     ============================================================ */
   const calOpenDay = (day) => {
     if (!day) return;
     setCalSelectedDay(day);
     const firstDefault = (day.macDinh || [])[0] || null;
     setCalForm({
-      loai: null,
-      id: null,
-      phong: "",
-      gioLam: "08:00",
-      gioKetThuc: "17:00",
-      lyDo: "",
+      ...emptyCalForm(),
       maCaMacDinh: firstDefault?.ca?.id || null,
+      caIds: firstDefault?.ca?.id ? [String(firstDefault.ca.id)] : [""],
     });
     setCalShowAddDefault(false);
-    setCalDefaultForm({ phong: "", caIds: [""] });
+    setCalDefaultForm(emptyDefaultForm());
   };
 
   const calSaveException = async () => {
@@ -209,12 +383,10 @@ export default function QuanLyCaLamViec() {
       ngay: calSelectedDay.ngay,
       loai: calForm.loai,
       phong: calForm.loai === "NGHI_PHEP" ? null : calForm.phong.trim(),
-      gioLam: calForm.loai === "NGHI_PHEP" ? null : calForm.gioLam,
-      gioKetThuc: calForm.loai === "NGHI_PHEP" ? null : calForm.gioKetThuc,
+      gioLam: calForm.loai === "NGHI_PHEP" ? null : null,
+      gioKetThuc: calForm.loai === "NGHI_PHEP" ? null : null,
       lyDo: calForm.lyDo.trim() || null,
-      // NGHI_PHEP có thể chọn 1 ca cụ thể (nghỉ ca đó) hoặc không chọn (nghỉ cả ngày)
-      maCaMacDinh:
-        calForm.loai === "NGHI_PHEP" ? calForm.maCaMacDinh : null,
+      maCaMacDinh: calForm.loai === "NGHI_PHEP" ? calForm.maCaMacDinh : null,
     };
     setCalSaving(true);
     try {
@@ -224,10 +396,11 @@ export default function QuanLyCaLamViec() {
         loai: null,
         id: null,
         phong: "",
-        gioLam: "08:00",
-        gioKetThuc: "17:00",
+        gioLam: "",
+        gioKetThuc: "",
         lyDo: "",
         maCaMacDinh: null,
+        caIds: [""],
       });
       setCalSelectedDay(null);
       await fetchCalMonth();
@@ -264,15 +437,17 @@ export default function QuanLyCaLamViec() {
   };
 
   const calStartEdit = (ex) => {
+    const selectedCaId = ex.caThayThe?.id || ex.maCaMacDinh || null;
     setCalForm({
+      ...emptyCalForm(),
       loai: ex.loai,
       id: ex.id,
       phong: ex.phong || "",
-      gioLam: (ex.gioLam || "08:00:00").substring(0, 5),
-      gioKetThuc: (ex.gioKetThuc || "17:00:00").substring(0, 5),
+      gioLam: ex.gioLam ? ex.gioLam.substring(0, 5) : "",
+      gioKetThuc: ex.gioKetThuc ? ex.gioKetThuc.substring(0, 5) : "",
       lyDo: ex.lyDo || "",
-      // NGHI_PHEP theo ca lưu caThayThe = ca bị nghỉ
-      maCaMacDinh: ex.caThayThe?.id || ex.maCaMacDinh || null,
+      maCaMacDinh: selectedCaId,
+      caIds: selectedCaId ? [String(selectedCaId)] : [""],
     });
   };
 
@@ -291,33 +466,22 @@ export default function QuanLyCaLamViec() {
     }
     setCalSaving(true);
     try {
-      // Tạo bản ghi riêng cho từng ngày cùng thứ trong tháng đang xem.
-      // Mỗi bản ghi có ngay = ngày cụ thể -> sửa/xóa 1 ngày không ảnh hưởng ngày khác.
-      const daysInMonth = new Date(calYear, calMonth, 0).getDate();
-      const thu = calSelectedDay.thu;
-      for (let dd = 1; dd <= daysInMonth; dd++) {
-        const date = new Date(calYear, calMonth - 1, dd);
-        const thuIndex = (date.getDay() + 6) % 7;
-        if (THU_ORDER[thuIndex] !== thu) continue;
-        const ngayKey = `${calYear}-${String(calMonth).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
-        for (const maCa of selectedCaIds) {
-          await createShiftApi({
-            maNhanVien: Number(calSelectedMaNV),
-            thu,
-            maCa,
-            phong: calDefaultForm.phong.trim(),
-            ngay: ngayKey,
-          });
-        }
-      }
+      await createDefaultShiftMonthApi({
+        maNhanVien: Number(calSelectedMaNV),
+        nam: calYear,
+        thang: calMonth,
+        thu: calSelectedDay.thu,
+        phong: calDefaultForm.phong.trim(),
+        maCaIds: selectedCaIds,
+      });
       setCalShowAddDefault(false);
-      setCalDefaultForm({ phong: "", caIds: [""] });
+      setCalDefaultForm({ phong: "", caIds: [""], gioLam: "", gioKetThuc: "" });
       const data = await fetchCalMonth();
       if (calSelectedDay) {
         const key = calSelectedDay.ngay;
         setCalSelectedDay(data?.days?.find((x) => x.ngay === key) || null);
       }
-      showSuccess("Đã thêm ca làm việc thường");
+      showSuccess("Đã thêm ca làm việc mặc định trong tháng");
     } catch (e) {
       showError("Lỗi thêm ca: " + e.message);
     } finally {
@@ -325,10 +489,9 @@ export default function QuanLyCaLamViec() {
     }
   };
 
-  // Xóa 1 ca mặc định của ngày đang xem: xóa thật bản ghi bang_phan_cong_ca_lam
   const calDeleteDefault = async (m) => {
     const ok = window.confirm(
-      `Xóa ca làm việc thường này?${m?.phong ? ` (${m.phong})` : ""}`,
+      `Xóa ca làm việc mặc định này?${m?.phong ? ` (${m.phong})` : ""}`,
     );
     if (!ok) return;
     if (!m?.id) {
@@ -343,9 +506,38 @@ export default function QuanLyCaLamViec() {
         const key = calSelectedDay.ngay;
         setCalSelectedDay(data?.days?.find((x) => x.ngay === key) || null);
       }
-      showSuccess("Đã xóa ca làm việc thường");
+      showSuccess("Đã xóa ca làm việc mặc định");
     } catch (e) {
       showError("Lỗi xóa ca: " + e.message);
+    } finally {
+      setCalSaving(false);
+    }
+  };
+
+  const calDeleteDefaultByWeekday = async () => {
+    if (!calSelectedDay || !calSelectedMaNV) return;
+    const ok = window.confirm(
+      `Xóa tất cả ca làm việc mặc định của ${calSelectedDay.thu} trong tháng ${calMonth}/${calYear}?`,
+    );
+    if (!ok) return;
+    setCalSaving(true);
+    try {
+      await deleteDefaultShiftByWeekdayApi({
+        maNhanVien: Number(calSelectedMaNV),
+        nam: calYear,
+        thang: calMonth,
+        thu: calSelectedDay.thu,
+      });
+      const data = await fetchCalMonth();
+      if (calSelectedDay) {
+        const key = calSelectedDay.ngay;
+        setCalSelectedDay(data?.days?.find((x) => x.ngay === key) || null);
+      }
+      showSuccess(
+        `Đã xóa tất cả ca làm việc mặc định của ${calSelectedDay.thu} trong tháng`,
+      );
+    } catch (e) {
+      showError("Lỗi xóa ca mặc định: " + e.message);
     } finally {
       setCalSaving(false);
     }
@@ -374,12 +566,13 @@ export default function QuanLyCaLamViec() {
     }
     setCalSaving(true);
     try {
-      // Cập nhật đúng bản ghi đang sửa bằng ca đầu tiên + phòng mới.
-      // Giữ nguyên ngay của bản ghi gốc -> chỉ ảnh hưởng đúng 1 ngày.
       const editingRecord = (calSelectedDay?.macDinh || []).find(
         (m) => m.id === calEditingDefaultId,
       );
-      const ngay = editingRecord?.ngay || calSelectedDay.ngay;
+      if (!editingRecord) {
+        throw new Error("Không tìm thấy bản ghi ca mặc định cần sửa");
+      }
+      const ngay = editingRecord.ngay || calSelectedDay.ngay;
       await updateShiftApi(calEditingDefaultId, {
         maNhanVien: Number(calSelectedMaNV),
         thu: calSelectedDay.thu,
@@ -387,8 +580,6 @@ export default function QuanLyCaLamViec() {
         phong: calEditDefaultForm.phong.trim(),
         ngay,
       });
-
-      // Tạo thêm các ca còn lại cho đúng ngày (nếu người dùng chọn nhiều ca)
       for (let i = 1; i < selectedCaIds.length; i++) {
         await createShiftApi({
           maNhanVien: Number(calSelectedMaNV),
@@ -398,7 +589,6 @@ export default function QuanLyCaLamViec() {
           ngay,
         });
       }
-
       setCalEditingDefaultId(null);
       setCalEditDefaultForm({ phong: "", caIds: [""] });
       const data = await fetchCalMonth();
@@ -406,7 +596,7 @@ export default function QuanLyCaLamViec() {
         const key = calSelectedDay.ngay;
         setCalSelectedDay(data?.days?.find((x) => x.ngay === key) || null);
       }
-      showSuccess("Đã cập nhật ca làm việc thường");
+      showSuccess("Đã cập nhật ca làm việc mặc định trong tháng");
     } catch (e) {
       showError("Lỗi cập nhật ca: " + e.message);
     } finally {
@@ -416,7 +606,7 @@ export default function QuanLyCaLamViec() {
 
   const calCancelEditDefault = () => {
     setCalEditingDefaultId(null);
-    setCalEditDefaultForm({ phong: "", caIds: [""] });
+    setCalEditDefaultForm(emptyDefaultForm());
   };
 
   const calCells = useMemo(() => {
@@ -442,13 +632,11 @@ export default function QuanLyCaLamViec() {
     const ngoaiLe = day.ngoaiLe || [];
     const themCa = ngoaiLe.filter((e) => e.loai === "THEM_CA");
     const nghiList = ngoaiLe.filter((e) => e.loai === "NGHI_PHEP");
-    // NGHI_PHEP có caThayThe = nghỉ 1 ca cụ thể; không có = nghỉ cả ngày
     const nghiCa = nghiList.find((e) => e.caThayThe);
     const nghiAll = nghiList.find((e) => !e.caThayThe);
     if (nghiAll) return { nghi: nghiAll, items: [] };
     const items = [];
     macDinh.forEach((m) => {
-      // Nếu ca mặc định bị nghỉ 1 ca cụ thể -> bỏ qua ca đó
       if (
         nghiCa &&
         nghiCa.caThayThe &&
@@ -460,7 +648,6 @@ export default function QuanLyCaLamViec() {
       items.push({ kind: "macDinh", data: m });
     });
     themCa.forEach((t) => {
-      // Thêm ca cũng bị nghỉ nếu trùng ca
       if (
         nghiCa &&
         nghiCa.caThayThe &&
@@ -469,15 +656,14 @@ export default function QuanLyCaLamViec() {
       ) {
         return;
       }
-      if (nghiCa && nghiCa.caThayThe && t.gioLam) {
-        // NGHI_PHEP lưu gioLam của ca bị nghỉ, so với THEM_CA thật sự là ca Thêm
-        // (THEM_CA không dùng caThayThe, nên giữ hiển thị)
-      }
       items.push({ kind: "them", data: t });
     });
     return { nghi: nghiCa, items };
   };
 
+  /* ============================================================
+     SECTION: STAFF HELPERS
+     ============================================================ */
   const ADMIN_ROLE_NAMES = ["quản trị viên", "quản trị"];
   const isAdminRole = (s) => {
     const cv = String(s.chucVu || s.chuc_vu || "")
@@ -488,8 +674,211 @@ export default function QuanLyCaLamViec() {
   const nonAdminStaff = staff.filter((s) => !isAdminRole(s));
 
   const filteredCalRooms = phongList;
+  const normalizeSearchText = (value) =>
+    String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  const getEmployeeRoleText = (s) => {
+    const directValue =
+      s?.tenChucVu ??
+      s?.ten_chuc_vu ??
+      s?.chucVu ??
+      s?.chuc_vu ??
+      s?.vaiTro ??
+      s?.vai_tro ??
+      s?.tenVaiTro ??
+      s?.ten_vai_tro ??
+      "";
+    if (directValue && typeof directValue !== "number") {
+      return String(directValue).trim();
+    }
 
-  // ============== DANH MỤC CA LOGIC ==============
+    const idCandidates = [
+      s?.maChucVu,
+      s?.ma_chuc_vu,
+      s?.chucVuId,
+      s?.idChucVu,
+      s?.maVaiTro,
+      s?.ma_vai_tro,
+      s?.chucVu,
+      s?.chuc_vu,
+      s?.vaiTro,
+      s?.vai_tro,
+    ].filter((v) => v !== null && v !== undefined && v !== "");
+
+    for (const id of idCandidates) {
+      const match = (chucVuList || []).find((cv) => {
+        const candidateIds = [
+          cv?.id,
+          cv?.maChucVu,
+          cv?.ma_chuc_vu,
+          cv?.maVaiTro,
+          cv?.ma_vai_tro,
+        ];
+        return candidateIds.some(
+          (candidate) => String(candidate) === String(id),
+        );
+      });
+      if (match) {
+        return String(
+          match.tenChucVu ??
+            match.ten_chuc_vu ??
+            match.tenVaiTro ??
+            match.ten_vai_tro ??
+            "",
+        ).trim();
+      }
+    }
+
+    return "";
+  };
+  const getEmployeeSpecialtyText = (s) => {
+    const directValue =
+      s?.tenChuyenKhoa ??
+      s?.ten_chuyen_khoa ??
+      s?.chuyenKhoa ??
+      s?.chuyen_khoa ??
+      s?.maChuyenKhoa ??
+      s?.ma_chuyen_khoa ??
+      s?.khoa ??
+      "";
+    if (directValue && typeof directValue !== "number") {
+      return String(directValue).trim();
+    }
+
+    const idCandidates = [
+      s?.maChuyenKhoa,
+      s?.ma_chuyen_khoa,
+      s?.chuyenKhoaId,
+      s?.chuyenKhoa,
+      s?.chuyen_khoa,
+    ].filter((v) => v !== null && v !== undefined && v !== "");
+
+    for (const id of idCandidates) {
+      const match = (chuyenKhoaList || []).find((ck) => {
+        const candidateIds = [ck?.maChuyenKhoa, ck?.ma_chuyen_khoa, ck?.id];
+        return candidateIds.some(
+          (candidate) => String(candidate) === String(id),
+        );
+      });
+      if (match) {
+        return String(
+          match.tenChuyenKhoa ?? match.ten_chuyen_khoa ?? "",
+        ).trim();
+      }
+    }
+
+    return "";
+  };
+  const getEmployeeRoomText = (s) => {
+    const directValue =
+      s?.tenPhong ??
+      s?.ten_phong ??
+      s?.phong ??
+      s?.phongLamViec ??
+      s?.phongBan ??
+      s?.maPhong ??
+      s?.ma_phong ??
+      "";
+    if (directValue && typeof directValue !== "number") {
+      return String(directValue).trim();
+    }
+
+    const idCandidates = [
+      s?.maPhong,
+      s?.ma_phong,
+      s?.phongId,
+      s?.phong,
+      s?.phongBan,
+    ].filter((v) => v !== null && v !== undefined && v !== "");
+
+    for (const id of idCandidates) {
+      const match = (phongList || []).find((p) => {
+        const candidateIds = [p?.maPhong, p?.ma_phong, p?.id];
+        return candidateIds.some(
+          (candidate) => String(candidate) === String(id),
+        );
+      });
+      if (match) {
+        return String(match.tenPhong ?? match.ten_phong ?? "").trim();
+      }
+    }
+
+    return "";
+  };
+  const getEmployeeLabel = (s) => {
+    const id = getEmployeeId(s);
+    return `${getEmployeeName(s)} (NV${String(id).padStart(3, "0")})`;
+  };
+  const matchesEmployeeFilters = (s) => {
+    const roleText = normalizeFilterText(getEmployeeRoleText(s));
+    const specialtyText = normalizeFilterText(getEmployeeSpecialtyText(s));
+    const roomText = normalizeFilterText(getEmployeeRoomText(s));
+    const filterRoleMatched =
+      !filterChucVu || roleText === normalizeFilterText(filterChucVu);
+    const filterSpecialtyMatched =
+      !filterChuyenKhoa ||
+      specialtyText === normalizeFilterText(filterChuyenKhoa);
+    const filterRoomMatched =
+      !filterPhong || roomText === normalizeFilterText(filterPhong);
+    return filterRoleMatched && filterSpecialtyMatched && filterRoomMatched;
+  };
+  const filteredCalEmployees = useMemo(() => {
+    const list = nonAdminStaff.filter((s) => matchesEmployeeFilters(s));
+    const q = normalizeSearchText(calEmployeeSearch.trim());
+    if (!q) return list;
+    return list.filter((s) => {
+      const name = normalizeSearchText(s.hoTen || s.ho_ten);
+      const code = normalizeSearchText(s.maNhanVien || s.ma_nhan_vien);
+      const specialty = normalizeSearchText(getEmployeeSpecialtyText(s));
+      const role = normalizeSearchText(getEmployeeRoleText(s));
+      const room = normalizeSearchText(getEmployeeRoomText(s));
+      const label = normalizeSearchText(getEmployeeLabel(s));
+      return (
+        name.includes(q) ||
+        code.includes(q) ||
+        specialty.includes(q) ||
+        role.includes(q) ||
+        room.includes(q) ||
+        label.includes(q)
+      );
+    });
+  }, [
+    nonAdminStaff,
+    calEmployeeSearch,
+    filterChucVu,
+    filterChuyenKhoa,
+    filterPhong,
+  ]);
+
+  useEffect(() => {
+    if (!calSelectedMaNV) return;
+    const selected = nonAdminStaff.find(
+      (s) => String(s.maNhanVien || s.ma_nhan_vien) === String(calSelectedMaNV),
+    );
+    if (selected) {
+      const label = getEmployeeLabel(selected);
+      setCalEmployeeSearch((prev) => (prev === label ? prev : label));
+    }
+  }, [calSelectedMaNV, nonAdminStaff]);
+
+  useEffect(() => {
+    if (
+      calSelectedMaNV &&
+      !filteredCalEmployees.some(
+        (s) => String(getEmployeeId(s)) === String(calSelectedMaNV),
+      )
+    ) {
+      setCalSelectedMaNV("");
+      setCalEmployeeSearch("");
+      setCalEmpOpen(false);
+    }
+  }, [filteredCalEmployees, calSelectedMaNV]);
+
+  /* ============================================================
+     SECTION: SHIFT CATEGORY LOGIC
+     ============================================================ */
   const saveCaLam = async () => {
     if (!caLamForm.tenCa.trim()) {
       showError("Vui lòng nhập tên ca!");
@@ -614,9 +1003,46 @@ export default function QuanLyCaLamViec() {
         <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 700 }}>
           📋 BẢNG PHÂN CÔNG CA LÀM VIỆC
         </h2>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "13px", opacity: 0.9 }}>Lọc chức vụ:</span>
+            <span style={{ fontSize: "13px", opacity: 0.9 }}>Chuyên khoa:</span>
+            <select
+              value={filterChuyenKhoa}
+              onChange={(e) => setFilterChuyenKhoa(e.target.value)}
+              style={{
+                padding: "6px 14px",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "13px",
+                background: "rgba(255,255,255,0.15)",
+                color: "#fff",
+                cursor: "pointer",
+                outline: "none",
+              }}
+            >
+              <option value="" style={{ color: "#111", background: "#fff" }}>
+                Tất cả
+              </option>
+              {chuyenKhoaList.map((ck) => (
+                <option
+                  key={ck.maChuyenKhoa || ck.ma_chuyen_khoa || ck.id}
+                  value={ck.tenChuyenKhoa || ck.ten_chuyen_khoa}
+                  style={{ color: "#111", background: "#fff" }}
+                >
+                  {ck.tenChuyenKhoa || ck.ten_chuyen_khoa}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "13px", opacity: 0.9 }}>Vai trò:</span>
             <select
               value={filterChucVu}
               onChange={(e) => setFilterChucVu(e.target.value)}
@@ -632,7 +1058,7 @@ export default function QuanLyCaLamViec() {
               }}
             >
               <option value="" style={{ color: "#111", background: "#fff" }}>
-                👥 Tất cả nhân viên
+                Tất cả
               </option>
               {chucVuList
                 .filter((cv) => {
@@ -643,13 +1069,43 @@ export default function QuanLyCaLamViec() {
                 })
                 .map((cv) => (
                   <option
-                    key={cv.id || cv.ma_chuc_vu}
+                    key={cv.id || cv.ma_chuc_vu || cv.maChucVu}
                     value={cv.tenChucVu || cv.ten_chuc_vu}
                     style={{ color: "#111", background: "#fff" }}
                   >
                     {cv.tenChucVu || cv.ten_chuc_vu}
                   </option>
                 ))}
+            </select>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "13px", opacity: 0.9 }}>Phòng:</span>
+            <select
+              value={filterPhong}
+              onChange={(e) => setFilterPhong(e.target.value)}
+              style={{
+                padding: "6px 14px",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "13px",
+                background: "rgba(255,255,255,0.15)",
+                color: "#fff",
+                cursor: "pointer",
+                outline: "none",
+              }}
+            >
+              <option value="" style={{ color: "#111", background: "#fff" }}>
+                Tất cả
+              </option>
+              {phongList.map((p) => (
+                <option
+                  key={p.maPhong || p.ma_phong || p.id}
+                  value={p.tenPhong || p.ten_phong}
+                  style={{ color: "#111", background: "#fff" }}
+                >
+                  {p.tenPhong || p.ten_phong}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -688,7 +1144,8 @@ export default function QuanLyCaLamViec() {
           🗂️ Danh mục ca
         </button>
       </div>
-      {/* ============== CALENDAR VIEW ============== */}
+
+      {/* CALENDAR VIEW */}
       {viewMode === "calendar" && (
         <>
           <div
@@ -721,29 +1178,28 @@ export default function QuanLyCaLamViec() {
                 >
                   Nhân viên:
                 </span>
-                <select
-                  value={calSelectedMaNV}
-                  onChange={(e) => setCalSelectedMaNV(e.target.value)}
-                  style={{
-                    padding: "6px 12px",
-                    border: "1px solid #ddd",
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                    outline: "none",
-                    minWidth: "200px",
+                <EmployeeSearchField
+                  items={filteredCalEmployees}
+                  value={calEmployeeSearch}
+                  selectedId={calSelectedMaNV}
+                  open={calEmpOpen}
+                  onOpen={() => setCalEmpOpen(true)}
+                  onClose={() => setCalEmpOpen(false)}
+                  onSearch={(next) => {
+                    setCalSelectedMaNV("");
+                    setCalEmployeeSearch(next);
+                    setCalEmpOpen(true);
                   }}
-                >
-                  <option value="">-- Chọn nhân viên --</option>
-                  {nonAdminStaff.map((s) => (
-                    <option
-                      key={s.maNhanVien || s.ma_nhan_vien}
-                      value={s.maNhanVien || s.ma_nhan_vien}
-                    >
-                      {s.hoTen || s.ho_ten} (NV
-                      {String(s.maNhanVien || s.ma_nhan_vien).padStart(3, "0")})
-                    </option>
-                  ))}
-                </select>
+                  onSelect={(id, label) => {
+                    setCalSelectedMaNV(id);
+                    setCalEmployeeSearch(label);
+                  }}
+                  onClear={() => {
+                    setCalEmployeeSearch("");
+                    setCalSelectedMaNV("");
+                    setCalEmpOpen(false);
+                  }}
+                />
               </div>
               <div
                 style={{ display: "flex", alignItems: "center", gap: "10px" }}
@@ -1006,75 +1462,65 @@ export default function QuanLyCaLamViec() {
                             : isDoi
                               ? "#5b21b6"
                               : "#1e40af";
-                              return (
-                                 <div
-                                   key={i}
-                                   style={{
-                                     background: bg,
-                                     border: `1px solid ${border}`,
-                                     borderRadius: "6px",
-                                     padding: "3px 6px",
-                                     fontSize: "11px",
-                                     color,
-                                   }}
-                                 >
-                                    <div style={{ fontWeight: 700 }}>
-                                      📍 {it.data.phong || "—"}
-                                    </div>
-                                    <div>
-                                      {isDoi
-                                        ? it.data.caThayThe?.tenCa || "Đổi ca"
-                                        : (() => {
-                                            const ca = it.data.ca;
-                                            const name =
-                                              ca?.tenCa ||
-                                              (() => {
-                                                const h = Number(
-                                                  (
-                                                    ca?.gioBatDau ||
-                                                    it.data.gioLam ||
-                                                    ""
-                                                  ).split(":")[0],
-                                                );
-                                                return h < 12
-                                                  ? "ca sáng"
-                                                  : "ca chiều";
-                                              })();
-                                            const start = fmtGio(
-                                              isDoi
-                                                ? it.data.gioLam
-                                                : ca?.gioBatDau || it.data.gioLam,
-                                            );
-                                            const end = fmtGio(
-                                              isDoi
-                                                ? it.data.gioKetThuc
-                                                : ca?.gioKetThuc || it.data.gioKetThuc,
-                                            );
-                                            return `${name} ${start}-${end}`;
-                                          })()}
-                                    </div>
-                                   {isExtra && (
-                                     <div
-                                       style={{
-                                         fontSize: "10px",
-                                         fontStyle: "italic",
-                                       }}
-                                     >
-                                       Thêm ca
-                                     </div>
-                                   )}
-                                   {isDoi && (
-                                     <div
-                                       style={{
-                                         fontSize: "10px",
-                                         fontStyle: "italic",
-                                       }}
-                                     >
-                                       Đổi ca
-                                     </div>
-                                   )}
-                                 </div>
-                              );
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                background: bg,
+                                border: `1px solid ${border}`,
+                                borderRadius: "6px",
+                                padding: "3px 6px",
+                                fontSize: "11px",
+                                color,
+                              }}
+                            >
+                              <div style={{ fontWeight: 700 }}>
+                                📍 {it.data.phong || "—"}
+                              </div>
+                              <div>
+                                {isDoi
+                                  ? it.data.caThayThe?.tenCa || "Đổi ca"
+                                  : (() => {
+                                      const ca = it.data.ca;
+                                      const timeValue =
+                                        ca?.gioBatDau || it.data.gioLam || "";
+                                      const name = getShiftDisplayName(it.data);
+                                      const start = fmtGio(
+                                        isDoi
+                                          ? it.data.gioLam
+                                          : ca?.gioBatDau || it.data.gioLam,
+                                      );
+                                      const end = fmtGio(
+                                        isDoi
+                                          ? it.data.gioKetThuc
+                                          : ca?.gioKetThuc ||
+                                              it.data.gioKetThuc,
+                                      );
+                                      return `${name} ${start}-${end}`;
+                                    })()}
+                              </div>
+                              {isExtra && (
+                                <div
+                                  style={{
+                                    fontSize: "10px",
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  Thêm ca thường ngoại lệ
+                                </div>
+                              )}
+                              {isDoi && (
+                                <div
+                                  style={{
+                                    fontSize: "10px",
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  Đổi ca
+                                </div>
+                              )}
+                            </div>
+                          );
                         })}
                         {!nghi && items.length === 0 && (
                           <div
@@ -1175,7 +1621,7 @@ export default function QuanLyCaLamViec() {
                     </div>
 
                     <div style={{ padding: "16px 20px" }}>
-                      {/* Ca mặc định (theo thứ) */}
+                      {/* Ca mặc định */}
                       <div style={{ marginBottom: "16px" }}>
                         <div
                           style={{
@@ -1185,7 +1631,8 @@ export default function QuanLyCaLamViec() {
                             marginBottom: "6px",
                           }}
                         >
-                          Ca làm việc thường (theo {calSelectedDay.thu})
+                          Ca làm việc mặc định trong tháng (theo{" "}
+                          {calSelectedDay.thu})
                         </div>
                         {(calSelectedDay.macDinh || []).length === 0 ? (
                           <div
@@ -1196,7 +1643,7 @@ export default function QuanLyCaLamViec() {
                               marginBottom: "6px",
                             }}
                           >
-                            Chưa có ca làm việc thường cho thứ này.
+                            Chưa có ca làm việc mặc định cho thứ này.
                           </div>
                         ) : (
                           (calSelectedDay.macDinh || []).map((m) => (
@@ -1241,9 +1688,7 @@ export default function QuanLyCaLamViec() {
                               </span>
                               <div style={{ display: "flex", gap: "6px" }}>
                                 <button
-                                  onClick={() =>
-                                    calStartEditDefault(m)
-                                  }
+                                  onClick={() => calStartEditDefault(m)}
                                   disabled={calSaving}
                                   style={{
                                     background: "#e0f2fe",
@@ -1276,6 +1721,31 @@ export default function QuanLyCaLamViec() {
                             </div>
                           ))
                         )}
+                        <div
+                          style={{
+                            marginTop: "8px",
+                            display: "flex",
+                            justifyContent: "flex-end",
+                          }}
+                        >
+                          <button
+                            onClick={calDeleteDefaultByWeekday}
+                            disabled={calSaving}
+                            style={{
+                              background: "#fee2e2",
+                              color: "#b91c1c",
+                              border: "none",
+                              borderRadius: "6px",
+                              padding: "4px 10px",
+                              fontSize: "10px",
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Xóa ca mặc định theo thứ
+                          </button>
+                        </div>
+
                         {calEditingDefaultId ? (
                           <div
                             style={{
@@ -1293,7 +1763,7 @@ export default function QuanLyCaLamViec() {
                                 marginBottom: "6px",
                               }}
                             >
-                              Sửa ca làm việc thường ({calSelectedDay.thu})
+                              Sửa ca mặc định ({calSelectedDay.thu})
                             </div>
                             <label
                               style={{
@@ -1318,115 +1788,122 @@ export default function QuanLyCaLamViec() {
                                   borderRadius: "5px",
                                   border: "1px solid #ddd",
                                 }}
-                                >
-                                  <option value="">-- Chọn phòng --</option>
-                                  {filteredCalRooms.map((p) => {
-                                    const ten = p.ten_phong || p.tenPhong;
-                                    return (
-                                      <option
-                                        key={p.ma_phong || p.maPhong}
-                                        value={ten}
-                                      >
-                                        {ten}
-                                      </option>
-                                    );
-                                  })}
-                                 </select>
+                              >
+                                <option value="">-- Chọn phòng --</option>
+                                {filteredCalRooms.map((p) => (
+                                  <option
+                                    key={p.ma_phong || p.maPhong}
+                                    value={p.ten_phong || p.tenPhong}
+                                  >
+                                    {p.ten_phong || p.tenPhong}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <div style={{ marginBottom: "15px" }}>
+                              <label style={{ fontSize: "12px" }}>
+                                Chọn ca:
                               </label>
-                                <div style={{ marginBottom: "15px" }}>
-                                  <label style={{ fontSize: "12px" }}>
-                                    Chọn ca:
-                                  </label>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "3px" }}>
-                                    {(calEditDefaultForm.caIds || [""]).map((caId, idx) => (
-                                      <div key={idx} style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                                        <select
-                                          value={caId}
-                                          onChange={(e) => {
-                                            const newCaIds = [...(calEditDefaultForm.caIds || [])];
-                                            newCaIds[idx] = e.target.value;
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "6px",
+                                  marginTop: "3px",
+                                }}
+                              >
+                                {(calEditDefaultForm.caIds || [""]).map(
+                                  (caId, idx) => (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        display: "flex",
+                                        gap: "6px",
+                                        alignItems: "center",
+                                      }}
+                                    >
+                                      <select
+                                        value={caId}
+                                        onChange={(e) => {
+                                          const newCaIds = [
+                                            ...(calEditDefaultForm.caIds || []),
+                                          ];
+                                          newCaIds[idx] = e.target.value;
+                                          setCalEditDefaultForm({
+                                            ...calEditDefaultForm,
+                                            caIds: newCaIds,
+                                          });
+                                        }}
+                                        style={{
+                                          flex: 1,
+                                          padding: "7px",
+                                          borderRadius: "5px",
+                                          border: "1px solid #ddd",
+                                        }}
+                                      >
+                                        <option value="">-- Chọn ca --</option>
+                                        {caLamList.map((ca) => (
+                                          <option key={ca.id} value={ca.id}>
+                                            {ca.tenCa} ({fmtGio(ca.gioBatDau)}–
+                                            {fmtGio(ca.gioKetThuc)})
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {(calEditDefaultForm.caIds || []).length >
+                                        1 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const next = (
+                                              calEditDefaultForm.caIds || []
+                                            ).filter((_, i) => i !== idx);
                                             setCalEditDefaultForm({
                                               ...calEditDefaultForm,
-                                              caIds: newCaIds,
+                                              caIds: next.length ? next : [""],
                                             });
                                           }}
                                           style={{
-                                            flex: 1,
-                                            padding: "7px",
+                                            width: "28px",
+                                            height: "28px",
                                             borderRadius: "5px",
                                             border: "1px solid #ddd",
+                                            background: "#fef2f2",
+                                            cursor: "pointer",
+                                            color: "#dc2626",
                                           }}
                                         >
-                                          <option value="">-- Chọn ca --</option>
-                                          {caLamList.map((ca) => {
-                                            const label =
-                                              ca.tenCa ||
-                                              (() => {
-                                                const h = Number(
-                                                  (ca.gioBatDau || "").split(":")[0],
-                                                );
-                                                return h < 12 ? "Ca sáng" : "Ca chiều";
-                                              })();
-                                            return (
-                                              <option key={ca.id} value={ca.id}>
-                                                {label} ({fmtGio(ca.gioBatDau)}–
-                                                {fmtGio(ca.gioKetThuc)})
-                                              </option>
-                                            );
-                                          })}
-                                        </select>
-                                        {(calEditDefaultForm.caIds || []).length > 1 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const newCaIds = (calEditDefaultForm.caIds || []).filter((_, i) => i !== idx);
-                                              setCalEditDefaultForm({
-                                                ...calEditDefaultForm,
-                                                caIds: newCaIds.length ? newCaIds : [""],
-                                              });
-                                            }}
-                                            style={{
-                                              width: "28px",
-                                              height: "28px",
-                                              borderRadius: "5px",
-                                              border: "1px solid #ddd",
-                                              background: "#fef2f2",
-                                              cursor: "pointer",
-                                              fontSize: "14px",
-                                              fontWeight: 700,
-                                              color: "#dc2626",
-                                            }}
-                                          >
-                                            ×
-                                          </button>
-                                        )}
-                                      </div>
-                                    ))}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setCalEditDefaultForm({
-                                          ...calEditDefaultForm,
-                                          caIds: [...(calEditDefaultForm.caIds || []), ""],
-                                        });
-                                      }}
-                                      style={{
-                                        width: "32px",
-                                        height: "32px",
-                                        borderRadius: "5px",
-                                        border: "1px solid #ddd",
-                                        background: "#f8fafc",
-                                        cursor: "pointer",
-                                        fontSize: "16px",
-                                        fontWeight: 700,
-                                        color: "#005bc0",
-                                        alignSelf: "flex-start",
-                                      }}
-                                    >
-                                      +
-                                    </button>
-                                  </div>
-                                </div>
+                                          ×
+                                        </button>
+                                      )}
+                                    </div>
+                                  ),
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCalEditDefaultForm({
+                                      ...calEditDefaultForm,
+                                      caIds: [
+                                        ...(calEditDefaultForm.caIds || []),
+                                        "",
+                                      ],
+                                    })
+                                  }
+                                  style={{
+                                    width: "32px",
+                                    height: "32px",
+                                    borderRadius: "5px",
+                                    border: "1px solid #ddd",
+                                    background: "#f8fafc",
+                                    cursor: "pointer",
+                                    color: "#005bc0",
+                                    alignSelf: "flex-start",
+                                  }}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
                             <div
                               style={{
                                 display: "flex",
@@ -1466,30 +1943,33 @@ export default function QuanLyCaLamViec() {
                             </div>
                           </div>
                         ) : !calShowAddDefault ? (
-                            <button
-                              onClick={() => {
-                                setCalShowAddDefault(true);
-                                const firstRoom =
-                                  filteredCalRooms[0]?.ten_phong ||
-                                  filteredCalRooms[0]?.tenPhong ||
-                                  "";
-                                setCalDefaultForm({ phong: firstRoom, caIds: [""] });
-                              }}
-                              disabled={calSaving}
-                              style={{
-                                marginTop: "4px",
-                                background: "#e0f2fe",
-                                color: "#0369a1",
-                                border: "none",
-                                borderRadius: "6px",
-                                padding: "5px 10px",
-                                fontSize: "11px",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                              }}
-                            >
-                              + Thêm ca làm việc thường
-                            </button>
+                          <button
+                            onClick={() => {
+                              setCalShowAddDefault(true);
+                              const firstRoom =
+                                filteredCalRooms[0]?.ten_phong ||
+                                filteredCalRooms[0]?.tenPhong ||
+                                "";
+                              setCalDefaultForm({
+                                phong: firstRoom,
+                                caIds: [""],
+                              });
+                            }}
+                            disabled={calSaving}
+                            style={{
+                              marginTop: "4px",
+                              background: "#e0f2fe",
+                              color: "#0369a1",
+                              border: "none",
+                              borderRadius: "6px",
+                              padding: "5px 10px",
+                              fontSize: "11px",
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                          >
+                            + Thêm ca làm việc mặc định trong tháng
+                          </button>
                         ) : (
                           <div
                             style={{
@@ -1507,7 +1987,7 @@ export default function QuanLyCaLamViec() {
                                 marginBottom: "6px",
                               }}
                             >
-                              Thêm ca làm việc thường ({calSelectedDay.thu})
+                              Thêm ca mặc định ({calSelectedDay.thu})
                             </div>
                             <label
                               style={{
@@ -1534,113 +2014,120 @@ export default function QuanLyCaLamViec() {
                                 }}
                               >
                                 <option value="">-- Chọn phòng --</option>
-                                {filteredCalRooms.map((p) => {
-                                  const ten = p.ten_phong || p.tenPhong;
-                                  return (
-                                    <option
-                                      key={p.ma_phong || p.maPhong}
-                                      value={ten}
-                                    >
-                                      {ten}
-                                    </option>
-                                  );
-                                })}
-                               </select>
+                                {filteredCalRooms.map((p) => (
+                                  <option
+                                    key={p.ma_phong || p.maPhong}
+                                    value={p.ten_phong || p.tenPhong}
+                                  >
+                                    {p.ten_phong || p.tenPhong}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <div style={{ marginBottom: "15px" }}>
+                              <label style={{ fontSize: "12px" }}>
+                                Chọn ca:
                               </label>
-                                <div style={{ marginBottom: "15px" }}>
-                                  <label style={{ fontSize: "12px" }}>
-                                    Chọn ca:
-                                  </label>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "3px" }}>
-                                    {(calDefaultForm.caIds || [""]).map((caId, idx) => (
-                                      <div key={idx} style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                                        <select
-                                          value={caId}
-                                          onChange={(e) => {
-                                            const newCaIds = [...(calDefaultForm.caIds || [])];
-                                            newCaIds[idx] = e.target.value;
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "6px",
+                                  marginTop: "3px",
+                                }}
+                              >
+                                {(calDefaultForm.caIds || [""]).map(
+                                  (caId, idx) => (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        display: "flex",
+                                        gap: "6px",
+                                        alignItems: "center",
+                                      }}
+                                    >
+                                      <select
+                                        value={caId}
+                                        onChange={(e) => {
+                                          const newCaIds = [
+                                            ...(calDefaultForm.caIds || []),
+                                          ];
+                                          newCaIds[idx] = e.target.value;
+                                          setCalDefaultForm({
+                                            ...calDefaultForm,
+                                            caIds: newCaIds,
+                                          });
+                                        }}
+                                        style={{
+                                          flex: 1,
+                                          padding: "7px",
+                                          borderRadius: "5px",
+                                          border: "1px solid #ddd",
+                                        }}
+                                      >
+                                        <option value="">-- Chọn ca --</option>
+                                        {caLamList.map((ca) => (
+                                          <option key={ca.id} value={ca.id}>
+                                            {ca.tenCa} ({fmtGio(ca.gioBatDau)}–
+                                            {fmtGio(ca.gioKetThuc)})
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {(calDefaultForm.caIds || []).length >
+                                        1 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const next = (
+                                              calDefaultForm.caIds || []
+                                            ).filter((_, i) => i !== idx);
                                             setCalDefaultForm({
                                               ...calDefaultForm,
-                                              caIds: newCaIds,
+                                              caIds: next.length ? next : [""],
                                             });
                                           }}
                                           style={{
-                                            flex: 1,
-                                            padding: "7px",
+                                            width: "28px",
+                                            height: "28px",
                                             borderRadius: "5px",
                                             border: "1px solid #ddd",
+                                            background: "#fef2f2",
+                                            cursor: "pointer",
+                                            color: "#dc2626",
                                           }}
                                         >
-                                          <option value="">-- Chọn ca --</option>
-                                          {caLamList.map((ca) => {
-                                            const label =
-                                              ca.tenCa ||
-                                              (() => {
-                                                const h = Number(
-                                                  (ca.gioBatDau || "").split(":")[0],
-                                                );
-                                                return h < 12 ? "Ca sáng" : "Ca chiều";
-                                              })();
-                                            return (
-                                              <option key={ca.id} value={ca.id}>
-                                                {label} ({fmtGio(ca.gioBatDau)}–
-                                                {fmtGio(ca.gioKetThuc)})
-                                              </option>
-                                            );
-                                          })}
-                                        </select>
-                                        {(calDefaultForm.caIds || []).length > 1 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const newCaIds = (calDefaultForm.caIds || []).filter((_, i) => i !== idx);
-                                              setCalDefaultForm({
-                                                ...calDefaultForm,
-                                                caIds: newCaIds.length ? newCaIds : [""],
-                                              });
-                                            }}
-                                            style={{
-                                              width: "28px",
-                                              height: "28px",
-                                              borderRadius: "5px",
-                                              border: "1px solid #ddd",
-                                              background: "#fef2f2",
-                                              cursor: "pointer",
-                                              fontSize: "14px",
-                                              fontWeight: 700,
-                                              color: "#dc2626",
-                                            }}
-                                          >
-                                            ×
-                                          </button>
-                                        )}
-                                      </div>
-                                    ))}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setCalDefaultForm({
-                                          ...calDefaultForm,
-                                          caIds: [...(calDefaultForm.caIds || []), ""],
-                                        });
-                                      }}
-                                      style={{
-                                        width: "32px",
-                                        height: "32px",
-                                        borderRadius: "5px",
-                                        border: "1px solid #ddd",
-                                        background: "#f8fafc",
-                                        cursor: "pointer",
-                                        fontSize: "16px",
-                                        fontWeight: 700,
-                                        color: "#005bc0",
-                                        alignSelf: "flex-start",
-                                      }}
-                                    >
-                                      +
-                                    </button>
-                                  </div>
-                                </div>
+                                          ×
+                                        </button>
+                                      )}
+                                    </div>
+                                  ),
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCalDefaultForm({
+                                      ...calDefaultForm,
+                                      caIds: [
+                                        ...(calDefaultForm.caIds || []),
+                                        "",
+                                      ],
+                                    })
+                                  }
+                                  style={{
+                                    width: "32px",
+                                    height: "32px",
+                                    borderRadius: "5px",
+                                    border: "1px solid #ddd",
+                                    background: "#f8fafc",
+                                    cursor: "pointer",
+                                    color: "#005bc0",
+                                    alignSelf: "flex-start",
+                                  }}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
                             <div
                               style={{
                                 display: "flex",
@@ -1649,10 +2136,9 @@ export default function QuanLyCaLamViec() {
                               }}
                             >
                               <button
-                                onClick={() => {
-                                  setCalShowAddDefault(false);
-                                  setCalDefaultForm({ phong: "", caIds: [""] });
-                                }}
+                                onClick={() =>
+                                  setCalDefaultForm({ phong: "", caIds: [""] })
+                                }
                                 disabled={calSaving}
                                 style={{
                                   padding: "6px 12px",
@@ -1719,9 +2205,6 @@ export default function QuanLyCaLamViec() {
                                 fontSize: "12px",
                                 color: "#9a3412",
                                 marginBottom: "4px",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "4px",
                               }}
                             >
                               <div
@@ -1744,13 +2227,7 @@ export default function QuanLyCaLamViec() {
                                     : ""}
                                   {ex.lyDo ? ` · 📝 ${ex.lyDo}` : ""}
                                 </div>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: "6px",
-                                    alignItems: "center",
-                                  }}
-                                >
+                                <div style={{ display: "flex", gap: "6px" }}>
                                   <button
                                     onClick={() => calStartEdit(ex)}
                                     disabled={calSaving}
@@ -1794,6 +2271,7 @@ export default function QuanLyCaLamViec() {
                                     justifyContent: "flex-end",
                                     gap: "8px",
                                     alignItems: "center",
+                                    marginTop: "4px",
                                   }}
                                 >
                                   <span
@@ -1802,11 +2280,10 @@ export default function QuanLyCaLamViec() {
                                       color: "#991b1b",
                                     }}
                                   >
-                                    Xác nhận xóa ngoại lệ này?
+                                    Xác nhận xóa?
                                   </span>
                                   <button
                                     onClick={cancelDeleteException}
-                                    disabled={calSaving}
                                     style={{
                                       padding: "3px 10px",
                                       borderRadius: "4px",
@@ -1820,7 +2297,6 @@ export default function QuanLyCaLamViec() {
                                   </button>
                                   <button
                                     onClick={confirmDeleteException}
-                                    disabled={calSaving}
                                     style={{
                                       padding: "3px 10px",
                                       borderRadius: "4px",
@@ -1841,14 +2317,14 @@ export default function QuanLyCaLamViec() {
                         )}
                       </div>
 
-                      {/* Thêm / sửa ngoại lệ */}
+                      {/* Form Ngoại lệ */}
                       <div
                         style={{
                           borderTop: "1px solid #e5e7eb",
                           paddingTop: "14px",
                         }}
                       >
-                        {!calForm.loai && (
+                        {!calForm.loai ? (
                           <div
                             style={{
                               display: "flex",
@@ -1872,11 +2348,10 @@ export default function QuanLyCaLamViec() {
                               disabled={calSaving}
                               style={btnStyle("#ca8a04")}
                             >
-                              ➕ Thêm ca
+                              ➕ Thêm ca thường ngoại lệ
                             </button>
                           </div>
-                        )}
-                        {calForm.loai && (
+                        ) : (
                           <div>
                             <div
                               style={{
@@ -1886,63 +2361,137 @@ export default function QuanLyCaLamViec() {
                                 marginBottom: "10px",
                               }}
                             >
-                              {calForm.id ? "Sửa" : "Thêm"}{" "}
-                              {TIEU_DE_THEO_LOAI[calForm.loai]}
+                              {calForm.id
+                                ? `Sửa ${TIEU_DE_THEO_LOAI[calForm.loai]}`
+                                : `➕ ${TIEU_DE_THEO_LOAI[calForm.loai]}`}
                             </div>
-
                             {calForm.loai !== "NGHI_PHEP" && (
                               <>
-                                <label
-                                  style={{
-                                    fontSize: "12px",
-                                    display: "block",
-                                    marginBottom: "8px",
-                                  }}
-                                >
-                                  Chọn ca:
-                                  <select
-                                    value={
-                                      calForm.maCaMacDinh
-                                        ? String(calForm.maCaMacDinh)
-                                        : ""
-                                    }
-                                    onChange={(e) => {
-                                      const id = e.target.value
-                                        ? Number(e.target.value)
-                                        : null;
-                                      const ca = caLamList.find(
-                                        (c) => c.id === id,
-                                      );
-                                      setCalForm({
-                                        ...calForm,
-                                        maCaMacDinh: id,
-                                        gioLam: ca
-                                          ? ca.gioBatDau
-                                          : calForm.gioLam,
-                                        gioKetThuc: ca
-                                          ? ca.gioKetThuc
-                                          : calForm.gioKetThuc,
-                                      });
-                                    }}
-                                    disabled={calSaving}
+                                <div style={{ marginBottom: "8px" }}>
+                                  <label
                                     style={{
-                                      width: "100%",
-                                      padding: "8px",
-                                      marginTop: "4px",
-                                      borderRadius: "5px",
-                                      border: "1px solid #ddd",
+                                      fontSize: "12px",
+                                      display: "block",
+                                      marginBottom: "6px",
                                     }}
                                   >
-                                    <option value="">-- Chọn ca --</option>
-                                    {caLamList.map((ca) => (
-                                      <option key={ca.id} value={ca.id}>
-                                        {ca.tenCa} ({fmtGio(ca.gioBatDau)}–
-                                        {fmtGio(ca.gioKetThuc)})
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-
+                                    Chọn ca:
+                                  </label>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "6px",
+                                    }}
+                                  >
+                                    {(calForm.caIds || [""]).map(
+                                      (caId, idx) => (
+                                        <div
+                                          key={idx}
+                                          style={{
+                                            display: "flex",
+                                            gap: "6px",
+                                            alignItems: "center",
+                                          }}
+                                        >
+                                          <select
+                                            value={caId}
+                                            onChange={(e) => {
+                                              const next = [
+                                                ...(calForm.caIds || [""]),
+                                              ];
+                                              next[idx] = e.target.value;
+                                              const id = e.target.value
+                                                ? Number(e.target.value)
+                                                : null;
+                                              const ca = caLamList.find(
+                                                (c) => c.id === id,
+                                              );
+                                              setCalForm({
+                                                ...calForm,
+                                                caIds: next,
+                                                maCaMacDinh: id,
+                                                gioLam: ca
+                                                  ? ca.gioBatDau
+                                                  : calForm.gioLam,
+                                                gioKetThuc: ca
+                                                  ? ca.gioKetThuc
+                                                  : calForm.gioKetThuc,
+                                              });
+                                            }}
+                                            disabled={calSaving}
+                                            style={{
+                                              flex: 1,
+                                              padding: "8px",
+                                              borderRadius: "5px",
+                                              border: "1px solid #ddd",
+                                            }}
+                                          >
+                                            <option value=""></option>
+                                            {caLamList.map((ca) => (
+                                              <option key={ca.id} value={ca.id}>
+                                                {ca.tenCa} (
+                                                {fmtGio(ca.gioBatDau)}–
+                                                {fmtGio(ca.gioKetThuc)})
+                                              </option>
+                                            ))}
+                                          </select>
+                                          {(calForm.caIds || []).length > 1 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const next = (
+                                                  calForm.caIds || []
+                                                ).filter((_, i) => i !== idx);
+                                                setCalForm({
+                                                  ...calForm,
+                                                  caIds: next.length
+                                                    ? next
+                                                    : [""],
+                                                });
+                                              }}
+                                              style={{
+                                                width: "28px",
+                                                height: "28px",
+                                                borderRadius: "5px",
+                                                border: "1px solid #ddd",
+                                                background: "#fef2f2",
+                                                cursor: "pointer",
+                                                color: "#dc2626",
+                                              }}
+                                            >
+                                              ×
+                                            </button>
+                                          )}
+                                        </div>
+                                      ),
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setCalForm({
+                                          ...calForm,
+                                          caIds: [
+                                            ...(calForm.caIds || [""]),
+                                            "",
+                                          ],
+                                        })
+                                      }
+                                      style={{
+                                        width: "32px",
+                                        height: "32px",
+                                        borderRadius: "5px",
+                                        border: "1px solid #ddd",
+                                        background: "#f8fafc",
+                                        cursor: "pointer",
+                                        color: "#005bc0",
+                                        alignSelf: "flex-start",
+                                      }}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
                                 <label
                                   style={{
                                     fontSize: "12px",
@@ -1968,61 +2517,19 @@ export default function QuanLyCaLamViec() {
                                       border: "1px solid #ddd",
                                     }}
                                   >
-                                    <option value="">-- Chọn phòng --</option>
-                                    {filteredCalRooms.map((p) => {
-                                      const ten = p.ten_phong || p.tenPhong;
-                                      return (
-                                        <option
-                                          key={p.ma_phong || p.maPhong}
-                                          value={ten}
-                                        >
-                                          {ten}
-                                        </option>
-                                      );
-                                    })}
-                                   </select>
-                                 </label>
-
-                                <div
-                                  style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "1fr 1fr",
-                                    gap: "10px",
-                                    marginBottom: "8px",
-                                  }}
-                                >
-                                  <label style={{ fontSize: "12px" }}>
-                                    Bắt đầu:
-                                  </label>
-                                  <span
-                                    style={{
-                                      width: "100%",
-                                      padding: "8px",
-                                      marginTop: "4px",
-                                    }}
-                                  >
-                                    {calForm.gioLam
-                                      ? calForm.gioLam.substring(0, 5)
-                                      : "--:--"}
-                                  </span>
-                                  <label style={{ fontSize: "12px" }}>
-                                    Kết thúc:
-                                  </label>
-                                  <span
-                                    style={{
-                                      width: "100%",
-                                      padding: "8px",
-                                      marginTop: "4px",
-                                    }}
-                                  >
-                                    {calForm.gioKetThuc
-                                      ? calForm.gioKetThuc.substring(0, 5)
-                                      : "--:--"}
-                                  </span>
-                                </div>
+                                    <option value=""></option>
+                                    {filteredCalRooms.map((p) => (
+                                      <option
+                                        key={p.ma_phong || p.maPhong}
+                                        value={p.ten_phong || p.tenPhong}
+                                      >
+                                        {p.ten_phong || p.tenPhong}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
                               </>
                             )}
-
                             <label
                               style={{
                                 fontSize: "12px",
@@ -2030,7 +2537,7 @@ export default function QuanLyCaLamViec() {
                                 marginBottom: "12px",
                               }}
                             >
-                              Lý do (tùy chọn):
+                              Lý do:
                               <input
                                 value={calForm.lyDo}
                                 onChange={(e) =>
@@ -2050,7 +2557,6 @@ export default function QuanLyCaLamViec() {
                                 }}
                               />
                             </label>
-
                             <div
                               style={{
                                 display: "flex",
@@ -2059,17 +2565,7 @@ export default function QuanLyCaLamViec() {
                               }}
                             >
                               <button
-                                onClick={() =>
-                                  setCalForm({
-                                    loai: null,
-                                    id: null,
-                                    phong: "",
-                                    gioLam: "08:00",
-                                    gioKetThuc: "17:00",
-                                    lyDo: "",
-                                    maCaMacDinh: null,
-                                  })
-                                }
+                                onClick={() => setCalForm(emptyCalForm())}
                                 disabled={calSaving}
                                 style={{
                                   padding: "8px 16px",
@@ -2107,7 +2603,7 @@ export default function QuanLyCaLamViec() {
         </>
       )}
 
-      {/* ============== DANH MỤC CA VIEW ============== */}
+      {/* SHIFT CATEGORY VIEW */}
       {viewMode === "danh-muc-ca" && (
         <div
           style={{
@@ -2158,7 +2654,7 @@ export default function QuanLyCaLamViec() {
               Đang tải danh mục ca...
             </div>
           )}
-          {caLamError && !caLamLoading && (
+          {caLamError && (
             <div
               style={{
                 background: "#fee2e2",
@@ -2237,7 +2733,7 @@ export default function QuanLyCaLamViec() {
             </div>
           )}
 
-          {/* MODAL THÊM/SỬA CA DANH MỤC */}
+          {/* MODAL THÊM/SỬA CA */}
           {openCaLamModal && (
             <div
               style={{
@@ -2269,7 +2765,7 @@ export default function QuanLyCaLamViec() {
                   }}
                 >
                   <div style={{ fontWeight: 700 }}>
-                    {editingCaLamId ? "Sửa ca" : "Thêm ca mới"}
+                    {editingCaLamId ? "Sửa ca" : "Thêm ca thường ngoại lệ"}
                   </div>
                   <button
                     onClick={() => setOpenCaLamModal(false)}
@@ -2318,7 +2814,7 @@ export default function QuanLyCaLamViec() {
                     }}
                   >
                     <label style={{ fontSize: "13px" }}>
-                      Giờ bắt đầu:
+                      Giờ bắt đầu:{" "}
                       <input
                         type="time"
                         value={caLamForm.gioBatDau}
@@ -2339,7 +2835,7 @@ export default function QuanLyCaLamViec() {
                       />
                     </label>
                     <label style={{ fontSize: "13px" }}>
-                      Giờ kết thúc:
+                      Giờ kết thúc:{" "}
                       <input
                         type="time"
                         value={caLamForm.gioKetThuc}

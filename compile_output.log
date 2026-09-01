@@ -1,0 +1,20 @@
+[36mvite v8.0.10 [32mbuilding client environment for production...[36m[39m
+[2Ktransforming...[33m[plugin rolldown:vite-resolve] Module "net" has been externalized for browser compatibility, imported by "d:/QLPK-WEB/frontend/node_modules/stompjs/lib/stomp-node.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.[39m
+✓ 167 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.75 kB │ gzip:   0.43 kB
+dist/assets/index-D9PSxHom.css    172.56 kB │ gzip:  24.95 kB
+dist/assets/index-xZB78y4K.js   1,103.58 kB │ gzip: 253.98 kB
+
+[33m[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[33m[33m[PLUGIN_TIMINGS] Warning:[0m Your build spent significant time in plugins. Here is a breakdown:
+  - vite:css (58%)
+  - vite:build-html (30%)
+See https://rolldown.rs/options/checks#plugintimings for more details.
+[39m
+[32m✓ built in 3.79s[39m
