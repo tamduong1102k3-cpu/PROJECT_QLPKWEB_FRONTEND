@@ -52,57 +52,24 @@ const getErrorMessage = async (response, fallback) => {
   }
 };
 
-const normalizeExceptionPayload = (payload) => {
-  if (!payload || !payload.loai) return payload;
-
-  const mapped = {
-    ...payload,
-    kieuPhanCong: "THEO_NGAY",
-    hanhDong:
-      payload.loai === "NGHI_PHEP"
-        ? "NGHI_PHEP"
-        : payload.loai === "DOI_CA"
-          ? "THAY_THE"
-          : "THEM",
-    maCa:
-      payload.maCaMacDinh ??
-      payload.maCa ??
-      (Array.isArray(payload.caIds) ? payload.caIds[0] : null),
-    phong: payload.loai === "NGHI_PHEP" ? null : payload.phong,
-    lyDo: payload.lyDo ?? null,
-  };
-
-  if (payload.loai === "NGHI_PHEP") {
-    return {
-      ...mapped,
-      maCa: null,
-      gioLam: null,
-      gioKetThuc: null,
-    };
-  }
-
-  if (mapped.maCa !== null && mapped.maCa !== undefined) {
-    return {
-      ...mapped,
-      maCa: Number(mapped.maCa),
-      gioLam: payload.gioLam || null,
-      gioKetThuc: payload.gioKetThuc || null,
-    };
-  }
-
-  return {
-    ...mapped,
-    gioLam: payload.gioLam || null,
-    gioKetThuc: payload.gioKetThuc || null,
-  };
-};
-
 const normalizeMonthData = (data) => {
   if (!data || !Array.isArray(data.days)) return data;
 
   return {
     ...data,
     days: data.days.map((day) => {
+      // Deduplicate macDinh: keep only first occurrence of each maCa
+      const seenMaCa = new Set();
+      const uniqueMacDinh = (day.macDinh || []).filter((item) => {
+        // Dedup by ca.id, fallback maCa, fallback id (mỗi bản ghi luôn có id duy nhất)
+        const key = item.ca?.id ?? item.maCa ?? item.id;
+        if (seenMaCa.has(key)) {
+          return false;
+        }
+        seenMaCa.add(key);
+        return true;
+      });
+
       const theoNgay = Array.isArray(day.theoNgay)
         ? day.theoNgay
         : Array.isArray(day.ngoaiLe)
@@ -111,6 +78,7 @@ const normalizeMonthData = (data) => {
 
       return {
         ...day,
+        macDinh: uniqueMacDinh,
         ngoaiLe: theoNgay.map((item) => ({
           ...item,
           loai:
@@ -153,12 +121,17 @@ export const createShiftApi = async (data) => {
 
 export const createDefaultShiftMonthApi = async (payload) => {
   try {
+    const normalized = {
+      ...payload,
+      kieuPhanCong: "MAC_DINH",
+      hanhDong: null,
+    };
     const response = await fetchClient(`${API_URL}/default-month`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(normalized),
     });
     if (!response.ok) {
       throw new Error(
@@ -248,6 +221,41 @@ export const updateShiftApi = async (id, data) => {
   }
 };
 
+/**
+ * CẬP NHẬT HÀNG LOẠT: Sửa ca mặc định cho TẤT CẢ các ngày cùng thứ trong tháng.
+ * Chỉ gửi khi người dùng bật cờ updateAllThu = true.
+ * Backend sẽ từ chối nếu updateAllThu không phải true.
+ */
+export const updateDefaultShiftMonthApi = async (payload) => {
+  try {
+    const normalized = {
+      ...payload,
+      kieuPhanCong: "MAC_DINH",
+      hanhDong: null,
+      updateAllThu: true,
+    };
+    const response = await fetchClient(`${API_URL}/default-month`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(normalized),
+    });
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(
+          response,
+          "Không thể cập nhật ca mặc định hàng loạt",
+        ),
+      );
+    }
+    return await parseJsonResponse(response);
+  } catch (error) {
+    console.error("Error in updateDefaultShiftMonthApi:", error);
+    throw error;
+  }
+};
+
 // Giữ lại các hàm khác của bạn nếu cần
 export const getWorkingTodayApi = async () => {
   try {
@@ -316,12 +324,13 @@ export const getShiftsByNhanVienApi = async (maNhanVien) => {
 
 /**
  * Lấy lịch cả tháng đã gộp (ca mặc định + ngoại lệ) của 1 nhân viên.
- * GET /api/ca-lam/thang?maNhanVien=&nam=&thang=
+ * GET /api/ca-lam-danh-muc/thang?maNhanVien=&nam=&thang=
+ * Now using unified bang_phan_cong_ca_lam with kieuPhanCong=MAC_DINH and THEO_NGAY
  */
 export const getMonthScheduleApi = async (maNhanVien, nam, thang) => {
   try {
     const response = await fetchClient(
-      `${CA_LAM_URL}/thang?maNhanVien=${maNhanVien}&nam=${nam}&thang=${thang}`,
+      `${CA_LAM_URL.replace('/api/ca-lam', '/api/ca-lam-danh-muc')}/thang?maNhanVien=${maNhanVien}&nam=${nam}&thang=${thang}`,
       {
         method: "GET",
       },
@@ -339,12 +348,28 @@ export const getMonthScheduleApi = async (maNhanVien, nam, thang) => {
 
 /**
  * Tạo ngoại lệ ca làm việc (nghỉ phép / đổi ca / thêm ca) cho 1 ngày.
- * POST /api/ca-lam/ngoai-le
+ * Now using unified bang_phan_cong_ca_lam with kieuPhanCong=THEO_NGAY
+ * POST /api/phan-cong
  */
 export const createExceptionApi = async (payload) => {
   try {
-    const mapped = normalizeExceptionPayload(payload);
-    const response = await fetchClient(`${CA_LAM_URL}/ngoai-le`, {
+    // Map legacy payload to unified format
+    const mapped = {
+      maNhanVien: payload.maNhanVien,
+      ngay: payload.ngay,
+      maCa: payload.maCaMacDinh ?? payload.maCa ?? (Array.isArray(payload.caIds) ? payload.caIds[0] : null),
+      phong: payload.loai === "NGHI_PHEP" ? null : payload.phong,
+      kieuPhanCong: "THEO_NGAY",
+      hanhDong:
+        payload.loai === "NGHI_PHEP"
+          ? "NGHI_PHEP"
+          : payload.loai === "DOI_CA"
+            ? "THAY_THE"
+            : "THEM",
+      lyDo: payload.lyDo ?? null,
+    };
+    
+    const response = await fetchClient(`${API_URL}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(mapped),
@@ -363,12 +388,30 @@ export const createExceptionApi = async (payload) => {
 
 /**
  * Cập nhật ngoại lệ ca làm việc theo id.
- * PUT /api/ca-lam/ngoai-le/{id}
+ * Now using unified bang_phan_cong_ca_lam with kieuPhanCong=THEO_NGAY
+ * PUT /api/phan-cong/{id}
  */
 export const updateExceptionApi = async (id, payload) => {
   try {
-    const mapped = normalizeExceptionPayload(payload);
-    const response = await fetchClient(`${CA_LAM_URL}/ngoai-le/${id}`, {
+    const mapped = {
+      maNhanVien: payload.maNhanVien,
+      ngay: payload.ngay,
+      maCa: payload.maCaMacDinh ?? payload.maCa ?? (Array.isArray(payload.caIds) ? payload.caIds[0] : null),
+      phong: payload.loai === "NGHI_PHEP" ? null : payload.phong,
+      hanhDong:
+        payload.loai === "NGHI_PHEP"
+          ? "NGHI_PHEP"
+          : payload.loai === "DOI_CA"
+            ? "THAY_THE"
+            : "THEM",
+      lyDo: payload.lyDo ?? null,
+    };
+
+    if (payload.kieuPhanCong != null) {
+      mapped.kieuPhanCong = payload.kieuPhanCong;
+    }
+
+    const response = await fetchClient(`${API_URL}/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(mapped),
@@ -385,13 +428,33 @@ export const updateExceptionApi = async (id, payload) => {
   }
 };
 
+export const updateShiftActionApi = async (id, { hanhDong, lyDo }) => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hanhDong, lyDo }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(response, `Lỗi: ${response.status}`),
+      );
+    }
+    return await parseJsonResponse(response);
+  } catch (error) {
+    console.error("Error in updateShiftActionApi:", error);
+    throw error;
+  }
+};
+
 /**
  * Xóa ngoại lệ ca làm việc theo id.
- * DELETE /api/ca-lam/ngoai-le/{id}
+ * Now using unified bang_phan_cong_ca_lam
+ * DELETE /api/phan-cong/{id}
  */
 export const deleteExceptionApi = async (id) => {
   try {
-    const response = await fetchClient(`${CA_LAM_URL}/ngoai-le/${id}`, {
+    const response = await fetchClient(`${API_URL}/${id}`, {
       method: "DELETE",
     });
     if (!response.ok) {

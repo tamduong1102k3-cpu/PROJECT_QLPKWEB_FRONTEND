@@ -1,346 +1,821 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getShiftsByNhanVienApi } from '../api/shiftApi';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { getMonthScheduleApi } from "../api/shiftApi";
 
-// ==================== CONFIG & HELPERS ====================
-
-const DAY_ORDER = [
-  { key: 'thu-2', label: 'Thứ 2' },
-  { key: 'thu-3', label: 'Thứ 3' },
-  { key: 'thu-4', label: 'Thứ 4' },
-  { key: 'thu-5', label: 'Thứ 5' },
-  { key: 'thu-6', label: 'Thứ 6' },
-  { key: 'thu-7', label: 'Thứ 7' },
-  { key: 'chu-nhat', label: 'Chủ Nhật' }
+const THU_ORDER = [
+  "Thứ 2",
+  "Thứ 3",
+  "Thứ 4",
+  "Thứ 5",
+  "Thứ 6",
+  "Thứ 7",
+  "Chủ Nhật",
 ];
 
-function classifyShift(gioLam = '', gioKetThuc = '') {
-  const startHour = parseInt((gioLam || '08').split(':')[0], 10) || 8;
-  if (startHour >= 5 && startHour < 12) return { type: 'sang', label: 'Ca sáng' };
-  if (startHour >= 12 && startHour < 17) return { type: 'chieu', label: 'Ca chiều' };
-  return { type: 'toi', label: 'Ca tối' };
-}
-
-const SHIFT_STYLE = {
-  sang: {
-    gradient: 'from-emerald-500 via-teal-500 to-cyan-500',
-    softBg: 'bg-emerald-50',
-    softBorder: 'border-emerald-200',
-    softText: 'text-emerald-600',
-    chipBg: 'bg-emerald-100 border-emerald-200',
-    icon: 'wb_sunny',
-    dot: 'bg-emerald-500',
-    iconColor: 'text-amber-400'
-  },
-  chieu: {
-    gradient: 'from-indigo-500 via-blue-500 to-sky-500',
-    softBg: 'bg-indigo-50',
-    softBorder: 'border-indigo-200',
-    softText: 'text-indigo-600',
-    chipBg: 'bg-indigo-100 border-indigo-200',
-    icon: 'light_mode',
-    dot: 'bg-indigo-500',
-    iconColor: 'text-blue-400'
-  },
-  toi: {
-    gradient: 'from-violet-600 via-purple-600 to-fuchsia-600',
-    softBg: 'bg-violet-50',
-    softBorder: 'border-violet-200',
-    softText: 'text-violet-600',
-    chipBg: 'bg-violet-100 border-violet-200',
-    icon: 'dark_mode',
-    dot: 'bg-violet-500',
-    iconColor: 'text-violet-400'
-  }
+const TIEU_DE_THEO_LOAI = {
+  NGHI_PHEP: "Nghỉ phép",
+  THEM_CA: "Thêm ca thường ngoại lệ",
 };
 
-// Ánh xạ JS getDay() (CN=0 ... T7=6) sang key "thu" của hệ thống
-const JS_DAY_TO_THU = {
-  0: 'chu-nhat',
-  1: 'thu-2',
-  2: 'thu-3',
-  3: 'thu-4',
-  4: 'thu-5',
-  5: 'thu-6',
-  6: 'thu-7'
+const TH = {
+  border: "1px solid #e5e7eb",
+  padding: "11px 8px",
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "#374151",
+  textAlign: "center",
+  background: "#f1f5f9",
+  whiteSpace: "nowrap",
 };
 
-function formatDate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+const TD = {
+  border: "1px solid #e5e7eb",
+  padding: "6px 8px",
+  fontSize: "13px",
+  color: "#374151",
+  verticalAlign: "top",
+};
 
-// Chuẩn hóa giá trị "thu" từ backend (vd: 'Thứ 2', 'thu-2', 'THU_2') về dạng so khớp được
-// Ví dụ: 'Thứ 2' -> 'thu2', 'thu-2' -> 'thu2', 'Chủ Nhật' -> 'chunhat', 'chu-nhat' -> 'chunhat'
-function normalizeDayKey(value) {
-  return (value || '')
-    .toString()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\s_-]+/g, '');
-}
+const fmtGio = (s) => (s || "").substring(0, 5) || "--:--";
 
-// ==================== MAIN COMPONENT ====================
+const getShiftTimeValue = (entry) =>
+  entry?.ca?.gioBatDau || entry?.gioLam || "";
 
-export default function LichLamViecTab({ user }) {
-  const [shifts, setShifts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedShift, setSelectedShift] = useState(null);
+const getShiftDisplayName = (entry) => {
+  const ca = entry?.ca;
+  const timeValue = getShiftTimeValue(entry);
+  const hour = Number(String(timeValue).split(":")[0] || 0);
+  return ca?.tenCa || (hour < 12 ? "ca sáng" : "ca chiều");
+};
 
+export default function LichCaLamNhanVien({ user }) {
   const maNhanVien = user?.maNhanVien || user?.id;
+  const employeeName = user?.hoTen || user?.ho_ten || "";
+
+  const [viewMode, setViewMode] = useState("calendar");
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
+  const [calData, setCalData] = useState(null);
+  const [calLoading, setCalLoading] = useState(false);
+  const [calError, setCalError] = useState(null);
+  const [calSelectedDay, setCalSelectedDay] = useState(null);
+
+  const fetchCalMonth = useCallback(async () => {
+    if (!maNhanVien) {
+      setCalData(null);
+      return null;
+    }
+    setCalLoading(true);
+    setCalError(null);
+    try {
+      const data = await getMonthScheduleApi(maNhanVien, calYear, calMonth);
+      setCalData(data);
+      return data;
+    } catch (e) {
+      setCalError(e.message);
+      return null;
+    } finally {
+      setCalLoading(false);
+    }
+  }, [maNhanVien, calYear, calMonth]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        if (!maNhanVien) {
-          setError('Không xác định được mã nhân viên.');
-          return;
-        }
-        const data = await getShiftsByNhanVienApi(maNhanVien);
-        setShifts(Array.isArray(data) ? data : []);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [maNhanVien]);
+    fetchCalMonth();
+  }, [fetchCalMonth]);
 
-  const today = new Date();
-  const currentMonth = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), []);
-
-  // Nhóm shifts theo thứ để tra cứu nhanh: { thuKey: [shift, ...] }
-  const shiftsByThu = useMemo(() => {
-    const map = {};
-    shifts.forEach(s => {
-      const key = normalizeDayKey(s.thu);
-      if (!map[key]) map[key] = [];
-      map[key].push(s);
-    });
-    return map;
-  }, [shifts]);
-
-  // Các ô ngày của tháng hiện tại (null = ô trống để giữ căn lưới, chỉ hiện ngày thuộc tháng này)
-  const monthCells = useMemo(() => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const first = new Date(year, month, 1);
-    const startOffset = (first.getDay() + 6) % 7; // Thứ 2 = 0
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const cells = [];
-    for (let i = 0; i < startOffset; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
-    while (cells.length % 7 !== 0) cells.push(null);
-    return cells;
-  }, [currentMonth]);
-
-  const monthLabel = currentMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
-
-  // Lấy danh sách ca của một ngày cụ thể (đã gán dateObj)
-  const getShiftsForDate = (dateObj) => {
-    const thuKey = JS_DAY_TO_THU[dateObj.getDay()];
-    const list = shiftsByThu[normalizeDayKey(thuKey)] || [];
-    return list.map(s => {
-      const classified = classifyShift(s.gioLam, s.gioKetThuc);
-      return {
-        ...s,
-        type: classified.type,
-        dateObj,
-        gioLam: (s.gioLam || '').substring(0, 5) || '08:00',
-        gioKetThuc: (s.gioKetThuc || '').substring(0, 5) || '17:00'
-      };
-    });
+  const changeCalMonth = (delta) => {
+    let m = calMonth + delta;
+    let y = calYear;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    }
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+    setCalMonth(m);
+    setCalYear(y);
   };
 
-  return (
-    <div className="min-h-screen relative">
-      {/* Background Decor */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-32 -left-32 w-[500px] h-[500px] bg-blue-100/50 rounded-full blur-[130px]"></div>
-        <div className="absolute top-1/3 -right-40 w-[450px] h-[450px] bg-violet-100/50 rounded-full blur-[130px]"></div>
-        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(100,116,139,0.06) 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
+  const calCells = useMemo(() => {
+    const first = new Date(calYear, calMonth - 1, 1);
+    const startOffset = (first.getDay() + 6) % 7;
+    const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+    const arr = [];
+    for (let i = 0; i < startOffset; i++) arr.push(null);
+    for (let d = 1; d <= daysInMonth; d++) arr.push(d);
+    while (arr.length % 7 !== 0) arr.push(null);
+    return arr;
+  }, [calYear, calMonth]);
+
+  const calGetDayData = (d) => {
+    if (!calData || !calData.days) return null;
+    const key = `${calYear}-${String(calMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    return calData.days.find((x) => x.ngay === key) || null;
+  };
+
+  const calMergeShows = (day) => {
+    if (!day) return { nghi: null, items: [] };
+    const macDinh = day.macDinh || [];
+    const ngoaiLe = day.ngoaiLe || [];
+    const themCa = ngoaiLe.filter((e) => e.loai === "THEM_CA");
+    const nghiList = ngoaiLe.filter((e) => e.loai === "NGHI_PHEP");
+    const nghiCa = nghiList.find((e) => e.caThayThe);
+    const nghiAll = nghiList.find((e) => !e.caThayThe);
+    if (nghiAll) return { nghi: nghiAll, items: [] };
+    const items = [];
+    macDinh.forEach((m) => {
+      if (
+        nghiCa &&
+        nghiCa.caThayThe &&
+        m.ca &&
+        nghiCa.caThayThe.id === m.ca.id
+      ) {
+        return;
+      }
+      items.push({ kind: "macDinh", data: m });
+    });
+    themCa.forEach((t) => {
+      if (
+        nghiCa &&
+        nghiCa.caThayThe &&
+        t.caThayThe &&
+        nghiCa.caThayThe.id === t.caThayThe.id
+      ) {
+        return;
+      }
+      items.push({ kind: "them", data: t });
+    });
+    return { nghi: nghiCa, items };
+  };
+
+  if (!maNhanVien) {
+    return (
+      <div style={{ padding: "20px" }}>
+        <div
+          style={{
+            padding: "40px",
+            textAlign: "center",
+            color: "#94a3b8",
+            background: "#fff",
+            borderRadius: "10px",
+            border: "1px solid #e5e7eb",
+            fontSize: "14px",
+          }}
+        >
+          Không xác định được mã nhân viên.
+        </div>
       </div>
+    );
+  }
 
-      <style>{`
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
-        .animate-slide-up { animation: slideUp 0.5s ease-out both; }
-        .animate-fade-in-scale { animation: fadeInScale 0.3s ease-out both; }
-        .glass-card { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.8); box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06); }
-        .skeleton { background: linear-gradient(90deg, rgba(241,245,249,0.5) 25%, rgba(248,250,252,0.8) 50%, rgba(241,245,249,0.5) 75%); background-size: 800px 100%; animation: shimmer 1.5s infinite; }
-        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
-      `}</style>
+  return (
+    <div style={{ display: "flex", flexDirection: "column", padding: "20px" }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-      <div className="relative z-10 max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-
-        {/* ==================== CALENDAR CARD ==================== */}
-        <div className="overflow-hidden rounded-3xl border-2 border-red-300 bg-white/80 shadow-xl shadow-red-100/50 backdrop-blur-sm">
-
-          {/* Red header with binding rings (calendar icon look) */}
-          <div className="relative bg-gradient-to-r from-red-600 to-rose-500 px-6 pt-4 pb-5">
-            {/* Binding rings */}
-            <div className="absolute -top-1.5 left-10 rounded-md bg-white/90 px-3 py-1.5 shadow-sm ring-2 ring-red-300" />
-            <div className="absolute -top-1.5 right-10 rounded-md bg-white/90 px-3 py-1.5 shadow-sm ring-2 ring-red-300" />
-            {/* Centered title */}
-            <div className="relative flex flex-col items-center gap-1.5">
-              <span className="material-symbols-outlined text-white text-[22px]">calendar_month</span>
-              <h2 className="text-lg font-black uppercase tracking-[0.2em] text-white">Lịch làm việc</h2>
-              <p className="text-xs font-semibold text-white/80 capitalize tracking-wide">Tháng {monthLabel}</p>
-            </div>
-          </div>
-
-          <div className="p-4">
-
-            {loading && (
-              <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
-                {[...Array(7)].map((_, i) => (
-                  <div key={i} className="glass-card rounded-3xl h-64 skeleton"></div>
-                ))}
-              </div>
-            )}
-
-            {error && !loading && (
-              <div className="glass-card rounded-3xl p-10 text-center max-w-md mx-auto">
-                <span className="material-symbols-outlined text-red-500 text-4xl mb-2">error</span>
-                <p className="text-slate-600">{error}</p>
-              </div>
-            )}
-
-            {/* MONTH VIEW */}
-            {!loading && !error && (
-              <div className="animate-fade-in-scale overflow-x-auto custom-scroll">
-                <div className="min-w-[820px]">
-                  {/* Weekday header */}
-                  <div className="grid grid-cols-7 gap-2 mb-2">
-                    {DAY_ORDER.map((day) => (
-                      <div
-                        key={day.key}
-                        className={`text-center py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wide ${
-                          day.key === 'thu-7' || day.key === 'chu-nhat'
-                            ? 'text-rose-500 bg-rose-50'
-                            : 'text-slate-500 bg-slate-50'
-                        }`}
-                      >
-                        {day.label}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Day cells */}
-                  <div className="grid grid-cols-7 gap-2">
-                    {monthCells.map((cell, idx) => {
-                      if (!cell) {
-                        return <div key={`empty-${idx}`} className="min-h-[110px] rounded-2xl" />;
-                      }
-                      const isToday = formatDate(cell) === formatDate(today);
-                      const isWeekend = cell.getDay() === 0 || cell.getDay() === 6;
-                      const dayShifts = getShiftsForDate(cell);
-                      const shownShifts = dayShifts.slice(0, 3);
-                      const extraCount = dayShifts.length - shownShifts.length;
-
-                      return (
-                        <div
-                          key={formatDate(cell)}
-                          className={`glass-card rounded-2xl overflow-hidden flex flex-col hover:shadow-lg transition-all duration-300 group ${isToday ? 'ring-2 ring-blue-500/40' : ''}`}
-                          style={{ animationDelay: `${idx * 0.01}s` }}
-                        >
-                          <div className={`px-2 py-1.5 border-b flex items-center justify-between ${isToday ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white' : 'bg-slate-50/80'}`}>
-                            <p className={`text-sm font-extrabold ${isToday ? 'text-white' : (isWeekend ? 'text-rose-500' : 'text-slate-800')}`}>{cell.getDate()}</p>
-                            {isToday && <span className="px-1.5 py-0.5 rounded-lg bg-white/20 text-[8px] font-bold uppercase">Hôm nay</span>}
-                          </div>
-
-                          <div className="flex-1 p-1.5 space-y-1 min-h-[90px]">
-                            {dayShifts.length === 0 ? (
-                              <div className="h-full flex flex-col items-center justify-center gap-1 text-slate-300">
-                                <span className="material-symbols-outlined text-[14px]">event_busy</span>
-                                <p className="text-[9px] font-medium">Nghỉ</p>
-                              </div>
-                            ) : (
-                              shownShifts.map((shift, sIdx) => {
-                                const style = SHIFT_STYLE[shift.type] || SHIFT_STYLE.chieu;
-                                return (
-                                  <button
-                                    key={sIdx}
-                                    onClick={() => setSelectedShift(shift)}
-                                    className={`w-full text-left rounded-lg px-1.5 py-1 text-white transition-transform hover:-translate-y-0.5 bg-gradient-to-br ${style.gradient} shadow-sm`}
-                                  >
-                                    <p className="text-[10px] font-extrabold leading-snug break-words">{shift.phong || 'Phòng trực'}</p>
-                                    <div className="inline-flex items-center gap-0.5 bg-black/10 px-1 py-0.5 rounded text-[8px] font-bold">
-                                      <span className="material-symbols-outlined text-[10px]">schedule</span>
-                                      {shift.gioLam} - {shift.gioKetThuc}
-                                    </div>
-                                  </button>
-                                );
-                              })
-                            )}
-                            {extraCount > 0 && (
-                              <button
-                                onClick={() => setSelectedShift({ ...dayShifts[3], _more: dayShifts.slice(3) })}
-                                className="w-full text-center text-[9px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg py-0.5"
-                              >
-                                +{extraCount} ca khác
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
+      {/* HEADER - y hệt QuanLyCaLamViec */}
+      <div
+        style={{
+          background: "linear-gradient(135deg,#005bc0,#0077e6)",
+          padding: "14px 24px",
+          borderRadius: "10px 10px 0 0",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "10px",
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 700 }}>
+          📋 BẢNG PHÂN CÔNG CA LÀM VIỆC
+        </h2>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 12px",
+              borderRadius: "8px",
+              fontSize: "13px",
+              background: "rgba(255,255,255,0.15)",
+              color: "#fff",
+              maxWidth: "280px",
+            }}
+          >
+            <span style={{ opacity: 0.9 }}>👤</span>
+            <span
+              style={{
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {employeeName
+                ? `${employeeName} (NV${String(maNhanVien).padStart(3, "0")})`
+                : `NV${String(maNhanVien).padStart(3, "0")}`}
+            </span>
           </div>
         </div>
-
       </div>
 
-      {/* DETAIL MODAL */}
-      {selectedShift && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={() => setSelectedShift(null)}>
+      {/* VIEW TOGGLE - y hệt */}
+      <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+        <button
+          onClick={() => setViewMode("calendar")}
+          style={{
+            padding: "7px 16px",
+            borderRadius: "8px",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: 600,
+            fontSize: "13px",
+            background: viewMode === "calendar" ? "#fff" : "#e5e7eb",
+            color: viewMode === "calendar" ? "#005bc0" : "#374151",
+          }}
+        >
+          📅 Lịch tháng
+        </button>
+      </div>
+
+      {/* CALENDAR VIEW - y hệt */}
+      {viewMode === "calendar" && (
+        <>
           <div
-            className="animate-fade-in-scale relative overflow-hidden rounded-[28px] bg-white shadow-2xl border border-white/60"
-            style={{ width: '100%', maxWidth: '384px' }}
-            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: "10px",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+              border: "1px solid #e5e7eb",
+              padding: "16px",
+            }}
           >
-            <div className={`bg-gradient-to-br ${SHIFT_STYLE[selectedShift.type]?.gradient} p-6 text-white`}>
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-[10px] font-bold uppercase opacity-80">Chi tiết ca làm việc</p>
-                  <h3 className="text-xl font-black">{selectedShift.phong || 'Phòng làm việc'}</h3>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "10px",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
+              >
+                <span
+                  style={{
+                    fontSize: "13px",
+                    color: "#374151",
+                    fontWeight: 600,
+                  }}
+                >
+                  Nhân viên:
+                </span>
+                <div
+                  style={{
+                    minWidth: "260px",
+                    padding: "8px 12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                    background: "#f8fafc",
+                    color: "#374151",
+                  }}
+                >
+                  {employeeName
+                    ? `${employeeName} (NV${String(maNhanVien).padStart(3, "0")})`
+                    : `NV${String(maNhanVien).padStart(3, "0")}`}
                 </div>
-                <button onClick={() => setSelectedShift(null)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">close</span>
+              </div>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
+              >
+                <button
+                  onClick={() => changeCalMonth(-1)}
+                  style={{
+                    padding: "6px 12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "6px",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  ◀
+                </button>
+                <span
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    minWidth: "100px",
+                    textAlign: "center",
+                  }}
+                >
+                  {calMonth}/{calYear}
+                </span>
+                <button
+                  onClick={() => changeCalMonth(1)}
+                  style={{
+                    padding: "6px 12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "6px",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  ▶
+                </button>
+                <button
+                  onClick={() => {
+                    const n = new Date();
+                    setCalMonth(n.getMonth() + 1);
+                    setCalYear(n.getFullYear());
+                  }}
+                  style={{
+                    padding: "6px 12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "6px",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                  }}
+                >
+                  Hôm nay
                 </button>
               </div>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-50 p-3 rounded-2xl">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Giờ làm</p>
-                  <p className="font-bold text-slate-800">{selectedShift.gioLam} – {selectedShift.gioKetThuc}</p>
-                </div>
-                <div className="bg-slate-50 p-3 rounded-2xl">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Thứ</p>
-                  <p className="font-bold text-slate-800 capitalize">{selectedShift.dateObj?.toLocaleDateString('vi-VN', { weekday: 'long' })}</p>
-                </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: "12px",
+              background: "#fff",
+              borderRadius: "10px",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+              border: "1px solid #e5e7eb",
+              padding: "12px",
+              overflowX: "auto",
+            }}
+          >
+            {calLoading && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "200px",
+                  gap: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    border: "3px solid #e5e7eb",
+                    borderTopColor: "#005bc0",
+                    borderRadius: "50%",
+                    animation: "spin 0.8s linear infinite",
+                  }}
+                />
+                <span style={{ color: "#6b7280" }}>Đang tải lịch tháng...</span>
               </div>
-              <div className="bg-amber-50 p-4 rounded-2xl">
-                <p className="text-[10px] font-bold text-amber-600 uppercase mb-1">Ghi chú</p>
-                <p className="text-sm text-slate-600 italic">{selectedShift.ghiChu || 'Không có ghi chú.'}</p>
+            )}
+            {calError && !calLoading && (
+              <div
+                style={{
+                  margin: "12px",
+                  padding: "14px",
+                  background: "#fee2e2",
+                  borderRadius: "8px",
+                  color: "#991b1b",
+                }}
+              >
+                Lỗi: {calError}
+              </div>
+            )}
+            {!calLoading && !calError && maNhanVien && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                  gap: "6px",
+                  minWidth: "820px",
+                }}
+              >
+                {THU_ORDER.map((t) => (
+                  <div
+                    key={t}
+                    style={{
+                      textAlign: "center",
+                      padding: "8px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      background:
+                        t === "Thứ 7" || t === "Chủ Nhật"
+                          ? "#fef2f2"
+                          : "#f1f5f9",
+                      color:
+                        t === "Thứ 7" || t === "Chủ Nhật"
+                          ? "#e11d48"
+                          : "#475569",
+                    }}
+                  >
+                    {t}
+                  </div>
+                ))}
+                {calCells.map((d, idx) => {
+                  if (d === null)
+                    return (
+                      <div
+                        key={`e-${idx}`}
+                        style={{
+                          minHeight: "104px",
+                          borderRadius: "10px",
+                          background: "#fafafa",
+                        }}
+                      />
+                    );
+                  const day = calGetDayData(d);
+                  const { nghi, items } = calMergeShows(day);
+                  const dateKey = `${calYear}-${String(calMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                  const isToday =
+                    dateKey ===
+                    (() => {
+                      const n = new Date();
+                      return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+                    })();
+                  const isWeekend =
+                    new Date(calYear, calMonth - 1, d).getDay() === 0 ||
+                    new Date(calYear, calMonth - 1, d).getDay() === 6;
+                  return (
+                    <div
+                      key={dateKey}
+                      onClick={() => day && setCalSelectedDay(day)}
+                      style={{
+                        minHeight: "104px",
+                        borderRadius: "10px",
+                        padding: "6px",
+                        cursor: day ? "pointer" : "default",
+                        border: isToday
+                          ? "2px solid #005bc0"
+                          : "1px solid #e5e7eb",
+                        background: "#fff",
+                        transition: "background .15s",
+                      }}
+                      onMouseEnter={(e) =>
+                        day &&
+                        (e.currentTarget.style.background = "#f0f9ff")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "#fff")
+                      }
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 800,
+                            color: isToday
+                              ? "#005bc0"
+                              : isWeekend
+                                ? "#e11d48"
+                                : "#1e293b",
+                          }}
+                        >
+                          {d}
+                        </span>
+                        {isToday && (
+                          <span
+                            style={{
+                              fontSize: "9px",
+                              fontWeight: 700,
+                              color: "#fff",
+                              background: "#005bc0",
+                              borderRadius: "6px",
+                              padding: "1px 5px",
+                            }}
+                          >
+                            Nay
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        {nghi && (
+                          <div
+                            style={{
+                              background: "#fee2e2",
+                              border: "1px solid #fca5a5",
+                              borderRadius: "6px",
+                              padding: "3px 6px",
+                              fontSize: "11px",
+                              color: "#b91c1c",
+                              fontWeight: 700,
+                            }}
+                          >
+                            🚫 Nghỉ{nghi.lyDo ? ` (${nghi.lyDo})` : ""}
+                          </div>
+                        )}
+                        {items.map((it, i) => {
+                          const isExtra = it.kind === "them";
+                          const isDoi = it.kind === "doi";
+                          const bg = isExtra
+                            ? "linear-gradient(135deg,#fef9c3,#fef08a)"
+                            : isDoi
+                              ? "linear-gradient(135deg,#ede9fe,#ddd6fe)"
+                              : "linear-gradient(135deg,#dbeafe,#eff6ff)";
+                          const border = isExtra
+                            ? "#facc15"
+                            : isDoi
+                              ? "#c4b5fd"
+                              : "#93c5fd";
+                          const color = isExtra
+                            ? "#854d0e"
+                            : isDoi
+                              ? "#5b21b6"
+                              : "#1e40af";
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                background: bg,
+                                border: `1px solid ${border}`,
+                                borderRadius: "6px",
+                                padding: "3px 6px",
+                                fontSize: "11px",
+                                color,
+                              }}
+                            >
+                              <div style={{ fontWeight: 700 }}>
+                                📍 {it.data.phong || "—"}
+                              </div>
+                              <div>
+                                {isDoi
+                                  ? it.data.caThayThe?.tenCa || "Đổi ca"
+                                  : (() => {
+                                      const ca = it.data.ca;
+                                      const timeValue =
+                                        ca?.gioBatDau || it.data.gioLam || "";
+                                      const name = getShiftDisplayName(it.data);
+                                      const start = fmtGio(
+                                        isDoi
+                                          ? it.data.gioLam
+                                          : ca?.gioBatDau || it.data.gioLam,
+                                      );
+                                      const end = fmtGio(
+                                        isDoi
+                                          ? it.data.gioKetThuc
+                                          : ca?.gioKetThuc ||
+                                              it.data.gioKetThuc,
+                                      );
+                                      return `${name} ${start}-${end}`;
+                                    })()}
+                              </div>
+                              {isExtra && (
+                                <div
+                                  style={{
+                                    fontSize: "10px",
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  Thêm ca thường ngoại lệ
+                                </div>
+                              )}
+                              {isDoi && (
+                                <div
+                                  style={{
+                                    fontSize: "10px",
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  Đổi ca
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {!nghi && items.length === 0 && (
+                          <div
+                            style={{
+                              fontSize: "10px",
+                              color: "#cbd5e1",
+                              textAlign: "center",
+                              marginTop: "8px",
+                            }}
+                          >
+                            —
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* MODAL CHI TIẾT NGÀY (READ-ONLY) - y hệt cấu trúc QuanLyCaLamViec */}
+          {calSelectedDay && (
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+                padding: "16px",
+              }}
+            >
+              <div
+                style={{
+                  background: "#fff",
+                  width: "480px",
+                  maxWidth: "100%",
+                  maxHeight: "90vh",
+                  overflowY: "auto",
+                  borderRadius: "16px",
+                  boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
+                }}
+              >
+                <div
+                  style={{
+                    background: "#005bc0",
+                    padding: "16px 20px",
+                    color: "#fff",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderRadius: "16px 16px 0 0",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700 }}>
+                      Chi tiết ca ngày {calSelectedDay.ngay}
+                    </div>
+                    <div style={{ fontSize: "12px", opacity: 0.85 }}>
+                      {calSelectedDay.thu} · {employeeName}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setCalSelectedDay(null)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontSize: "20px",
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ padding: "16px 20px" }}>
+                  {/* Ca mặc định - read only */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "#334155",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      Ca làm việc mặc định trong tháng (theo{" "}
+                      {calSelectedDay.thu})
+                    </div>
+                    {(calSelectedDay.macDinh || []).length === 0 ? (
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#94a3b8",
+                          fontStyle: "italic",
+                          marginBottom: "6px",
+                        }}
+                      >
+                        Chưa có ca làm việc mặc định cho thứ này.
+                      </div>
+                    ) : (
+                      (calSelectedDay.macDinh || []).map((m) => (
+                        <div
+                          key={m.id}
+                          style={{
+                            background: "#f1f5f9",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "6px",
+                            padding: "6px 8px",
+                            fontSize: "12px",
+                            color: "#334155",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          📍 {m.phong || "—"}
+                          <br />
+                          {(() => {
+                            const ca = m.ca;
+                            const name =
+                              ca?.tenCa ||
+                              (() => {
+                                const h = Number(
+                                  (ca?.gioBatDau || m.gioLam || "").split(
+                                    ":",
+                                  )[0],
+                                );
+                                return h < 12 ? "ca sáng" : "ca chiều";
+                              })();
+                            const start = fmtGio(ca?.gioBatDau || m.gioLam);
+                            const end = fmtGio(
+                              ca?.gioKetThuc || m.gioKetThuc,
+                            );
+                            return `${name} ${start}-${end}`;
+                          })()}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Ngoại lệ - read only */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "#334155",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      Ngoại lệ đã có
+                    </div>
+                    {(calSelectedDay.ngoaiLe || []).length === 0 ? (
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#94a3b8",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        Chưa có.
+                      </div>
+                    ) : (
+                      (calSelectedDay.ngoaiLe || []).map((ex) => (
+                        <div
+                          key={ex.id}
+                          style={{
+                            background: "#fff7ed",
+                            border: "1px solid #fed7aa",
+                            borderRadius: "6px",
+                            padding: "6px 8px",
+                            fontSize: "12px",
+                            color: "#9a3412",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          <span style={{ fontWeight: 700 }}>
+                            {TIEU_DE_THEO_LOAI[ex.loai] || ex.loai}
+                          </span>
+                          {ex.caThayThe?.tenCa
+                            ? ` · ${ex.caThayThe.tenCa}`
+                            : ""}
+                          {ex.phong ? ` · 📍 ${ex.phong}` : ""}
+                          {ex.gioLam
+                            ? ` · 🕗 ${fmtGio(ex.gioLam)}–${fmtGio(ex.gioKetThuc)}`
+                            : ""}
+                          {ex.lyDo ? ` · 📝 ${ex.lyDo}` : ""}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
-    </div>
+
+      </div>
   );
 }
