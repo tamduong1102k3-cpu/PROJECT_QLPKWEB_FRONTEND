@@ -145,6 +145,33 @@ export const createDefaultShiftMonthApi = async (payload) => {
   }
 };
 
+export const nhanCaMacDinhDenCuoiNamApi = async (payload) => {
+  try {
+    const response = await fetchClient(
+      `${API_URL}/nhan-ca-mac-dinh-den-cuoi-nam`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(
+          response,
+          "Không thể nhân ca mặc định đến cuối năm",
+        ),
+      );
+    }
+    return await parseJsonResponse(response);
+  } catch (error) {
+    console.error("Error in nhanCaMacDinhDenCuoiNamApi:", error);
+    throw error;
+  }
+};
+
 export const deleteDefaultShiftByWeekdayApi = async ({
   maNhanVien,
   nam,

@@ -126,7 +126,7 @@ const BangDieuKhienAdmin = ({
   }, {
     id: 'shifts',
     label: 'Ca Làm Việc',
-    icon: 'calendar_view_week'
+    icon: 'calendar_month'
   }, {
     id: 'rooms',
     label: 'Phòng Chức Năng',

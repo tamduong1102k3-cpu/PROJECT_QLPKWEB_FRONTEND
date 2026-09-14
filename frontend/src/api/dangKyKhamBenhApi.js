@@ -14,11 +14,16 @@ export const getTodayApi = async (keyword = '') => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode || null;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -37,8 +42,12 @@ export const getAllApi = async () => {
     const response = await fetchClient(API_URL, { method: 'GET' });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
-      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
-      throw new Error(errorMsg);
+      let errorCode = null;
+      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; errorCode = errorData.errorCode || null; } catch (e) {}
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : [];
@@ -57,8 +66,12 @@ export const getByIdApi = async (id) => {
     const response = await fetchClient(`${API_URL}/${id}`, { method: 'GET' });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
-      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
-      throw new Error(errorMsg);
+      let errorCode = null;
+      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; errorCode = errorData.errorCode || null; } catch (e) {}
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -81,6 +94,7 @@ export const createApi = async (data) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       // Đọc full response body để debug
       let responseBody = null;
       try {
@@ -91,9 +105,13 @@ export const createApi = async (data) => {
           const errorData = JSON.parse(textBody);
           responseBody = errorData;
           errorMsg = errorData.message || errorMsg;
+          errorCode = errorData.errorCode || null;
         } catch (jsonParseError) {}
       } catch (readError) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -116,8 +134,12 @@ export const updateApi = async (id, data) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
-      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
-      throw new Error(errorMsg);
+      let errorCode = null;
+      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; errorCode = errorData.errorCode || null; } catch (e) {}
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -136,8 +158,12 @@ export const deleteApi = async (id) => {
     const response = await fetchClient(`${API_URL}/${id}`, { method: 'DELETE' });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
-      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
-      throw new Error(errorMsg);
+      let errorCode = null;
+      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; errorCode = errorData.errorCode || null; } catch (e) {}
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     return true;
   } catch (error) {
@@ -160,11 +186,16 @@ export const updateStatusApi = async (id, data) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode || null;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -189,11 +220,16 @@ export const setXepCuoiApi = async (id) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode || null;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -219,11 +255,16 @@ export const goiLaiApi = async (id, maChuyenKhoa) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode || null;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;

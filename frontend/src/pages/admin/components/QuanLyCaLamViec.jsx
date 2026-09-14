@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   createShiftApi,
   createDefaultShiftMonthApi,
+  nhanCaMacDinhDenCuoiNamApi,
   deleteDefaultShiftByWeekdayApi,
   getMonthScheduleApi,
   createExceptionApi,
@@ -256,7 +257,9 @@ export default function QuanLyCaLamViec() {
   const [calConfirmModal, setCalConfirmModal] = useState(null);
   const [calDeleteConfirmId, setCalDeleteConfirmId] = useState(null);
   const [calSaving, setCalSaving] = useState(false);
+  const [calYearEndSaving, setCalYearEndSaving] = useState(false);
   const [calShowAddDefault, setCalShowAddDefault] = useState(false);
+  const [calDefaultActionMode, setCalDefaultActionMode] = useState("month");
   const [calEditingDefaultId, setCalEditingDefaultId] = useState(null);
   const [calEditDefaultForm, setCalEditDefaultForm] =
     useState(emptyDefaultForm());
@@ -592,6 +595,46 @@ export default function QuanLyCaLamViec() {
       showError("Lỗi thêm ca: " + e.message);
     } finally {
       setCalSaving(false);
+    }
+  };
+
+  const calAddDefaultThroughYearEnd = async () => {
+    if (!calSelectedDay || !calSelectedMaNV) return;
+    if (!calDefaultForm.phong.trim()) {
+      showError("Vui lòng chọn phòng!");
+      return;
+    }
+    const selectedCaIds = (calDefaultForm.caIds || [])
+      .map((id) => (id ? parseInt(id, 10) : null))
+      .filter((id) => id !== null);
+    if (selectedCaIds.length === 0) {
+      showError("Vui lòng chọn ít nhất 1 ca!");
+      return;
+    }
+
+    setCalYearEndSaving(true);
+    try {
+      const result = await nhanCaMacDinhDenCuoiNamApi({
+        maNhanVien: Number(calSelectedMaNV),
+        thangBatDau: `${calYear}-${String(calMonth).padStart(2, "0")}`,
+        thu: calSelectedDay.thu,
+        phong: calDefaultForm.phong.trim(),
+        danhSachMaCa: selectedCaIds,
+      });
+      setCalShowAddDefault(false);
+      setCalDefaultForm(emptyDefaultForm());
+      const data = await fetchCalMonth();
+      if (calSelectedDay) {
+        const key = calSelectedDay.ngay;
+        setCalSelectedDay(data?.days?.find((x) => x.ngay === key) || null);
+      }
+      showSuccess(
+        `Đã nhân ${result?.soLuongDaThem ?? 0} ca qua ${result?.soThangDaXuLy ?? 0} tháng`,
+      );
+    } catch (e) {
+      showError("Lỗi nhân ca đến cuối năm: " + e.message);
+    } finally {
+      setCalYearEndSaving(false);
     }
   };
 
@@ -2820,33 +2863,69 @@ const calDeleteDefault = async (m) => {
                             </div>
                           </div>
                         ) : !calShowAddDefault ? (
-                          <button
-                            onClick={() => {
-                              setCalShowAddDefault(true);
-                              const firstRoom =
-                                filteredCalRooms[0]?.ten_phong ||
-                                filteredCalRooms[0]?.tenPhong ||
-                                "";
-                              setCalDefaultForm({
-                                phong: firstRoom,
-                                caIds: [""],
-                              });
-                            }}
-                            disabled={calSaving}
+                          <div
                             style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: "6px",
                               marginTop: "4px",
-                              background: "#e0f2fe",
-                              color: "#0369a1",
-                              border: "none",
-                              borderRadius: "6px",
-                              padding: "5px 10px",
-                              fontSize: "11px",
-                              cursor: "pointer",
-                              fontWeight: 600,
                             }}
                           >
-                            + Thêm ca làm việc mặc định trong tháng
-                          </button>
+                            <button
+                              onClick={() => {
+                                setCalShowAddDefault(true);
+                                setCalDefaultActionMode("month");
+                                const firstRoom =
+                                  filteredCalRooms[0]?.ten_phong ||
+                                  filteredCalRooms[0]?.tenPhong ||
+                                  "";
+                                setCalDefaultForm({
+                                  phong: firstRoom,
+                                  caIds: [""],
+                                });
+                              }}
+                              disabled={calSaving || calYearEndSaving}
+                              style={{
+                                background: "#e0f2fe",
+                                color: "#0369a1",
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "5px 10px",
+                                fontSize: "11px",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                              }}
+                            >
+                              + Thêm ca làm việc mặc định trong tháng
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCalShowAddDefault(true);
+                                setCalDefaultActionMode("yearEnd");
+                                const firstRoom =
+                                  filteredCalRooms[0]?.ten_phong ||
+                                  filteredCalRooms[0]?.tenPhong ||
+                                  "";
+                                setCalDefaultForm({
+                                  phong: firstRoom,
+                                  caIds: [""],
+                                });
+                              }}
+                              disabled={calSaving || calYearEndSaving}
+                              style={{
+                                background: "#dcfce7",
+                                color: "#166534",
+                                border: "1px solid #86efac",
+                                borderRadius: "6px",
+                                padding: "5px 10px",
+                                fontSize: "11px",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                              }}
+                            >
+                              ↗ Nhân ca đến cuối năm
+                            </button>
+                          </div>
                         ) : (
                           <div
                             style={{
@@ -2864,7 +2943,9 @@ const calDeleteDefault = async (m) => {
                                 marginBottom: "6px",
                               }}
                             >
-                              Thêm ca mặc định ({calSelectedDay.thu})
+                              {calDefaultActionMode === "yearEnd"
+                                ? `Nhân ca mặc định đến cuối năm (${calSelectedDay.thu})`
+                                : `Thêm ca mặc định (${calSelectedDay.thu})`}
                             </div>
                             <label
                               style={{
@@ -3016,7 +3097,7 @@ const calDeleteDefault = async (m) => {
                                 onClick={() =>
                                   setCalDefaultForm({ phong: "", caIds: [""] })
                                 }
-                                disabled={calSaving}
+                                disabled={calSaving || calYearEndSaving}
                                 style={{
                                   padding: "6px 12px",
                                   borderRadius: "6px",
@@ -3027,22 +3108,43 @@ const calDeleteDefault = async (m) => {
                               >
                                 Hủy
                               </button>
-                              <button
-                                onClick={calAddDefault}
-                                disabled={calSaving}
-                                style={{
-                                  padding: "6px 14px",
-                                  borderRadius: "6px",
-                                  background: "#005bc0",
-                                  color: "#fff",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  fontWeight: 600,
-                                  fontSize: "12px",
-                                }}
-                              >
-                                Lưu
-                              </button>
+                              {calDefaultActionMode === "month" ? (
+                                <button
+                                  onClick={calAddDefault}
+                                  disabled={calSaving || calYearEndSaving}
+                                  style={{
+                                    padding: "6px 14px",
+                                    borderRadius: "6px",
+                                    background: "#005bc0",
+                                    color: "#fff",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontWeight: 600,
+                                    fontSize: "12px",
+                                  }}
+                                >
+                                  Lưu
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={calAddDefaultThroughYearEnd}
+                                  disabled={calSaving || calYearEndSaving}
+                                  style={{
+                                    padding: "6px 14px",
+                                    borderRadius: "6px",
+                                    background: "#047857",
+                                    color: "#fff",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontWeight: 600,
+                                    fontSize: "12px",
+                                  }}
+                                >
+                                  {calYearEndSaving
+                                    ? "Đang nhân..."
+                                    : "Nhân đến cuối năm"}
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
