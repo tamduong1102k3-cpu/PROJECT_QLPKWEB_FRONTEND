@@ -38,7 +38,7 @@ const getScheduleForDate = (shifts, date) => {
   return { leave: null, items: replacement.length > 0 ? [...replacement, ...extra] : [...defaults, ...extra] };
 };
 
-export default function WorkScheduleDateCalendar({ selectedDate, minDateStr, shifts, onSelect }) {
+export default function WorkScheduleDateCalendar({ selectedDate, minDateStr, shifts, onSelect, disabled: disabledProp = false }) {
   const [viewDate, setViewDate] = useState(() => {
     const date = minDateStr ? new Date(`${minDateStr}T12:00:00`) : new Date();
     return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -70,16 +70,16 @@ export default function WorkScheduleDateCalendar({ selectedDate, minDateStr, shi
   return (
     <div style={{ width: '100%', minWidth: 0, marginTop: 6, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', padding: 8, boxSizing: 'border-box', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, padding: '0 2px 8px', flexWrap: 'wrap' }}>
-        <button type="button" onClick={() => changeMonth(-1)} style={{ width: 32, height: 30, padding: 0, border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', fontWeight: 700 }}>
+        <button type="button" onClick={() => changeMonth(-1)} disabled={disabledProp} style={{ width: 32, height: 30, padding: 0, border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: disabledProp ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: disabledProp ? 0.5 : 1 }}>
           ◀
         </button>
         <span style={{ fontSize: 13, fontWeight: 700, minWidth: 72, textAlign: 'center' }}>
           {month + 1}/{year}
         </span>
-        <button type="button" onClick={() => changeMonth(1)} style={{ width: 32, height: 30, padding: 0, border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', fontWeight: 700 }}>
+        <button type="button" onClick={() => changeMonth(1)} disabled={disabledProp} style={{ width: 32, height: 30, padding: 0, border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: disabledProp ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: disabledProp ? 0.5 : 1 }}>
           ▶
         </button>
-        <button type="button" onClick={() => setViewDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1))} style={{ height: 30, padding: '0 8px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 11 }}>
+        <button type="button" onClick={() => setViewDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1))} disabled={disabledProp} style={{ height: 30, padding: '0 8px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: disabledProp ? 'not-allowed' : 'pointer', fontSize: 11, opacity: disabledProp ? 0.5 : 1 }}>
           Hôm nay
         </button>
       </div>
@@ -95,7 +95,8 @@ export default function WorkScheduleDateCalendar({ selectedDate, minDateStr, shi
           if (!date) return <div key={`empty-${index}`} style={{ minHeight: 112, borderRadius: 7, background: '#fafafa' }} />;
 
           const dateStr = formatDateInput(date);
-          const disabled = isDisabled(date);
+          const disabledBySchedule = isDisabled(date);
+          const disabled = disabledBySchedule || disabledProp;
           const isSelected = dateStr === selectedDate;
           const isToday = dateStr === todayStr;
           const isWeekend = date.getDay() === 0 || date.getDay() === 6;
@@ -106,8 +107,8 @@ export default function WorkScheduleDateCalendar({ selectedDate, minDateStr, shi
               key={dateStr}
               type="button"
               disabled={disabled}
-              onClick={() => onSelect(dateStr)}
-              title={disabled ? 'Bác sĩ không làm việc' : `Chọn ngày ${dateStr}`}
+              onClick={() => { if (!disabled) onSelect(dateStr); }}
+              title={disabled ? (disabledProp ? 'Ngày khám bị khóa' : 'Bác sĩ không làm việc') : `Chọn ngày ${dateStr}`}
               style={{
                 minHeight: 112,
                 minWidth: 0,

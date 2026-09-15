@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { getByDoctorApi, createApi, updateApi, hoanLichApi } from '../../../api/appointmentApi';
 import { getAllChuyenKhoaApi, getAllPhongApi } from '../../../api/danhMucApi';
@@ -102,6 +102,28 @@ const getDaysUntil = (dateStr) => {
   return <span className="text-[10px] text-gray-400">Còn {diff} ngày</span>;
 };
 
+const removeVietnameseTones = (str) => {
+  if (!str) return '';
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+};
+
+const isDoctor = (doc) => {
+  const roleText = removeVietnameseTones(String(
+    doc?.tenChucVu ??
+    doc?.ten_chuc_vu ??
+    doc?.chucVu ??
+    doc?.chuc_vu ??
+    doc?.vaiTro ??
+    doc?.vai_tro ??
+    doc?.tenVaiTro ??
+    doc?.ten_vai_tro ??
+    ''
+  ).toLowerCase().trim());
+  if (!roleText) return false;
+  if (roleText.includes('tro ly bac si') || roleText.includes('tro ly')) return false;
+  return roleText.includes('bac si');
+};
+
 const getShiftId = (shift) => shift?.ca?.id ?? shift?.maCa ?? shift?.maCaMacDinh ?? null;
 
 const getAvailableShiftIds = (shifts, dateStr) => {
@@ -168,11 +190,39 @@ const StatusDropdown = ({ appointment, onUpdate }) => {
   );
 };
 
-/* ─── Create Modal (Portal) ─── */
-const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate, patient, chuyenKhoaList, dichVuList, benhNhanList, phongList, creating, doctorShifts, availableCaList }) => {
+/* ─── Create/Update Modal (Portal) ─── */
+const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate, patient, chuyenKhoaList, dichVuList, benhNhanList, phongList, creating, doctorShifts, availableCaList, mode = 'create', nhanVienList = [], onBacSiChange, hoanLich = false, setHoanLich, lyDoHoan = '', setLyDoHoan }) => {
+  const isUpdate = mode === 'update';
   const [patientSearch, setPatientSearch] = useState('');
   const [showPatientList, setShowPatientList] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [bacSiChangeWarning, setBacSiChangeWarning] = useState('');
+  // Lưu bác sĩ + ngày ban đầu khi mở modal — để tính diff lúc submit
+  const initialBacSiRef = useRef(formData.maBacSi);
+  const initialDateRef = useRef(formData.ngayTaiKham);
+
+  // Khi đổi bác sĩ: kiểm tra ngày hiện tại còn hợp lệ với bác sĩ mới không.
+  // Nếu KHÔNG → reset ngày + ca, báo người dùng chọn lại.
+  useEffect(() => {
+    if (!isUpdate) return;
+    if (String(formData.maBacSi) === String(initialBacSiRef.current)) return; // chưa đổi bác sĩ
+    if (!formData.ngayTaiKham) return; // ngày đã bị reset rồi
+
+    if (Array.isArray(doctorShifts) && doctorShifts.length > 0) {
+      const availableIds = getAvailableShiftIds(doctorShifts, formData.ngayTaiKham);
+      if (availableIds.length === 0) {
+        // Bác sĩ mới không làm việc vào ngày đang chọn → reset ngày + ca, bắt chọn lại
+        setBacSiChangeWarning(
+          `Bác sĩ mới không làm việc vào ngày ${formatDateDisplay(formData.ngayTaiKham)}. Vui lòng chọn ngày khác.`
+        );
+        setFormData(prev => ({ ...prev, ngayTaiKham: '', maCa: '' }));
+        clearError('ngayTaiKham');
+        clearError('maCa');
+      } else {
+        setBacSiChangeWarning('');
+      }
+    }
+  }, [doctorShifts, formData.ngayTaiKham, isUpdate, formData.maBacSi]);
 
   const errorStyle = { borderColor: '#ef4444', background: '#fef2f2' };
 
@@ -187,12 +237,18 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
 
   const validateAndSubmit = () => {
     const errors = {};
+    // Validate đầy đủ mọi field — không phân nhánh theo hoanLich
     if (!formData.maBenhNhan) errors.maBenhNhan = 'Chưa chọn bệnh nhân';
     if (!formData.maChuyenKhoa) errors.maChuyenKhoa = 'Chưa chọn chuyên khoa';
     if (!formData.maPhong) errors.maPhong = 'Chưa chọn phòng khám';
     if (!formData.maDichVu) errors.maDichVu = 'Chưa chọn dịch vụ';
-    if (!formData.ngayTaiKham) errors.ngayTaiKham = 'Chưa chọn ngày tái khám';
+    if (nhanVienList.length > 0 && !formData.maBacSi) errors.maBacSi = 'Chưa chọn bác sĩ';
+    if (!formData.ngayTaiKham) errors.ngayTaiKham = 'Chưa chọn ngày khám';
     if (!formData.maCa) errors.maCa = 'Chưa chọn ca khám';
+    // Tick "Hoãn" → trạng thái HOAN, bắt buộc nhập lý do
+    if (isUpdate && hoanLich && !lyDoHoan?.trim()) {
+      errors.lyDoHoan = 'Vui lòng nhập lý do hoãn lịch';
+    }
     setFormErrors(errors);
     if (Object.keys(errors).length === 0) {
       onCreate();
@@ -203,6 +259,15 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
   const filteredDichVus = formData.maChuyenKhoa
     ? dichVuList.filter(dv => String(dv.maChuyenKhoa) === String(formData.maChuyenKhoa))
     : dichVuList;
+
+  // Lọc bác sĩ theo chuyên khoa đã chọn (chỉ khi có nhanVienList — lễ tân)
+  const filteredBacSiList = nhanVienList.length > 0
+    ? nhanVienList.filter(nv => {
+        if (!isDoctor(nv)) return false;
+        if (!formData.maChuyenKhoa) return true;
+        return String(nv.chuyenKhoa ?? nv.maChuyenKhoa ?? '') === String(formData.maChuyenKhoa);
+      })
+    : [];
 
   const filteredPhongList = getAssignedRoomOptions({
     doctorShifts,
@@ -258,7 +323,7 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
                 <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: 22 }}>calendar_add_on</span>
               </div>
               <div>
-                <h3 style={{ fontWeight: 800, fontSize: '1.1rem', color: '#fff', margin: 0 }}>Tạo lịch hẹn tái khám</h3>
+                <h3 style={{ fontWeight: 800, fontSize: '1.1rem', color: '#fff', margin: 0 }}>{isUpdate ? 'Cập nhật lịch khám' : 'Tạo lịch hẹn tái khám'}</h3>
                 <p style={{ color: 'rgba(199,210,254,0.9)', fontSize: 12, margin: '2px 0 0' }}>
                   {patient ? `Bệnh nhân: ${patient.hoTen || 'N/A'}` : 'Điền đầy đủ thông tin bên dưới'}
                 </p>
@@ -349,7 +414,12 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
               </label>
               <select
                 value={formData.maChuyenKhoa || ''}
-                onChange={e => { setFormData({ ...formData, maChuyenKhoa: e.target.value ? Number(e.target.value) : '', maDichVu: '' }); clearError('maChuyenKhoa'); }}
+                onChange={e => {
+                  const maChuyenKhoa = e.target.value ? Number(e.target.value) : '';
+                  setFormData({ ...formData, maChuyenKhoa, maDichVu: '', maBacSi: '', maPhong: '', ngayTaiKham: '', maCa: '' });
+                  if (onBacSiChange) onBacSiChange('');
+                  clearError('maChuyenKhoa');
+                }}
                 style={formErrors.maChuyenKhoa ? { ...selectStyle, ...errorStyle } : selectStyle}
               >
                 <option value="">-- Chọn chuyên khoa --</option>
@@ -371,7 +441,7 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
               )}
             </div>
 
-            {/* Chọn phòng */}
+            {/* Chọn phòng — luôn editable */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>meeting_room</span>
@@ -381,9 +451,15 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
                 value={formData.maPhong || ''}
                 onChange={e => { setFormData({ ...formData, maPhong: e.target.value ? Number(e.target.value) : '' }); clearError('maPhong'); }}
                 style={formErrors.maPhong ? { ...selectStyle, ...errorStyle } : selectStyle}
-                disabled={!formData.maChuyenKhoa}
+                disabled={!formData.maChuyenKhoa || (nhanVienList.length > 0 && !formData.maBacSi)}
               >
-                <option value="">{formData.maChuyenKhoa ? '-- Chọn phòng --' : '-- Chọn chuyên khoa trước --'}</option>
+                <option value="">
+                  {!formData.maChuyenKhoa
+                    ? '-- Chọn chuyên khoa trước --'
+                    : (nhanVienList.length > 0 && !formData.maBacSi)
+                      ? '-- Chọn bác sĩ trước --'
+                      : '-- Chọn phòng --'}
+                </option>
                 {filteredPhongList.map(room => (
                   <option key={room.maPhong} value={room.maPhong}>
                     {room.tenPhong}
@@ -404,7 +480,7 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
               )}
             </div>
 
-            {/* Chọn dịch vụ */}
+            {/* Chọn dịch vụ — luôn editable */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>medical_services</span>
@@ -436,12 +512,52 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
                 </p>
               )}
             </div>
+
+            {/* Chọn bác sĩ — CHỈ hiển thị khi có nhanVienList (lễ tân), luôn editable */}
+            {nhanVienList.length > 0 && (
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>stethoscope</span>
+                  Bác sĩ <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <select
+                  value={formData.maBacSi ?? ''}
+                  onChange={e => {
+                    const maBacSi = e.target.value ? Number(e.target.value) : '';
+                    // Khi đổi bác sĩ: reset ca khám (ca cũ có thể không thuộc lịch bác sĩ mới)
+                    // Giữ nguyên ngày khám (disabled trong nhánh không hoãn)
+                    setFormData({ ...formData, maBacSi, maPhong: '', maCa: '' });
+                    if (onBacSiChange) onBacSiChange(maBacSi);
+                    clearError('maBacSi');
+                  }}
+                  style={formErrors.maBacSi ? { ...selectStyle, ...errorStyle } : selectStyle}
+                  disabled={!formData.maChuyenKhoa}
+                >
+                  <option value="">{formData.maChuyenKhoa ? '-- Chọn bác sĩ --' : '-- Chọn chuyên khoa trước --'}</option>
+                  {filteredBacSiList.map(nv => (
+                    <option key={nv.maNhanVien} value={nv.maNhanVien}>{nv.hoTen}</option>
+                  ))}
+                </select>
+                {formData.maChuyenKhoa && filteredBacSiList.length === 0 && (
+                  <p style={{ fontSize: 10, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>warning</span>
+                    Chuyên khoa này chưa có bác sĩ được cấu hình.
+                  </p>
+                )}
+                {formErrors.maBacSi && (
+                  <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>error</span>
+                    {formErrors.maBacSi}
+                  </p>
+                )}
+              </div>
+            )}
             </div>
             {/* /Cột trái */}
 
             {/* Cột phải: ngày tái khám + ghi chú */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Ngày tái khám */}
+            {/* Ngày tái khám — luôn editable */}
             <div>
               <label style={{ fontSize: 13, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>event</span>
@@ -451,7 +567,11 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
                 selectedDate={formData.ngayTaiKham}
                 minDateStr={getMinDate()}
                 shifts={doctorShifts}
-                onSelect={(dateStr) => { setFormData({ ...formData, ngayTaiKham: dateStr, maCa: '' }); clearError('ngayTaiKham'); clearError('maCa'); }}
+                onSelect={(dateStr) => {
+                  setFormData(prev => ({ ...prev, ngayTaiKham: dateStr, maCa: '' }));
+                  clearError('ngayTaiKham');
+                  clearError('maCa');
+                }}
               />
               {formErrors.ngayTaiKham && (
                 <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
@@ -500,7 +620,7 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
               )}
             </div>
 
-            {/* Ghi chú */}
+            {/* Ghi chú — luôn editable */}
             <div>
               <label style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#818cf8' }}>notes</span>
@@ -516,6 +636,51 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
                 onBlur={e => e.target.style.borderColor = '#e5e7eb'}
               />
             </div>
+
+            {/* Hoãn lịch — chỉ hiển thị trong mode update */}
+            {isUpdate && setHoanLich && (
+              <div style={{ padding: '0.75rem 1rem', background: hoanLich ? '#fffbeb' : '#f8fafc', border: `1.5px solid ${hoanLich ? '#f59e0b' : '#e2e8f0'}`, borderRadius: '0.75rem', transition: 'all 0.2s' }}>
+                {bacSiChangeWarning && (
+                  <div style={{ padding: '0.6rem 0.85rem', background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '0.625rem', fontSize: 12, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>warning</span>
+                    {bacSiChangeWarning}
+                  </div>
+                )}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: hoanLich ? '#b45309' : '#374151' }}>
+                  <input
+                    type="checkbox"
+                    checked={hoanLich}
+                    onChange={e => {
+                      setHoanLich(e.target.checked);
+                      if (!e.target.checked) setLyDoHoan?.('');
+                    }}
+                    style={{ width: 16, height: 16, accentColor: '#f59e0b', cursor: 'pointer' }}
+                  />
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: hoanLich ? '#f59e0b' : '#9ca3af' }}>event_repeat</span>
+                  Hoãn lịch
+                </label>
+                {/* Lý do hoãn — chỉ hiển thị khi tick "Hoãn lịch" */}
+                {hoanLich && (
+                  <div style={{ marginTop: 10 }}>
+                    <textarea
+                      value={lyDoHoan}
+                      onChange={e => { setLyDoHoan?.(e.target.value); if (formErrors.lyDoHoan) clearError('lyDoHoan'); }}
+                      rows={2}
+                      placeholder="Nhập lý do hoãn lịch..."
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', background: '#fff', border: `1.5px solid ${formErrors.lyDoHoan ? '#ef4444' : '#fcd34d'}`, borderRadius: '0.625rem', fontSize: 13, color: '#374151', outline: 'none', boxSizing: 'border-box', resize: 'none' }}
+                      onFocus={e => e.target.style.borderColor = '#f59e0b'}
+                      onBlur={e => e.target.style.borderColor = formErrors.lyDoHoan ? '#ef4444' : '#fcd34d'}
+                    />
+                    {formErrors.lyDoHoan && (
+                      <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>error</span>
+                        {formErrors.lyDoHoan}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             </div>
             {/* /Cột phải */}
           </div>
@@ -539,7 +704,7 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
               ) : (
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check</span>
               )}
-              {creating ? 'Đang tạo...' : 'Xác nhận tạo'}
+              {creating ? (isUpdate ? 'Đang lưu...' : 'Đang tạo...') : (isUpdate ? 'Lưu thay đổi' : 'Xác nhận tạo')}
             </button>
           </div>
         </div>
@@ -859,7 +1024,7 @@ const FILTER_OPTS = [
   { value: 'HOAN', label: 'Hoãn' },
 ];
 
-const TabHenTaiKham = ({ user, patient }) => {
+const TabHenTaiKham = ({ user, patient, appointments: externalAppointments }) => {
   const { showSuccess, showError } = useNotification();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -966,7 +1131,11 @@ const TabHenTaiKham = ({ user, patient }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getByDoctorApi();
+      // Nếu có externalAppointments (truyền từ ngoài — ví dụ từ LichKham lễ tân)
+      // thì dùng trực tiếp, không gọi getByDoctorApi() (vì lễ tân không có maChuyenKhoa trong JWT)
+      const data = externalAppointments && externalAppointments.length > 0
+        ? externalAppointments
+        : await getByDoctorApi();
       // Tab trong màn hình khám bệnh: chỉ hiển thị lịch hẹn của bệnh nhân ĐANG KHÁM
       const filtered = patient?.maBenhNhan
         ? (data || []).filter(a => Number(a.maBenhNhan) === Number(patient.maBenhNhan))
@@ -977,7 +1146,7 @@ const TabHenTaiKham = ({ user, patient }) => {
     } finally {
       setLoading(false);
     }
-  }, [patient]);
+  }, [patient, externalAppointments]);
 
   useEffect(() => {
     const timer = setTimeout(fetchData, 0);
@@ -1072,7 +1241,6 @@ const TabHenTaiKham = ({ user, patient }) => {
     try {
       await updateApi(cancelTarget, {
         trangThai: 'HUY',
-        nguoiHuy: 'BAC_SI',
         ghiChu: lyDoFinal
       });
       showSuccess('Đã hủy lịch hẹn và thông báo cho bệnh nhân');
@@ -1540,5 +1708,7 @@ const TabHenTaiKham = ({ user, patient }) => {
     </div>
   );
 };
+
+export { AppointmentModal, formatDateInput, formatDateDisplay, getVietnameseDayFromDate, getUniqueWorkingDays, getAssignedRoomOptions, getAvailableShiftIds, getShiftId };
 
 export default TabHenTaiKham;

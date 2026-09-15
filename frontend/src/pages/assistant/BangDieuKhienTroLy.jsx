@@ -1,11 +1,10 @@
-import { getTodayApi as _getTodayDangKy, updateStatusApi as _updateDangKyStatus, setXepCuoiApi as _setXepCuoiApi, goiLaiApi as _goiLaiApi } from '../../api/dangKyKhamBenhApi';
+import { getTodayApi as _getTodayDangKy, updateStatusApi as _updateDangKyStatus } from '../../api/dangKyKhamBenhApi';
 import { getCurrentRoomApi as _getCurrentRoomApi } from '../../api/shiftApi';
 import { updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
 // ĐẢM BẢO IMPORT apiClient
 import { apiClient } from "../../api/apiClient"; 
 import { useNotification } from '../../components/NotificationContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import ModalGoiLai from '../../components/ModalGoiLai';
 import React, { useState, useEffect, useCallback } from 'react';
 import { sqlLikeMatch } from '../../utils/searchUtils';
 import VitalSignsFormComponent from '../../components/VitalSignsForm';
@@ -40,7 +39,6 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
   const [currentRoom, setCurrentRoom] = useState("Đang tải...");
   const { showSuccess, showError } = useNotification();
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
-  const [goiLaiState, setGoiLaiState] = useState({ isOpen: false, patient: null });
 
   const isRhmAssistant = Number(user?.maChuyenKhoa) === 5;
   const isTmhAssistant = Number(user?.maChuyenKhoa) === 4;
@@ -69,7 +67,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
       const pending = [...choKhamOrDangKham, ...absentList];
       
       setPatients({ pending, completed: completedList, absent: absentList });
-        setStats({ waitingToday: pending.length, processedToday: completedList.length, absentToday: absent.length });
+        setStats({ waitingToday: pending.length, processedToday: completedList.length, absentToday: absentList.length });
       }
       if (user?.maNhanVien) {
         const roomData = await _getCurrentRoomApi(user.maNhanVien);
@@ -133,24 +131,17 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
     handleSelectPatient(patient);
   };
 
-  const handleMarkAbsent = (patient, type = 'tam_thoi') => {
-    const isQuaLau = type === 'qua_lau';
+  const handleMarkAbsent = (patient) => {
     setConfirmState({
       isOpen: true,
       title: 'Xác nhận vắng mặt',
-      message: isQuaLau
-        ? `Đánh dấu bệnh nhân "${patient.hoTen}" vắng quá lâu? Bệnh nhân sẽ được xếp xuống cuối danh sách khi quay lại.`
-        : `Đánh dấu bệnh nhân "${patient.hoTen}" vắng mặt?`,
+      message: `Bạn có muốn đánh vắng bệnh nhân "${patient.hoTen}"?`,
       type: 'warning',
       icon: 'person_off',
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, isOpen: false }));
         try {
           await _updateDangKyStatus(patient.id, { trangThai: 'VANG_MAT' });
-          // Nếu vắng quá lâu thì đánh dấu xếp cuối
-          if (isQuaLau) {
-            await _setXepCuoiApi(patient.id);
-          }
           showSuccess(`Đã đánh dấu vắng mặt "${patient.hoTen}"`);
           fetchStats();
         } catch (e) {
@@ -183,41 +174,6 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
     });
   };
 
-  const handleGoiLai_SauNguoiDangKham = async () => {
-    const patient = goiLaiState.patient;
-    setGoiLaiState({ isOpen: false, patient: null });
-    try {
-      await _updateDangKyStatus(patient.id, { trangThai: 'CHO_KHAM' });
-      await fetchStats();
-      showSuccess(`Đã gọi lại "${patient.hoTen}"`);
-    } catch (e) {
-      showError("Lỗi: " + e.message);
-    }
-  };
-
-  const handleGoiLai_XepCuoiHang = async () => {
-    const patient = goiLaiState.patient;
-    setGoiLaiState({ isOpen: false, patient: null });
-    try {
-      await _updateDangKyStatus(patient.id, { trangThai: 'CHO_KHAM' });
-      await _setXepCuoiApi(patient.id);
-      await fetchStats();
-      showSuccess(`Đã xếp "${patient.hoTen}" xuống cuối hàng chờ`);
-    } catch (e) {
-      showError("Lỗi: " + e.message);
-    }
-  };
-
-  const handleGoiLai = async (patient) => {
-    try {
-      await _goiLaiApi(patient.id, user?.maChuyenKhoa);
-      await fetchStats();
-      showSuccess(`Đã gọi lại "${patient.hoTen}"`);
-    } catch (e) {
-      showError("Lỗi: " + e.message);
-    }
-  };
-
   const navItems = [
     { id: 'dashboard', label: 'Bàn Làm Việc', icon: 'desk' },
     { id: 'patients', label: 'Thông Tin Bệnh Nhân', icon: 'person_search' },
@@ -247,7 +203,6 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
                 onOpenResult={handleOpenResult}
                 onMarkAbsent={handleMarkAbsent}
                 onMarkPresent={handleMarkPresent}
-                onGoiLai={handleGoiLai}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 isRefreshing={loadingQueue}
@@ -381,13 +336,6 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
             icon={confirmState.icon}
             onConfirm={confirmState.onConfirm}
             onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
-          />
-          <ModalGoiLai
-            isOpen={goiLaiState.isOpen}
-            patient={goiLaiState.patient}
-            onSauNguoiDangKham={handleGoiLai_SauNguoiDangKham}
-            onXepCuoiHang={handleGoiLai_XepCuoiHang}
-            onCancel={() => setGoiLaiState({ isOpen: false, patient: null })}
           />
         </main>
       </div>

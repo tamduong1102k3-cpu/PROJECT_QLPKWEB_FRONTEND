@@ -1,27 +1,53 @@
 import { getAllApi } from '../../../api/lichKhamApi';
 import { getAllApi as getAllDichVuApi } from '../../../api/dichVuApi';
-import { getAllPhongApi } from '../../../api/danhMucApi';
-import { getAllNhanVienApi } from '../../../api/employeeApi';
+import { getAllChuyenKhoaApi, getAllPhongApi } from '../../../api/danhMucApi';
 import { getAllCaLamDanhMucApi } from '../../../api/caLamDanhMucApi';
-import { updateApi as updateAppointmentApi } from '../../../api/appointmentApi';
+import { updateApi as updateAppointmentApi, hoanLichApi } from '../../../api/appointmentApi';
+import { getShiftsByNhanVienApi } from '../../../api/shiftApi';
+import { getAllApi as getAllBenhNhanApi } from '../../../api/benhNhanApi';
+import { getAllNhanVienApi } from '../../../api/employeeApi';
 import { useState, useEffect, useCallback } from 'react';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
+import { AppointmentModal, getAvailableShiftIds } from '../../doctor/components/TabHenTaiKham';
 
-const LichKham = ({ onCheckIn, compact, simple }) => {
+const MODAL_STYLE = `
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+`;
+
+const LichKham = ({ onCheckIn, compact, simple, user }) => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [dichVuMap, setDichVuMap] = useState({});
 
-  // Dữ liệu dropdown cho modal sửa
+  // Dữ liệu dropdown cho modal cập nhật (dùng AppointmentModal)
+  const [chuyenKhoaList, setChuyenKhoaList] = useState([]);
+  const [dichVuList, setDichVuList] = useState([]);
   const [phongList, setPhongList] = useState([]);
-  const [nhanVienList, setNhanVienList] = useState([]);
+  const [benhNhanList, setBenhNhanList] = useState([]);
   const [caList, setCaList] = useState([]);
+  const [nhanVienList, setNhanVienList] = useState([]);
+  const [doctorShifts, setDoctorShifts] = useState([]);
+
   const [editModal, setEditModal] = useState({ open: false, appointment: null });
-  const [editForm, setEditForm] = useState({ maPhong: '', maBacSi: '', ngayKham: '', maCa: '', ghiChu: '' });
+  const [editFormData, setEditFormData] = useState({
+    maBenhNhan: '',
+    maChuyenKhoa: '',
+    maPhong: '',
+    maDichVu: '',
+    maBacSi: '',
+    ngayTaiKham: '',
+    maCa: '',
+    ghiChu: ''
+  });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [hoanLich, setHoanLich] = useState(false);
+  const [lyDoHoan, setLyDoHoan] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -46,13 +72,31 @@ const LichKham = ({ onCheckIn, compact, simple }) => {
     })();
   }, []);
 
-  // Tải danh sách phòng, bác sĩ, ca khám cho modal sửa
+  // Tải danh sách dropdown cho modal cập nhật
   useEffect(() => {
     (async () => {
+      try { const ck = await getAllChuyenKhoaApi(); setChuyenKhoaList(Array.isArray(ck) ? ck : []); } catch (e) { console.warn('Không thể tải chuyên khoa:', e); }
+      try { const dv = await getAllDichVuApi(); setDichVuList(Array.isArray(dv) ? dv : []); } catch (e) { console.warn('Không thể tải dịch vụ:', e); }
       try { const ph = await getAllPhongApi(); setPhongList(Array.isArray(ph) ? ph : []); } catch (e) { console.warn('Không thể tải phòng:', e); }
-      try { const nv = await getAllNhanVienApi(); setNhanVienList(Array.isArray(nv) ? nv : []); } catch (e) { console.warn('Không thể tải nhân viên:', e); }
+      try { const bn = await getAllBenhNhanApi(); setBenhNhanList(Array.isArray(bn) ? bn : []); } catch (e) { console.warn('Không thể tải bệnh nhân:', e); }
       try { const ca = await getAllCaLamDanhMucApi(); setCaList(Array.isArray(ca) ? ca : []); } catch (e) { console.warn('Không thể tải ca làm việc:', e); }
+      try { const nv = await getAllNhanVienApi(); setNhanVienList(Array.isArray(nv) ? nv : []); } catch (e) { console.warn('Không thể tải danh sách nhân viên:', e); }
     })();
+  }, []);
+
+  // Hàm load lịch làm việc của bác sĩ theo mã bác sĩ
+  const loadDoctorShifts = useCallback(async (maBacSi) => {
+    if (!maBacSi) {
+      setDoctorShifts([]);
+      return;
+    }
+    try {
+      const shifts = await getShiftsByNhanVienApi(maBacSi);
+      setDoctorShifts(Array.isArray(shifts) ? shifts : []);
+    } catch (err) {
+      console.error('Error loading doctor shifts:', err);
+      setDoctorShifts([]);
+    }
   }, []);
 
   const refreshList = useCallback(async () => {
@@ -64,39 +108,60 @@ const LichKham = ({ onCheckIn, compact, simple }) => {
     }
   }, []);
 
-  // Mở modal sửa thông tin lịch khám
+  // Mở modal cập nhật — điền formData từ appointment + load lịch làm việc của bác sĩ của lịch đó
   const openEditModal = (a) => {
-    setEditForm({
+    setEditFormData({
+      maBenhNhan: a.maBenhNhan ?? '',
+      tenBenhNhan: a.tenBenhNhan ?? '',
+      maChuyenKhoa: a.maChuyenKhoa ?? '',
       maPhong: a.maPhong ?? '',
-      maBacSi: a.maBacSi ?? '',
+      maDichVu: a.maDichVu ?? '',
+      maBacSi: a.maBacSi ?? a.maNhanVien ?? '',
+      ngayTaiKham: a.ngayKham ?? a.ngayTaiKham ?? '',
       maCa: a.maCa ?? '',
-      ngayKham: a.ngayKham ?? '',
       ghiChu: a.ghiChu ?? ''
     });
     setEditModal({ open: true, appointment: a });
+    // Calendar phải dựa trên ma_bac_si của lịch khám, không phải user đang đăng nhập (lễ tân)
+    loadDoctorShifts(a.maBacSi ?? a.maNhanVien);
   };
 
   const closeEditModal = () => {
     setEditModal({ open: false, appointment: null });
     setSavingEdit(false);
+    setHoanLich(false);
+    setLyDoHoan('');
   };
 
-  // Lưu thông tin đã sửa
+  // Lưu thông tin đã sửa — CHỈ gọi updateApi()
+  // - KHÔNG tick "Hoãn" → update() bình thường, giữ nguyên trạng thái
+  // - TICK "Hoãn" → update() với trangThai='HOAN' + append lý do hoãn vào ghiChu
   const handleSaveEdit = async () => {
     const appointment = editModal.appointment;
     if (!appointment) return;
     setSavingEdit(true);
     try {
       const payload = {
-        maBenhNhan: appointment.maBenhNhan,
-        maPhong: editForm.maPhong ? Number(editForm.maPhong) : null,
-        maBacSi: editForm.maBacSi ? Number(editForm.maBacSi) : null,
-        ngayKham: editForm.ngayKham || null,
-        maCa: editForm.maCa ? Number(editForm.maCa) : null,
-        ghiChu: editForm.ghiChu || null,
-        maChuyenKhoa: appointment.maChuyenKhoa,
-        maDichVu: appointment.maDichVu
+        maBenhNhan: Number(editFormData.maBenhNhan),
+        maChuyenKhoa: Number(editFormData.maChuyenKhoa),
+        maBacSi: editFormData.maBacSi ? Number(editFormData.maBacSi) : null,
+        maPhong: editFormData.maPhong ? Number(editFormData.maPhong) : null,
+        maDichVu: editFormData.maDichVu ? Number(editFormData.maDichVu) : null,
+        maCa: editFormData.maCa ? Number(editFormData.maCa) : null,
+        ngayTaiKham: editFormData.ngayTaiKham || null,
+        ghiChu: editFormData.ghiChu || null
       };
+
+      if (hoanLich) {
+        // Tick "Hoãn" → trạng thái là HOAN, append lý do vào ghiChu
+        payload.trangThai = 'HOAN';
+        const lyDo = lyDoHoan?.trim();
+        payload.ghiChu = [
+          editFormData.ghiChu?.trim(),
+          lyDo ? `Hoãn: ${lyDo}` : ''
+        ].filter(Boolean).join(' | ') || null;
+      }
+
       await updateAppointmentApi(appointment.id, payload);
       closeEditModal();
       await refreshList();
@@ -193,6 +258,18 @@ const LichKham = ({ onCheckIn, compact, simple }) => {
     if (s === 'TAI_KHAM') return <span className="text-purple-600 text-[12px] font-bold uppercase tracking-wide">Tái khám</span>;
     if (s === 'DAT_LICH_APP') return <span className="text-indigo-600 text-[12px] font-bold uppercase tracking-wide">App</span>;
     return <span className="text-gray-500 text-[12px] font-bold uppercase tracking-wide">{source || 'Khác'}</span>;
+  };
+
+  // Lấy danh sách ca khả dụng cho ngày đã chọn
+  const getAvailableCa = (dateStr) => {
+    const ids = getAvailableShiftIds(doctorShifts, dateStr);
+    return caList.filter(ca => ids.includes(Number(ca.id)));
+  };
+
+  const getMinDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
   };
 
   return (
@@ -321,128 +398,30 @@ const LichKham = ({ onCheckIn, compact, simple }) => {
         />
       )}
 
-      {/* MODAL SỬA THÔNG TIN LỊCH KHÁM */}
+      {/* MODAL CẬP NHẬT LỊCH KHÁM — dùng AppointmentModal mode="update" */}
       {editModal.open && editModal.appointment && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={closeEditModal}>
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-white text-xl">edit_calendar</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-[15px]">Cập nhật lịch khám</h3>
-                  <p className="text-emerald-100 text-xs">#{editModal.appointment.id} • {editModal.appointment.tenBenhNhan || `BN#${editModal.appointment.maBenhNhan}`}</p>
-                </div>
-              </div>
-              <button onClick={closeEditModal} className="p-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-all">
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-5 space-y-4">
-              {/* Phòng khám */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5">Phòng khám</label>
-                <select
-                  value={editForm.maPhong ?? ''}
-                  onChange={e => setEditForm({ ...editForm, maPhong: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-gray-50"
-                >
-                  <option value="">-- Chọn phòng --</option>
-                  {phongList.map(p => (
-                    <option key={p.maPhong} value={p.maPhong}>{p.tenPhong}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Bác sĩ */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5">Bác sĩ</label>
-                <select
-                  value={editForm.maBacSi ?? ''}
-                  onChange={e => setEditForm({ ...editForm, maBacSi: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-gray-50"
-                >
-                  <option value="">-- Chọn bác sĩ --</option>
-                  {nhanVienList
-                    .filter(nv => nv.chucVu === 'BAC_SI' || nv.tenChucVu?.toUpperCase().includes('BÁC S'))
-                    .map(nv => (
-                      <option key={nv.maNhanVien} value={nv.maNhanVien}>{nv.hoTen}</option>
-                    ))}
-                </select>
-              </div>
-
-              {/* Ngày khám */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5">Ngày khám</label>
-                <input
-                  type="date"
-                  value={editForm.ngayKham}
-                  onChange={e => setEditForm({ ...editForm, ngayKham: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-gray-50"
-                />
-              </div>
-
-              {/* Ca khám */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5">Ca khám</label>
-                <select
-                  value={editForm.maCa ?? ''}
-                  onChange={e => setEditForm({ ...editForm, maCa: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-gray-50"
-                >
-                  <option value="">-- Chọn ca --</option>
-                  {caList.map(ca => (
-                    <option key={ca.id} value={ca.id}>{ca.tenCa} ({ca.gioBatDau} - {ca.gioKetThuc})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Ghi chú */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1.5">Ghi chú</label>
-                <textarea
-                  rows={3}
-                  value={editForm.ghiChu}
-                  onChange={e => setEditForm({ ...editForm, ghiChu: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-gray-50 resize-none"
-                  placeholder="Ghi chú cho lịch khám..."
-                />
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-5 pb-5 pt-1 flex gap-3">
-              <button
-                onClick={closeEditModal}
-                disabled={savingEdit}
-                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all disabled:opacity-50"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                disabled={savingEdit}
-                className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 transition-all shadow-md shadow-emerald-200 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {savingEdit ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Đang lưu...
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-lg">save</span>
-                    Lưu thay đổi
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AppointmentModal
+          mode="update"
+          formData={editFormData}
+          setFormData={setEditFormData}
+          onClose={closeEditModal}
+          onCreate={handleSaveEdit}
+          getMinDate={getMinDate}
+          patient={{ maBenhNhan: editModal.appointment.maBenhNhan, hoTen: editModal.appointment.tenBenhNhan }}
+          chuyenKhoaList={chuyenKhoaList}
+          dichVuList={dichVuList}
+          benhNhanList={benhNhanList}
+          phongList={phongList}
+          nhanVienList={nhanVienList}
+          onBacSiChange={(maBacSi) => loadDoctorShifts(maBacSi)}
+          creating={savingEdit}
+          doctorShifts={doctorShifts}
+          availableCaList={getAvailableCa(editFormData.ngayTaiKham)}
+          hoanLich={hoanLich}
+          setHoanLich={setHoanLich}
+          lyDoHoan={lyDoHoan}
+          setLyDoHoan={setLyDoHoan}
+        />
       )}
     </div>
   );

@@ -91,6 +91,7 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <LichKham
+                user={user}
                 onCheckIn={(appt) => {
                   setQuickCheckInAppt(appt);
                   setActiveTab('checkin');

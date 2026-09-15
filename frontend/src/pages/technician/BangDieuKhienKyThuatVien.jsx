@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getPendingTestsApi, getCompletedTestsTodayApi } from '../../api/phieuChiDinhApi';
-import { getTodayApi as getTodayDangKyApi, updateStatusApi, setXepCuoiApi } from '../../api/dangKyKhamBenhApi';
+import { getTodayApi as getTodayDangKyApi, updateStatusApi } from '../../api/dangKyKhamBenhApi';
 import { acceptClsPatientApi, updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
 import { getByPhieuKhamApi } from '../../api/chiSoKhamTongHopApi';
 import { getAllApi as getAllServicesApi } from '../../api/dichVuApi';
@@ -19,7 +19,6 @@ import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
 import { useNotification } from '../../components/NotificationContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import ModalGoiLai from '../../components/ModalGoiLai';
 
 const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   const { showWarning } = useNotification();
@@ -48,7 +47,6 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   // Danh sách toàn bộ dịch vụ để tra cứu loại dịch vụ
   const [servicesList, setServicesList] = useState([]);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, type: 'primary', icon: '' });
-  const [goiLaiState, setGoiLaiState] = useState({ isOpen: false, patient: null });
   // Sidebar width state và ref để kéo dãn
   const [sidebarWidth, setSidebarWidth] = useState(288); // 288px = w-72
   const isResizing = useRef(false);
@@ -227,22 +225,24 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
     return item.id;
   };
 
-  const handleMarkAbsent = async (item, type = 'tam_thoi') => {
-    try {
-      const regId = getRegistrationId(item);
-      console.log('Mark absent - regId:', regId, 'type:', type, 'item:', item);
-      const result1 = await updateStatusApi(regId, { trangThai: 'VANG_MAT' });
-      console.log('Update status result:', result1);
-      // Nếu vắng quá lâu thì tự động đánh dấu xếp cuối
-      if (type === 'qua_lau') {
-        const result2 = await setXepCuoiApi(regId);
-        console.log('Set xep cuoi result:', result2);
+  const handleMarkAbsent = (item) => {
+    setConfirmState({
+      isOpen: true,
+      title: 'Xác nhận vắng mặt',
+      message: `Bạn có muốn đánh vắng bệnh nhân "${item.hoTen}"?`,
+      type: 'warning',
+      icon: 'person_off',
+      onConfirm: async () => {
+        setConfirmState(prev => ({ ...prev, isOpen: false }));
+        try {
+          const regId = getRegistrationId(item);
+          await updateStatusApi(regId, { trangThai: 'VANG_MAT' });
+          await fetchWorklist();
+        } catch (error) {
+          showWarning('Lỗi: ' + error.message);
+        }
       }
-      await fetchWorklist();
-    } catch (error) {
-      console.error('Error in handleMarkAbsent:', error);
-      showWarning('Lỗi: ' + error.message);
-    }
+    });
   };
 
   const handleMarkPresent = (item) => {
@@ -271,31 +271,6 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
         }
       }
     });
-  };
-
-  const handleGoiLai_SauNguoiDangKham = async () => {
-    const item = goiLaiState.patient;
-    setGoiLaiState({ isOpen: false, patient: null });
-    try {
-      const regId = getRegistrationId(item);
-      await updateStatusApi(regId, { trangThai: 'CHO_KHAM' });
-      await fetchWorklist();
-    } catch (error) {
-      showWarning('Lỗi: ' + error.message);
-    }
-  };
-
-  const handleGoiLai_XepCuoiHang = async () => {
-    const item = goiLaiState.patient;
-    setGoiLaiState({ isOpen: false, patient: null });
-    try {
-      const regId = getRegistrationId(item);
-      await updateStatusApi(regId, { trangThai: 'CHO_KHAM' });
-      await setXepCuoiApi(regId);
-      await fetchWorklist();
-    } catch (error) {
-      showWarning('Lỗi: ' + error.message);
-    }
   };
 
   // KTV nhấn KHÁM - gộp: tạo Phiếu khám (nếu chưa có) + mở đo sinh hiệu / tiếp nhận CLS
@@ -499,13 +474,6 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
         icon={confirmState.icon}
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
-      />
-      <ModalGoiLai
-        isOpen={goiLaiState.isOpen}
-        patient={goiLaiState.patient}
-        onSauNguoiDangKham={handleGoiLai_SauNguoiDangKham}
-        onXepCuoiHang={handleGoiLai_XepCuoiHang}
-        onCancel={() => setGoiLaiState({ isOpen: false, patient: null })}
       />
     </div>
   );
