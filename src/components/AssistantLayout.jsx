@@ -61,6 +61,7 @@ const AssistantLayout = ({
       if (examSubTab !== 'vitals' && examData) {
         const payload = {
           maPhieuKham: selectedPatient.maPhieuKham,
+          maChuyenKhoa: user?.maChuyenKhoa,
           ...examData,
           maNhanVienNhap: user?.maNhanVien || user?.id
         };
@@ -83,6 +84,7 @@ const AssistantLayout = ({
   const buildFinalPayload = () => {
     const payload = {
       maPhieuKham: selectedPatient.maPhieuKham,
+      maChuyenKhoa: user?.maChuyenKhoa,
       nhietDo: vitalsFields?.nhietDo === '' ? null : parseFloat(vitalsFields?.nhietDo),
       nhipTim: vitalsFields?.nhipTim === '' ? null : parseInt(vitalsFields?.nhipTim),
       nhipTho: vitalsFields?.nhipTho === '' ? null : parseInt(vitalsFields?.nhipTho),
@@ -137,6 +139,7 @@ const AssistantLayout = ({
     if (examSubTab === 'vitals' && examData) {
       const specialtyPayload = {
         maPhieuKham: selectedPatient.maPhieuKham,
+        maChuyenKhoa: user?.maChuyenKhoa,
         ...examData,
         maNhanVienNhap: user?.maNhanVien || user?.id
       };
@@ -144,6 +147,7 @@ const AssistantLayout = ({
     } else if (examSubTab !== 'vitals' && examData) {
       const payload = {
         maPhieuKham: selectedPatient.maPhieuKham,
+        maChuyenKhoa: user?.maChuyenKhoa,
         ...examData,
         maNhanVienNhap: user?.maNhanVien || user?.id
       };
@@ -218,6 +222,7 @@ const AssistantLayout = ({
             ref={vitalsRef}
             phieuKhamId={selectedPatient.maPhieuKham}
             assistantId={user?.maNhanVien || user?.id}
+            maChuyenKhoa={user?.maChuyenKhoa}
             initialGhiChu={selectedPatient?.ghiChu}
             showSaveOnly
             vitalsFields={vitalsFields}

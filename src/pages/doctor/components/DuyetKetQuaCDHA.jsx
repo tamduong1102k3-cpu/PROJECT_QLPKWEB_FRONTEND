@@ -7,11 +7,13 @@ import {
 import { getTiepNhanClsByPhieuKhamApi } from "../../../api/tiepNhanClsApi";
 import { useNotification } from '../../../components/NotificationContext';
 import PrintButton from '../../../components/PrintButton';
+import formatGender from '../../../utils/formatGender';
 
 const DuyetKetQuaCDHA = ({
   patient,
   user,
-  onBack
+  onBack,
+  readOnly = false
 }) => {
   const { showSuccess, showError, showWarning } = useNotification();
   const [loading, setLoading] = useState(true);
@@ -75,12 +77,15 @@ const DuyetKetQuaCDHA = ({
         ketLuan: currentResult.ketLuan,
         deNghi: currentResult.deNghi,
         duongDanAnh1: currentResult.duongDanAnh1,
-        duongDanAnh2: currentResult.duongDanAnh2
+        duongDanAnh2: currentResult.duongDanAnh2,
+        // Khi xem lại ca đã duyệt (readOnly) => chỉ cập nhật nội dung, giữ nguyên trạng thái
+        updateOnly: readOnly
       };
       const detailId = currentResult.maChiTietChiDinh || currentResult.idChiTietChiDinh;
       await approveCdhaResultApi(detailId, payload);
-      showSuccess("Đã ký duyệt kết quả chẩn đoán hình ảnh thành công!");
-      onBack();
+      showSuccess(readOnly ? "Đã cập nhật kết quả thành công!" : "Đã ký duyệt kết quả chẩn đoán hình ảnh thành công!");
+      if (!readOnly) onBack();
+      else fetchCdhaResults();
     } catch (e) {
       console.error(e);
       showError("Lỗi khi ký duyệt kết quả: " + e.message);
@@ -160,7 +165,7 @@ const DuyetKetQuaCDHA = ({
           <div>
             <h2 className="text-xl font-black text-gray-800">{patient.hoTen}</h2>
             <p className="text-sm text-gray-500">
-              #{patient.maBenhNhan} • {patient.gioiTinh ? 'Nam' : 'Nữ'} • {patient.ngaySinh ? new Date(patient.ngaySinh).getFullYear() : ''}
+               #{patient.maBenhNhan} • {formatGender(patient.gioiTinh)} • {patient.ngaySinh ? new Date(patient.ngaySinh).getFullYear() : ''}
             </p>
           </div>
         </div>
@@ -210,7 +215,7 @@ const DuyetKetQuaCDHA = ({
                   <h3 className="text-base font-bold text-gray-700">PHIẾU KẾT QUẢ CHẨN ĐOÁN HÌNH ẢNH</h3>
                   <p className="text-sm text-gray-500 mt-1">
                     Mã BN: #{patient.maBenhNhan} | Mã PK: #{patient.maPhieuKham} |
-                    Giới: {patient.gioiTinh ? 'Nam' : 'Nữ'} |
+                     Giới: {formatGender(patient.gioiTinh)} |
                     Năm sinh: {patient.ngaySinh ? new Date(patient.ngaySinh).getFullYear() : ''}
                   </p>
                 </div>
@@ -278,7 +283,7 @@ const DuyetKetQuaCDHA = ({
                 rows={9}
                 value={currentResult?.moTaHinhAnh || ''}
                 onChange={e => handleTextChange('moTaHinhAnh', e.target.value)}
-                disabled={isApproved}
+                disabled={isApproved && !readOnly}
                 placeholder="Nhập mô tả chi tiết hình ảnh chẩn đoán..."
                 className="w-full px-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-base leading-relaxed"
               />
@@ -294,7 +299,7 @@ const DuyetKetQuaCDHA = ({
                 rows={5}
                 value={currentResult?.ketLuan || ''}
                 onChange={e => handleTextChange('ketLuan', e.target.value)}
-                disabled={isApproved}
+                disabled={isApproved && !readOnly}
                 placeholder="VD: Viêm phổi thùy phải / Không có bất thường rõ..."
                 className="w-full px-5 py-4 border-2 border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-base font-bold text-indigo-900 leading-relaxed"
               />
@@ -310,7 +315,7 @@ const DuyetKetQuaCDHA = ({
                 type="text"
                 value={currentResult?.deNghi || ''}
                 onChange={e => handleTextChange('deNghi', e.target.value)}
-                disabled={isApproved}
+                disabled={isApproved && !readOnly}
                 placeholder="VD: Kết hợp lâm sàng hoặc đề nghị làm thêm xét nghiệm..."
                 className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-base"
               />
@@ -323,7 +328,16 @@ const DuyetKetQuaCDHA = ({
                 <span>🩺 BS duyệt: {user?.hoTen || user?.username}</span>
               </div>
               <div className="flex gap-4">
-                {!isApproved ? (
+                {readOnly ? (
+                  <button
+                    onClick={handleApprove}
+                    disabled={submitting}
+                    className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-base font-bold rounded-xl shadow-lg shadow-indigo-200 flex items-center gap-2 w-full justify-center transition-all"
+                  >
+                    <span className="material-symbols-outlined">save</span>
+                    LƯU CẬP NHẬT (GIỮ NGUYÊN TRẠNG THÁI)
+                  </button>
+                ) : !isApproved ? (
                   <>
                     <button
                       onClick={handleReject}
@@ -458,7 +472,7 @@ const DuyetKetQuaCDHA = ({
           <div className="grid grid-cols-2 gap-4 mb-6 border bg-gray-50/50 p-4 rounded-xl text-xs">
             <div>
               <p><strong>Họ tên BN:</strong> {patient.hoTen}</p>
-              <p><strong>Năm sinh:</strong> {new Date(patient.ngaySinh).getFullYear()} • <strong>Giới tính:</strong> {patient.gioiTinh ? 'Nam' : 'Nữ'}</p>
+              <p><strong>Năm sinh:</strong> {new Date(patient.ngaySinh).getFullYear()} • <strong>Giới tính:</strong> {formatGender(patient.gioiTinh)}</p>
               <p><strong>Mã BN:</strong> #{patient.maBenhNhan}</p>
             </div>
             <div>

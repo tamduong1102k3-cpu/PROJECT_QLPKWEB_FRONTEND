@@ -23,15 +23,8 @@ const DangNhap = ({ onForgotPassword, onLoginSuccess }) => {
     try {
       const data = await loginApi({ identity, password });
       if (data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('refreshToken', data.refreshToken || '');
-        // Lưu mã nhân viên để sử dụng khi làm thủ tục tiếp đón,
-        // tránh phụ thuộc vào JWT decode (vì token refresh có thể mất maNhanVien)
-        if (data.maNhanVien) {
-          localStorage.setItem('maNhanVien', data.maNhanVien);
-        }
+        if (onLoginSuccess) onLoginSuccess({ ...data, vaiTro: data.role });
       }
-      if (onLoginSuccess) onLoginSuccess({ ...data, vaiTro: data.role });
     } catch (error) {
       setErrorMessage(error.message || 'Đăng nhập thất bại.');
     } finally {

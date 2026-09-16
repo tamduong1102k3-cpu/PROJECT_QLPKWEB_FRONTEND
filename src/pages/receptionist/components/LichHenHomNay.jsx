@@ -33,6 +33,7 @@ const LichHenHomNay = ({ onCheckIn }) => {
         <div>
           <p className="font-bold text-sm text-gray-800">{a.tenBenhNhan}</p>
           <p className="text-[11px] text-gray-500">Bác sĩ: {a.tenNhanVien}</p>
+          <p className="text-[11px] text-gray-500">Ca: {a.tenCa || 'Chưa cập nhật'}{a.tenCa ? ` (${a.gioBatDau || ''} - ${a.gioKetThuc || ''})` : ''}</p>
         </div>
       </div>
       <button 

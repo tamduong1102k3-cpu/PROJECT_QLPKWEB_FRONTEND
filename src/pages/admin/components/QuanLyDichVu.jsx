@@ -8,7 +8,8 @@ const empty = {
   donGia: '',
   loaiDichVu: '',
   phong: '',
-  maChuyenKhoa: ''
+  maChuyenKhoa: '',
+  version: undefined
 };
 const fmtGia = val => {
   if (!val && val !== 0) return '—';
@@ -74,7 +75,8 @@ export default function QuanLyDichVu() {
       donGia: d.donGia ?? '',
       loaiDichVu: d.loaiDichVu || '',
       phong: d.phong ?? '',
-      maChuyenKhoa: d.maChuyenKhoa ?? ''
+      maChuyenKhoa: d.maChuyenKhoa ?? '',
+      version: d.version ?? undefined
     });
     setEditId(d.maDichVu);
     setModal('edit');
@@ -94,25 +96,31 @@ export default function QuanLyDichVu() {
       donGia: Number(form.donGia),
       loaiDichVu: form.loaiDichVu || null,
       phong: form.phong !== '' ? Number(form.phong) : null,
-      maChuyenKhoa: form.maChuyenKhoa !== '' ? Number(form.maChuyenKhoa) : null
+      maChuyenKhoa: form.maChuyenKhoa !== '' ? Number(form.maChuyenKhoa) : null,
+      version: form.version
     };
     try {
-      const res = {
-        ok: false
-      };
-      try {
-        if (modal === 'edit') {
-          await updateApi(editId, body);
-        } else {
-          await createApi(body);
-        }
-        res.ok = true;
-      } catch (e) {}
-      if (!res.ok) throw new Error('Lỗi lưu dữ liệu');
+      if (modal === 'edit') {
+        await updateApi(editId, body);
+      } else {
+        await createApi(body);
+      }
       setModal(null);
       fetchAll();
     } catch (e) {
-      alert(e.message);
+      const status = e.status || e.response?.status;
+      const msg = e.message || '';
+      const isConflict = status === 409
+        || msg.includes('409')
+        || msg.includes('người dùng khác cập nhật')
+        || msg.includes('Vui lòng tải lại');
+      if (isConflict) {
+        alert('⚠️ Dữ liệu đã được người dùng khác cập nhật. Vui lòng tải lại dữ liệu mới nhất!');
+        setModal(null);
+        fetchAll();
+      } else {
+        alert(msg);
+      }
     } finally {
       setSaving(false);
     }

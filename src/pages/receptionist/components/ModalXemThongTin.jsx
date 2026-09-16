@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAllNhanVienApi } from '../../../api/employeeApi';
 import ModalDoiMatKhau from './ModalDoiMatKhau';
+import formatGender from '../../../utils/formatGender';
 
 const ModalXemThongTin = ({ user, onClose }) => {
   const [employeeInfo, setEmployeeInfo] = useState(null);
@@ -33,11 +34,6 @@ const ModalXemThongTin = ({ user, onClose }) => {
     } catch {
       return '---';
     }
-  };
-
-  const formatGender = (gioiTinh) => {
-    if (gioiTinh === undefined || gioiTinh === null) return '---';
-    return gioiTinh === 1 ? 'Nam' : 'Nữ';
   };
 
   const roleLabel = {

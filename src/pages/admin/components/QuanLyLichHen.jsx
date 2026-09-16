@@ -126,13 +126,14 @@ const QuanLyLichHen = ({ showActions = 'all', onQuickCheckIn }) => {
                 <th className="px-4 py-3">Bệnh Nhân</th>
                 <th className="px-4 py-3">Chuyên Khoa</th>
                 <th className="px-4 py-3">Bác Sĩ</th>
+                <th className="px-4 py-3">Ca Khám</th>
                 <th className="px-4 py-3">Ngày Hẹn</th>
                 <th className="px-4 py-3">Trạng Thái</th>
                 <th className="px-4 py-3 text-right">Thao Tác</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan="7" className="text-center py-10 text-gray-400 italic">Đang tải dữ liệu...</td></tr> : filtered.length === 0 ? <tr><td colSpan="7" className="text-center py-10 text-gray-400 italic">Không tìm thấy lịch hẹn nào</td></tr> : filtered.map(a => {
+              {loading ? <tr><td colSpan="8" className="text-center py-10 text-gray-400 italic">Đang tải dữ liệu...</td></tr> : filtered.length === 0 ? <tr><td colSpan="8" className="text-center py-10 text-gray-400 italic">Không tìm thấy lịch hẹn nào</td></tr> : filtered.map(a => {
               const status = formatStatus(a.trangThai);
               return <tr key={a.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="px-4 py-4 text-sm font-medium text-gray-400">#{a.id}</td>
@@ -142,6 +143,10 @@ const QuanLyLichHen = ({ showActions = 'all', onQuickCheckIn }) => {
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-600">{a.tenChuyenKhoa}</td>
                     <td className="px-4 py-4 text-sm text-gray-600">{a.tenNhanVien}</td>
+                    <td className="px-4 py-4 text-sm text-gray-600">
+                      {a.tenCa || '—'}
+                      {a.tenCa && <div className="text-xs text-gray-400">{a.gioBatDau} - {a.gioKetThuc}</div>}
+                    </td>
                     <td className="px-4 py-4 text-sm text-gray-600 font-medium">
                       {new Date(a.ngayTaiKham).toLocaleDateString('vi-VN')}
                     </td>

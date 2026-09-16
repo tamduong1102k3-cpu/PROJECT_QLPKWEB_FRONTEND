@@ -6,6 +6,7 @@ import { useNotification } from './NotificationContext';
 const VitalSignsForm = forwardRef(({
   phieuKhamId,
   assistantId,
+  maChuyenKhoa,
   initialGhiChu = '',
   showSaveOnly = false,
   vitalsFields,
@@ -68,6 +69,7 @@ const VitalSignsForm = forwardRef(({
     try {
       const payload = {
         maPhieuKham: phieuKhamId,
+        maChuyenKhoa: maChuyenKhoa,
         nhietDo: parseFloat(vitals.nhietDo) || null,
         nhipTim: parseInt(vitals.nhipTim) || null,
         nhipTho: parseInt(vitals.nhipTho) || null,

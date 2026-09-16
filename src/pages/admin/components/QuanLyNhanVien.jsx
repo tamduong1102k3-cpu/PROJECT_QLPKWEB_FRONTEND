@@ -120,7 +120,7 @@ const QuanLyNhanVien = () => {
     dia_chi: '',
     so_dien_thoai: '',
     email: '',
-    chuyen_khoa: '', // Sẽ lưu ID hoặc Tên tùy backend cần
+    chuyen_khoa: '', // Lưu maChuyenKhoa (ID) dạng string để match với select option
     bang_cap: '',
     chuc_vu: '', // Sẽ lưu ID hoặc Tên tùy backend cần
     ngay_vao_lam: '',
@@ -152,7 +152,7 @@ const QuanLyNhanVien = () => {
       dia_chi: emp.diaChi || '',
       so_dien_thoai: emp.soDienThoai || '',
       email: emp.email || '',
-      chuyen_khoa: emp.chuyenKhoa || '',
+      chuyen_khoa: emp.chuyenKhoa ? emp.chuyenKhoa.toString() : '',
       bang_cap: emp.bangCap || '',
       chuc_vu: emp.chucVu || '',
       ngay_vao_lam: emp.ngayVaoLam ? emp.ngayVaoLam.split('T')[0] : '',
@@ -234,7 +234,7 @@ const QuanLyNhanVien = () => {
       ngaySinh: formData.ngay_sinh,
       diaChi: formData.dia_chi,
       soDienThoai: formData.so_dien_thoai,
-      chuyenKhoa: formData.chuyen_khoa,
+      chuyenKhoa: formData.chuyen_khoa ? parseInt(formData.chuyen_khoa) : null,
       bangCap: formData.bang_cap,
       chucVu: formData.chuc_vu,
       ngayVaoLam: formData.ngay_vao_lam
@@ -315,7 +315,7 @@ const QuanLyNhanVien = () => {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm text-gray-800 font-medium">{emp.chucVu}</p>
-                    <p className="text-xs text-gray-500">{emp.chuyenKhoa || 'Không'}</p>
+                    <p className="text-xs text-gray-500">{dsChuyenKhoa.find(ck => ck.maChuyenKhoa === emp.chuyenKhoa)?.tenChuyenKhoa || 'Không'}</p>
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm text-gray-800">{emp.soDienThoai}</p>
@@ -359,11 +359,11 @@ const QuanLyNhanVien = () => {
 
       {/* Add Employee Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl animate-fade-in my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl animate-fade-in max-h-[90vh] overflow-y-auto relative border border-gray-100">
             
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-2xl z-10">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-2xl sticky top-0 z-20">
               <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">{isEditMode ? 'edit_square' : 'person_add'}</span>
                 {isEditMode ? 'Cập Nhật Nhân Viên' : 'Thêm Nhân Viên Mới'}
@@ -407,7 +407,11 @@ const QuanLyNhanVien = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
                       <input type="tel" name="so_dien_thoai" value={formData.so_dien_thoai} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
                     </div>
-                    <div className="md:col-span-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
+                      <input required type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                    </div>
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ</label>
                       <input type="text" name="dia_chi" value={formData.dia_chi} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
                     </div>
@@ -432,7 +436,7 @@ const QuanLyNhanVien = () => {
                       <select name="chuyen_khoa" value={formData.chuyen_khoa} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none bg-white text-gray-900">
                         <option value="" className="bg-white text-gray-900">-- Chọn chuyên khoa --</option>
                         {dsChuyenKhoa.map(ck => (
-                          <option key={ck.maChuyenKhoa} value={ck.tenChuyenKhoa} className="bg-white text-gray-900">{ck.tenChuyenKhoa}</option>
+                          <option key={ck.maChuyenKhoa} value={ck.maChuyenKhoa} className="bg-white text-gray-900">{ck.tenChuyenKhoa}</option>
                         ))}
                       </select>
                     </div>
@@ -454,11 +458,7 @@ const QuanLyNhanVien = () => {
                       <span className="material-symbols-outlined text-blue-600">manage_accounts</span>
                       3. Tạo tài khoản hệ thống
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
-                        <input required={!isEditMode} type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập (Username) <span className="text-red-500">*</span></label>
                         <input required={!isEditMode} type="text" name="username" value={formData.username} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
@@ -472,7 +472,7 @@ const QuanLyNhanVien = () => {
                           ))}
                         </select>
                       </div>
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-2">
                         <p className="text-sm text-gray-500 italic">* Mật khẩu mặc định sẽ là <strong>12345</strong> và yêu cầu đổi ở lần đăng nhập đầu tiên.</p>
                       </div>
                     </div>

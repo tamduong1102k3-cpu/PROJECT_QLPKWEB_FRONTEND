@@ -14,10 +14,10 @@ const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0, compact = false }) 
       ok: true,
       json: async () => await _getTodayDangKy()
     }))().then(r => r.ok ? r.json() : []).then(data => {
-      // Chỉ lấy bệnh nhân đang chờ khám (CHO_KHAM), loại trừ các trạng thái đã kết thúc
-      const waiting = data.filter(r => r.trangThai === 'CHO_KHAM' && r.trangThai !== 'HOAN_THANH' && r.trangThai !== 'HOAN_TAT');
+      // Hiển thị tất cả bệnh nhân đăng ký khám trong ngày hôm nay
+      const todayList = data.filter(r => r.trangThai !== 'HUY');
       const cancelled = data.filter(r => r.trangThai === 'HUY');
-      setList(waiting);
+      setList(todayList);
       setCancelled(cancelled);
       if (shouldShowLoading) setLoading(false);
     }).catch(() => { if (shouldShowLoading) setLoading(false); });
@@ -25,6 +25,17 @@ const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0, compact = false }) 
   useEffect(() => {
     fetchList();
   }, [fetchList, refreshTrigger]);
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'CHO_KHAM': return 'Chờ khám';
+      case 'DANG_KHAM': return 'Đang khám';
+      case 'HOAN_THANH':
+      case 'HOAN_TAT': return 'Đã khám';
+      case 'HUY': return 'Đã hủy';
+      default: return status || 'Chờ khám';
+    }
+  };
+
   const cancelRegistration = id => {
     updateStatusApi(id, { trangThai: 'HUY' })
       .then(() => {
@@ -44,7 +55,7 @@ const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0, compact = false }) 
           </div>
           <div>
             <p className="font-bold text-sm text-gray-800">{p.hoTen}</p>
-            <p className="text-xs text-gray-5">Đã hủy • {new Date(p.thoiGian).toLocaleTimeString('vi-VN', {
+            <p className="text-xs text-gray-5">{getStatusLabel(p.trangThai)} • {new Date(p.thoiGian).toLocaleTimeString('vi-VN', {
               hour: '2-digit',
               minute: '2-digit'
             })}</p>
@@ -77,13 +88,13 @@ const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0, compact = false }) 
         <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold shadow-sm">
           {p.soThuTu}
         </div>
-        <div>
-          <p className="font-bold text-sm text-gray-800">{p.hoTen}</p>
-          <p className="text-xs text-gray-500">Chờ khám • {new Date(p.thoiGian).toLocaleTimeString('vi-VN', {
-            hour: '2-digit',
-            minute: '2-digit'
-          })}</p>
-        </div>
+          <div>
+            <p className="font-bold text-sm text-gray-800">{p.hoTen}</p>
+            <p className="text-xs text-gray-500">{getStatusLabel(p.trangThai)} • {new Date(p.thoiGian).toLocaleTimeString('vi-VN', {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}</p>
+          </div>
       </div>
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-bold px-2 py-1 bg-blue-50 text-blue-600 rounded-lg uppercase">{p.tenChuyenKhoa}</span>

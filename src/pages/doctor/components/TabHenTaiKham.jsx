@@ -1,50 +1,169 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { getAllApi, createApi, updateApi } from '../../../api/appointmentApi';
-import { getAllChuyenKhoaApi } from '../../../api/danhMucApi';
+import { getByDoctorApi, createApi, updateApi, hoanLichApi } from '../../../api/appointmentApi';
+import { getAllChuyenKhoaApi, getAllPhongApi } from '../../../api/danhMucApi';
 import { getAllApi as getAllDichVuApi } from '../../../api/dichVuApi';
 import { getAllApi as getAllBenhNhanApi } from '../../../api/benhNhanApi';
 import { getShiftsByNhanVienApi } from '../../../api/shiftApi';
+import { getAllCaLamDanhMucApi } from '../../../api/caLamDanhMucApi';
+import WorkScheduleDateCalendar from '../../../components/WorkScheduleDateCalendar';
 import { useNotification } from '../../../components/NotificationContext';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
 
-/* ─── keyframe style ─── */
 const MODAL_STYLE = `
   @keyframes modalIn {
     from { opacity: 0; transform: scale(0.9) translateY(20px); }
-    to   { opacity: 1; transform: scale(1)   translateY(0);    }
+    to { opacity: 1; transform: scale(1) translateY(0); }
   }
 `;
 
-/* ─── Status config ─── */
-const STATUS_CONFIG = {
-  CHUA_DEN: { label: 'Chưa đến', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400', ring: '#f59e0b' },
-  DA_DEN: { label: 'Đã đến', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400', ring: '#10b981' },
-  HOAN: { label: 'Hoãn', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-400', ring: '#ef4444' },
+const selectStyle = {
+  width: '100%',
+  padding: '0.75rem 1rem',
+  background: '#f9fafb',
+  border: '1.5px solid #e5e7eb',
+  borderRadius: '0.75rem',
+  fontSize: 12,
+  color: '#374151',
+  outline: 'none',
+  boxSizing: 'border-box'
+};
+
+const formatDateInput = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDateDisplay = (dateStr) => {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+};
+
+const getVietnameseDayFromDate = (dateStr) => {
+  if (!dateStr) return '';
+  return ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'][new Date(`${dateStr}T12:00:00`).getDay()];
+};
+
+const getUniqueWorkingDays = (shifts) => {
+  if (!Array.isArray(shifts) || shifts.length === 0) return [];
+  const order = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
+  return [...new Set(shifts.map((shift) => shift?.thu).filter(Boolean))]
+    .sort((left, right) => order.indexOf(left) - order.indexOf(right));
+};
+
+const normalizeRoomName = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+};
+
+const getAssignedRoomOptions = ({ doctorShifts, selectedDate, selectedCaId, chuyenKhoaId, phongList }) => {
+  const catalog = Array.isArray(phongList) ? phongList : [];
+  const selectedDayName = selectedDate ? getVietnameseDayFromDate(selectedDate) : '';
+
+  const candidateAssignments = Array.isArray(doctorShifts)
+    ? doctorShifts.filter((shift) => {
+        const matchesDate = !selectedDate || shift?.ngay === selectedDate || (!shift?.ngay && shift?.thu === selectedDayName);
+        const matchesCa = !selectedCaId || String(shift?.ca?.id ?? shift?.maCa ?? shift?.maCaMacDinh ?? '') === String(selectedCaId);
+        const matchesDepartment = !chuyenKhoaId || String(shift?.maChuyenKhoa ?? '') === String(chuyenKhoaId) || !shift?.maChuyenKhoa;
+        return matchesDate && matchesCa && matchesDepartment;
+      })
+    : [];
+
+  const assignedRoomNames = new Set(
+    candidateAssignments
+      .map((shift) => normalizeRoomName(shift?.phong || shift?.tenPhong || shift?.phongLamViec))
+      .filter(Boolean)
+  );
+
+  const filteredCatalog = catalog.filter((room) => {
+    const sameDepartment = !chuyenKhoaId || String(room?.maChuyenKhoa) === String(chuyenKhoaId);
+    if (!sameDepartment) return false;
+    if (assignedRoomNames.size === 0) return true;
+    const roomName = normalizeRoomName(room?.tenPhong || room?.ten_phong);
+    return assignedRoomNames.has(roomName);
+  });
+
+  if (filteredCatalog.length > 0) return filteredCatalog;
+  return catalog.filter((room) => !chuyenKhoaId || String(room?.maChuyenKhoa) === String(chuyenKhoaId));
 };
 
 const getDaysUntil = (dateStr) => {
   if (!dateStr) return null;
-  const diff = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
+  const today = new Date();
+  const target = new Date(`${dateStr}T12:00:00`);
+  const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
   if (diff < 0) return <span className="text-[10px] text-red-400 font-medium">Đã qua</span>;
   if (diff === 0) return <span className="text-[10px] text-emerald-500 font-bold">Hôm nay</span>;
   if (diff === 1) return <span className="text-[10px] text-indigo-500 font-medium">Ngày mai</span>;
   return <span className="text-[10px] text-gray-400">Còn {diff} ngày</span>;
 };
 
-/* ─── Status dropdown pill (inline update) ─── */
+const removeVietnameseTones = (str) => {
+  if (!str) return '';
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+};
+
+const isDoctor = (doc) => {
+  const roleText = removeVietnameseTones(String(
+    doc?.tenChucVu ??
+    doc?.ten_chuc_vu ??
+    doc?.chucVu ??
+    doc?.chuc_vu ??
+    doc?.vaiTro ??
+    doc?.vai_tro ??
+    doc?.tenVaiTro ??
+    doc?.ten_vai_tro ??
+    ''
+  ).toLowerCase().trim());
+  if (!roleText) return false;
+  if (roleText.includes('tro ly bac si') || roleText.includes('tro ly')) return false;
+  return roleText.includes('bac si');
+};
+
+const getShiftId = (shift) => shift?.ca?.id ?? shift?.maCa ?? shift?.maCaMacDinh ?? null;
+
+const getAvailableShiftIds = (shifts, dateStr) => {
+  if (!dateStr || !Array.isArray(shifts)) return [];
+  const date = new Date(`${dateStr}T12:00:00`);
+  const dayNames = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+  const dayName = dayNames[date.getDay()];
+  const rowsOnDate = shifts.filter(shift => shift?.ngay === dateStr);
+  if (rowsOnDate.some(shift => shift?.kieuPhanCong === 'THEO_NGAY' && shift?.hanhDong === 'NGHI_PHEP')) return [];
+
+  const replacement = rowsOnDate.filter(shift => shift?.kieuPhanCong === 'THEO_NGAY' && shift?.hanhDong === 'THAY_THE');
+  const extra = rowsOnDate.filter(shift => shift?.kieuPhanCong === 'THEO_NGAY' && shift?.hanhDong === 'THEM');
+  const defaults = shifts.filter(shift => shift?.kieuPhanCong === 'MAC_DINH'
+    && (shift?.ngay === dateStr || (!shift?.ngay && shift?.thu === dayName)));
+  const rows = replacement.length > 0 ? [...replacement, ...extra] : [...defaults, ...extra];
+  return [...new Set(rows.map(getShiftId).filter(Boolean).map(Number))];
+};
+
+const STATUS_CONFIG = {
+  CHUA_DEN: { label: 'Chưa đến', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
+  DA_DEN: { label: 'Đã đến', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400' },
+  HOAN: { label: 'Hoãn', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-400' },
+};
+
+const NGUON_TAO_CONFIG = {
+  TAI_KHAM: { label: 'Tái khám', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  DAT_LICH_APP: { label: 'Đặt lịch app', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
+};
+
 const StatusDropdown = ({ appointment, onUpdate }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const cfg = STATUS_CONFIG[appointment.trangThai] || {};
+  const config = STATUS_CONFIG[appointment.trangThai] || {};
 
-  const handleChange = async (newStatus) => {
-    if (newStatus === appointment.trangThai) { setOpen(false); return; }
-    setLoading(true);
+  const handleChange = async (status) => {
     setOpen(false);
+    if (status === appointment.trangThai) return;
+    setLoading(true);
     try {
-      await onUpdate(appointment.id, { ...appointment, trangThai: newStatus });
+      await onUpdate(appointment.id, { ...appointment, trangThai: status });
     } finally {
       setLoading(false);
     }
@@ -52,241 +171,58 @@ const StatusDropdown = ({ appointment, onUpdate }) => {
 
   return (
     <div className="relative inline-block">
-      <button
-        onClick={() => setOpen(o => !o)}
-        disabled={loading}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-full border cursor-pointer hover:opacity-80 transition-opacity ${cfg.cls || 'bg-gray-50 text-gray-600 border-gray-200'}`}
-      >
-        {loading
-          ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-          : <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot || 'bg-gray-400'}`} />
-        }
-        {cfg.label || appointment.trangThai}
+      <button type="button" onClick={() => setOpen((value) => !value)} disabled={loading} className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-full border cursor-pointer hover:opacity-80 ${config.cls || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+        {loading ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" /> : <span className={`w-1.5 h-1.5 rounded-full ${config.dot || 'bg-gray-400'}`} />}
+        {config.label || appointment.trangThai}
         <span className="material-symbols-outlined text-[12px]">expand_more</span>
       </button>
-
-      {open && ReactDOM.createPortal(
-        <>
-          <div className="fixed inset-0 z-[99998]" onClick={() => setOpen(false)} />
-          <div
-            className="fixed z-[99999] mt-1 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden min-w-[140px]"
-            style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
-          >
-            {Object.entries(STATUS_CONFIG).map(([key, s]) => (
-              <button
-                key={key}
-                onClick={() => handleChange(key)}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors ${key === appointment.trangThai ? 'font-bold' : 'font-medium text-gray-600'}`}
-              >
-                <span className={`w-2 h-2 rounded-full ${s.dot}`} />
-                {s.label}
-                {key === appointment.trangThai && <span className="material-symbols-outlined text-[16px] text-indigo-500 ml-auto">check</span>}
-              </button>
-            ))}
-          </div>
-        </>,
-        document.body
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 min-w-[140px] overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl">
+          {Object.entries(STATUS_CONFIG).map(([status, item]) => (
+            <button key={status} type="button" onClick={() => handleChange(status)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-gray-50">
+              <span className={`w-2 h-2 rounded-full ${item.dot}`} />
+              {item.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
 };
 
-/* ─── Select style helper ─── */
-const selectStyle = {
-  width: '100%', padding: '0.75rem 1rem', background: '#f9fafb', border: '1.5px solid #e5e7eb',
-  borderRadius: '0.75rem', fontSize: 14, fontWeight: 600, color: '#1f2937', outline: 'none',
-  boxSizing: 'border-box', appearance: 'auto'
-};
-
-/* ─── Helper: format ngày YYYY-MM-DD từ Date ─── */
-const formatDateInput = (date) => {
-  if (!date) return '';
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-/* ─── Helper: format ngày dd/MM/yyyy ─── */
-const formatDateDisplay = (dateStr) => {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}/${y}`;
-};
-
-/* ─── Chuyển danh sách thứ làm việc sang mảng số ngày trong tuần (0=CN, 1=T2, ..., 6=T7) ─── */
-const getAvailableDayNumbers = (shifts) => {
-  if (!Array.isArray(shifts) || shifts.length === 0) return [];
-  const dayMap = { 'Chủ Nhật': 0, 'Thứ 2': 1, 'Thứ 3': 2, 'Thứ 4': 3, 'Thứ 5': 4, 'Thứ 6': 5, 'Thứ 7': 6 };
-  return [...new Set(shifts.map(s => dayMap[s.thu]).filter(d => d !== undefined))];
-};
-
-/* ─── Helper: chuyển đổi ngày sang thứ tiếng Việt ─── */
-const getVietnameseDayFromDate = (dateStr) => {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-  return days[d.getDay()];
-};
-
-/* ─── Tổng hợp danh sách thứ làm việc duy nhất ─── */
-const getUniqueWorkingDays = (shifts) => {
-  if (!Array.isArray(shifts) || shifts.length === 0) return [];
-  const dayOrder = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
-  const uniqueDays = [...new Set(shifts.map(s => s.thu).filter(Boolean))];
-  return uniqueDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
-};
-
-/* ─── Custom Calendar component (thuần, không dependency) ─── */
-const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-const VIETNAMESE_DAYS = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-
-const CustomCalendar = ({ selectedDate, minDateStr, shifts, onSelect }) => {
-  const [viewDate, setViewDate] = useState(() => {
-    const d = minDateStr ? new Date(minDateStr + 'T12:00:00') : new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
-
-  const availableDayNumbers = getAvailableDayNumbers(shifts);
-  const minDate = minDateStr ? new Date(minDateStr + 'T12:00:00') : null;
-
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-
-  const startOfMonth = new Date(year, month, 1);
-  const firstDayCol = startOfMonth.getDay(); // 0=CN
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  // Tạo mảng cells: đầu tháng thêm ô trống theo firstDayCol
-  const cells = [];
-  for (let i = 0; i < firstDayCol; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(new Date(year, month, d));
-  }
-
-  const isDisabled = (date) => {
-    // Không cho chọn hôm nay/quá khứ
-    if (minDate && date.getTime() < new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate()).getTime()) {
-      return true;
-    }
-    if (!minDate && date.getTime() < new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime()) {
-      return true;
-    }
-    // Kiểm tra thứ làm việc
-    if (availableDayNumbers.length > 0 && !availableDayNumbers.includes(date.getDay())) {
-      return true;
-    }
-    return false;
-  };
-
-  const prevMonth = () => {
-    setViewDate(new Date(year, month - 1, 1));
-  };
-  const nextMonth = () => {
-    setViewDate(new Date(year, month + 1, 1));
-  };
-
-  const monthLabel = `Tháng ${month + 1}/${year}`;
-  const todayStr = formatDateInput(new Date());
-
-  return (
-    <div style={{ border: '1.5px solid #e5e7eb', borderRadius: '0.75rem', background: '#fff', overflow: 'hidden', marginTop: 6 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.75rem', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-        <button
-          type="button"
-          onClick={prevMonth}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 18, display: 'flex', alignItems: 'center', padding: '2px 6px', borderRadius: 8 }}
-          title="Tháng trước"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
-        </button>
-        <span style={{ fontWeight: 700, fontSize: 13, color: '#374151' }}>{monthLabel}</span>
-        <button
-          type="button"
-          onClick={nextMonth}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 18, display: 'flex', alignItems: 'center', padding: '2px 6px', borderRadius: 8 }}
-          title="Tháng sau"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
-        </button>
-      </div>
-
-      {/* Weekday header */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #f1f5f9' }}>
-        {WEEKDAY_LABELS.map(w => (
-          <div key={w} style={{ padding: '6px 0', textAlign: 'center', fontSize: 10, fontWeight: 700, color: '#9ca3af' }}>{w}</div>
-        ))}
-      </div>
-
-      {/* Day grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, padding: 6 }}>
-        {cells.map((cell, idx) => {
-          if (!cell) return <div key={`empty-${idx}`} />;
-          const dateStr = formatDateInput(cell);
-          const disabled = isDisabled(cell);
-          const isSelected = dateStr === selectedDate;
-          const isToday = dateStr === todayStr;
-
-          return (
-            <button
-              key={dateStr}
-              type="button"
-              disabled={disabled}
-              onClick={() => onSelect(dateStr)}
-              title={disabled ? 'Bác sĩ không làm việc' : getVietnameseDayFromDate(dateStr)}
-              style={{
-                aspectRatio: '1',
-                border: 'none',
-                borderRadius: 8,
-                background: isSelected ? '#4f46e5' : isToday && !disabled ? '#eef2ff' : (disabled ? '#f3f4f6' : 'transparent'),
-                color: isSelected ? '#fff' : (disabled ? '#d1d5db' : '#374151'),
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                fontWeight: isSelected ? 700 : (isToday ? 700 : 500),
-                textDecoration: disabled ? 'line-through' : 'none',
-                opacity: disabled ? 0.65 : 1,
-                transition: 'all 0.15s ease',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.1
-              }}
-              onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = isSelected ? '#4338ca' : '#eef2ff'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = isSelected ? '#4f46e5' : (isToday && !disabled ? '#eef2ff' : 'transparent'); }}
-            >
-              <span style={{ fontSize: 13 }}>{cell.getDate()}</span>
-              <span
-                style={{
-                  fontSize: 8,
-                  fontWeight: 600,
-                  marginTop: 2,
-                  color: isSelected ? 'rgba(255,255,255,0.85)' : (disabled ? '#d1d5db' : '#9ca3af'),
-                  textDecoration: 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {VIETNAMESE_DAYS[cell.getDay()]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Legend */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 10px 8px', borderTop: '1px solid #f1f5f9', fontSize: 10, color: '#6b7280' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 4, background: '#4f46e5', display: 'inline-block' }} /> Ngày chọn
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 4, background: '#f3f4f6', border: '1px solid #d1d5db', display: 'inline-block' }} /> Nghỉ
-        </span>
-      </div>
-    </div>
-  );
-};
-
-/* ─── Create Modal (Portal) ─── */
-const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate, patient, chuyenKhoaList, dichVuList, benhNhanList, creating, doctorShifts }) => {
+/* ─── Create/Update Modal (Portal) ─── */
+const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate, patient, chuyenKhoaList, dichVuList, benhNhanList, phongList, creating, doctorShifts, availableCaList, mode = 'create', nhanVienList = [], onBacSiChange, hoanLich = false, setHoanLich, lyDoHoan = '', setLyDoHoan, originalDate = '' }) => {
+  const isUpdate = mode === 'update';
   const [patientSearch, setPatientSearch] = useState('');
   const [showPatientList, setShowPatientList] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [bacSiChangeWarning, setBacSiChangeWarning] = useState('');
+  // Lưu bác sĩ + ngày ban đầu khi mở modal — để tính diff lúc submit
+  const initialBacSiRef = useRef(formData.maBacSi);
+  const initialDateRef = useRef(formData.ngayTaiKham);
+
+  // Khi đổi bác sĩ: kiểm tra ngày hiện tại còn hợp lệ với bác sĩ mới không.
+  // Nếu KHÔNG → reset ngày + ca, báo người dùng chọn lại.
+  useEffect(() => {
+    if (!isUpdate) return;
+    if (String(formData.maBacSi) === String(initialBacSiRef.current)) return; // chưa đổi bác sĩ
+    if (!formData.ngayTaiKham) return; // ngày đã bị reset rồi
+
+    if (Array.isArray(doctorShifts) && doctorShifts.length > 0) {
+      const availableIds = getAvailableShiftIds(doctorShifts, formData.ngayTaiKham);
+      if (availableIds.length === 0) {
+        // Bác sĩ mới không làm việc vào ngày đang chọn → reset ngày + ca, bắt chọn lại
+        setBacSiChangeWarning(
+          `Bác sĩ mới không làm việc vào ngày ${formatDateDisplay(formData.ngayTaiKham)}. Vui lòng chọn ngày khác.`
+        );
+        setFormData(prev => ({ ...prev, ngayTaiKham: '', maCa: '' }));
+        clearError('ngayTaiKham');
+        clearError('maCa');
+      } else {
+        setBacSiChangeWarning('');
+      }
+    }
+  }, [doctorShifts, formData.ngayTaiKham, isUpdate, formData.maBacSi]);
 
   const errorStyle = { borderColor: '#ef4444', background: '#fef2f2' };
 
@@ -299,12 +235,35 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
     });
   };
 
+  // Normalize ngày — cắt bỏ phần giờ nếu có (ISO datetime → yyyy-MM-dd)
+  const normalizeDate = (v) => v ? String(v).split('T')[0] : '';
+
+  // Tính xem người dùng có đổi ngày so với ngày gốc không
+  const oldDate = normalizeDate(originalDate);
+  const newDate = normalizeDate(formData.ngayTaiKham);
+  const dateChanged = isUpdate && newDate !== '' && newDate !== oldDate;
+
+  // Nút Lưu chỉ disable khi: đổi ngày mà chưa tick "Hoãn"
+  const canSave = !dateChanged || hoanLich;
+
   const validateAndSubmit = () => {
     const errors = {};
+    // Validate đầy đủ mọi field — không phân nhánh theo hoanLich
     if (!formData.maBenhNhan) errors.maBenhNhan = 'Chưa chọn bệnh nhân';
     if (!formData.maChuyenKhoa) errors.maChuyenKhoa = 'Chưa chọn chuyên khoa';
+    if (!formData.maPhong) errors.maPhong = 'Chưa chọn phòng khám';
     if (!formData.maDichVu) errors.maDichVu = 'Chưa chọn dịch vụ';
-    if (!formData.ngayTaiKham) errors.ngayTaiKham = 'Chưa chọn ngày tái khám';
+    if (nhanVienList.length > 0 && !formData.maBacSi) errors.maBacSi = 'Chưa chọn bác sĩ';
+    if (!formData.ngayTaiKham) errors.ngayTaiKham = 'Chưa chọn ngày khám';
+    if (!formData.maCa) errors.maCa = 'Chưa chọn ca khám';
+    // Tick "Hoãn" → trạng thái HOAN, bắt buộc nhập lý do
+    if (isUpdate && hoanLich && !lyDoHoan?.trim()) {
+      errors.lyDoHoan = 'Vui lòng nhập lý do hoãn lịch';
+    }
+    // Đổi ngày mà chưa tick "Hoãn" → chặn
+    if (dateChanged && !hoanLich) {
+      errors.ngayTaiKham = 'Bạn đã đổi ngày khám. Vui lòng tick "Hoãn lịch" và nhập lý do để lưu.';
+    }
     setFormErrors(errors);
     if (Object.keys(errors).length === 0) {
       onCreate();
@@ -315,6 +274,23 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
   const filteredDichVus = formData.maChuyenKhoa
     ? dichVuList.filter(dv => String(dv.maChuyenKhoa) === String(formData.maChuyenKhoa))
     : dichVuList;
+
+  // Lọc bác sĩ theo chuyên khoa đã chọn (chỉ khi có nhanVienList — lễ tân)
+  const filteredBacSiList = nhanVienList.length > 0
+    ? nhanVienList.filter(nv => {
+        if (!isDoctor(nv)) return false;
+        if (!formData.maChuyenKhoa) return true;
+        return String(nv.chuyenKhoa ?? nv.maChuyenKhoa ?? '') === String(formData.maChuyenKhoa);
+      })
+    : [];
+
+  const filteredPhongList = getAssignedRoomOptions({
+    doctorShifts,
+    selectedDate: formData.ngayTaiKham,
+    selectedCaId: formData.maCa,
+    chuyenKhoaId: formData.maChuyenKhoa,
+    phongList,
+  });
 
   // Lọc bệnh nhân theo từ khóa
   const filteredBenhNhans = benhNhanList.filter(bn =>
@@ -346,7 +322,7 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
       >
         <div
           style={{
-            width: '100%', maxWidth: '900px',
+            width: '100%', maxWidth: '1100px',
             background: '#fff', borderRadius: '1.5rem',
             boxShadow: '0 32px 80px rgba(0,0,0,0.3)',
             overflow: 'hidden',
@@ -362,7 +338,7 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
                 <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: 22 }}>calendar_add_on</span>
               </div>
               <div>
-                <h3 style={{ fontWeight: 800, fontSize: '1.1rem', color: '#fff', margin: 0 }}>Tạo lịch hẹn tái khám</h3>
+                <h3 style={{ fontWeight: 800, fontSize: '1.1rem', color: '#fff', margin: 0 }}>{isUpdate ? 'Cập nhật lịch khám' : 'Tạo lịch hẹn tái khám'}</h3>
                 <p style={{ color: 'rgba(199,210,254,0.9)', fontSize: 12, margin: '2px 0 0' }}>
                   {patient ? `Bệnh nhân: ${patient.hoTen || 'N/A'}` : 'Điền đầy đủ thông tin bên dưới'}
                 </p>
@@ -377,7 +353,7 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
           </div>
 
           {/* Body */}
-          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'row', gap: '1.5rem' }}>
+          <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', gap: '0.75rem', alignItems: 'start' }}>
             {/* Cột trái: bệnh nhân, chuyên khoa, dịch vụ */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {/* Chọn bệnh nhân - only when no patient from exam view */}
@@ -391,7 +367,7 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
               </div>
             ) : (
               <div>
-                <label style={{ fontSize: 13, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>person_search</span>
                   Chọn bệnh nhân <span style={{ color: '#ef4444' }}>*</span>
                 </label>
@@ -447,13 +423,18 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
 
             {/* Chọn chuyên khoa */}
             <div>
-              <label style={{ fontSize: 13, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>local_hospital</span>
                 Chuyên khoa <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <select
                 value={formData.maChuyenKhoa || ''}
-                onChange={e => { setFormData({ ...formData, maChuyenKhoa: e.target.value ? Number(e.target.value) : '', maDichVu: '' }); clearError('maChuyenKhoa'); }}
+                onChange={e => {
+                  const maChuyenKhoa = e.target.value ? Number(e.target.value) : '';
+                  setFormData({ ...formData, maChuyenKhoa, maDichVu: '', maBacSi: '', maPhong: '', ngayTaiKham: '', maCa: '' });
+                  if (onBacSiChange) onBacSiChange('');
+                  clearError('maChuyenKhoa');
+                }}
                 style={formErrors.maChuyenKhoa ? { ...selectStyle, ...errorStyle } : selectStyle}
               >
                 <option value="">-- Chọn chuyên khoa --</option>
@@ -475,9 +456,48 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
               )}
             </div>
 
-            {/* Chọn dịch vụ */}
+            {/* Chọn phòng — luôn editable */}
             <div>
-              <label style={{ fontSize: 13, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>meeting_room</span>
+                Phòng khám <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={formData.maPhong || ''}
+                onChange={e => { setFormData({ ...formData, maPhong: e.target.value ? Number(e.target.value) : '' }); clearError('maPhong'); }}
+                style={formErrors.maPhong ? { ...selectStyle, ...errorStyle } : selectStyle}
+                disabled={!formData.maChuyenKhoa || (nhanVienList.length > 0 && !formData.maBacSi)}
+              >
+                <option value="">
+                  {!formData.maChuyenKhoa
+                    ? '-- Chọn chuyên khoa trước --'
+                    : (nhanVienList.length > 0 && !formData.maBacSi)
+                      ? '-- Chọn bác sĩ trước --'
+                      : '-- Chọn phòng --'}
+                </option>
+                {filteredPhongList.map(room => (
+                  <option key={room.maPhong} value={room.maPhong}>
+                    {room.tenPhong}
+                  </option>
+                ))}
+              </select>
+              {formErrors.maPhong && (
+                <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>error</span>
+                  {formErrors.maPhong}
+                </p>
+              )}
+              {filteredPhongList.length === 0 && formData.maChuyenKhoa && (
+                <p style={{ fontSize: 10, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 12 }}>warning</span>
+                  Chuyên khoa này chưa có phòng được cấu hình.
+                </p>
+              )}
+            </div>
+
+            {/* Chọn dịch vụ — luôn editable */}
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>medical_services</span>
                 Dịch vụ <span style={{ color: '#ef4444' }}>*</span>
               </label>
@@ -507,22 +527,66 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
                 </p>
               )}
             </div>
+
+            {/* Chọn bác sĩ — CHỈ hiển thị khi có nhanVienList (lễ tân), luôn editable */}
+            {nhanVienList.length > 0 && (
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>stethoscope</span>
+                  Bác sĩ <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <select
+                  value={formData.maBacSi ?? ''}
+                  onChange={e => {
+                    const maBacSi = e.target.value ? Number(e.target.value) : '';
+                    // Khi đổi bác sĩ: reset ca khám (ca cũ có thể không thuộc lịch bác sĩ mới)
+                    // Giữ nguyên ngày khám (disabled trong nhánh không hoãn)
+                    setFormData({ ...formData, maBacSi, maPhong: '', maCa: '' });
+                    if (onBacSiChange) onBacSiChange(maBacSi);
+                    clearError('maBacSi');
+                  }}
+                  style={formErrors.maBacSi ? { ...selectStyle, ...errorStyle } : selectStyle}
+                  disabled={!formData.maChuyenKhoa}
+                >
+                  <option value="">{formData.maChuyenKhoa ? '-- Chọn bác sĩ --' : '-- Chọn chuyên khoa trước --'}</option>
+                  {filteredBacSiList.map(nv => (
+                    <option key={nv.maNhanVien} value={nv.maNhanVien}>{nv.hoTen}</option>
+                  ))}
+                </select>
+                {formData.maChuyenKhoa && filteredBacSiList.length === 0 && (
+                  <p style={{ fontSize: 10, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>warning</span>
+                    Chuyên khoa này chưa có bác sĩ được cấu hình.
+                  </p>
+                )}
+                {formErrors.maBacSi && (
+                  <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>error</span>
+                    {formErrors.maBacSi}
+                  </p>
+                )}
+              </div>
+            )}
             </div>
             {/* /Cột trái */}
 
             {/* Cột phải: ngày tái khám + ghi chú */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Ngày tái khám */}
+            {/* Ngày tái khám — luôn editable */}
             <div>
               <label style={{ fontSize: 13, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>event</span>
                 Ngày tái khám <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <CustomCalendar
+              <WorkScheduleDateCalendar
                 selectedDate={formData.ngayTaiKham}
                 minDateStr={getMinDate()}
                 shifts={doctorShifts}
-                onSelect={(dateStr) => { setFormData({ ...formData, ngayTaiKham: dateStr }); clearError('ngayTaiKham'); }}
+                onSelect={(dateStr) => {
+                  setFormData(prev => ({ ...prev, ngayTaiKham: dateStr, maCa: '' }));
+                  clearError('ngayTaiKham');
+                  clearError('maCa');
+                }}
               />
               {formErrors.ngayTaiKham && (
                 <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
@@ -544,7 +608,34 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
               )}
             </div>
 
-            {/* Ghi chú */}
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>schedule</span>
+                Ca khám <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={formData.maCa || ''}
+                onChange={e => { setFormData({ ...formData, maCa: e.target.value ? Number(e.target.value) : '' }); clearError('maCa'); }}
+                disabled={!formData.ngayTaiKham}
+                style={formErrors.maCa ? { ...selectStyle, ...errorStyle } : selectStyle}
+              >
+                <option value="">{formData.ngayTaiKham ? '-- Chọn ca khám --' : '-- Chọn ngày trước --'}</option>
+                {availableCaList.map(ca => (
+                  <option key={ca.id} value={ca.id}>{ca.tenCa} ({ca.gioBatDau} - {ca.gioKetThuc})</option>
+                ))}
+              </select>
+              {formData.ngayTaiKham && availableCaList.length === 0 && (
+                <p style={{ fontSize: 11, color: '#ef4444', marginTop: 5 }}>Bác sĩ không có ca phù hợp trong ngày đã chọn.</p>
+              )}
+              {formErrors.maCa && (
+                <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>error</span>
+                  {formErrors.maCa}
+                </p>
+              )}
+            </div>
+
+            {/* Ghi chú — luôn editable */}
             <div>
               <label style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#818cf8' }}>notes</span>
@@ -560,6 +651,51 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
                 onBlur={e => e.target.style.borderColor = '#e5e7eb'}
               />
             </div>
+
+            {/* Hoãn lịch — chỉ hiển thị trong mode update */}
+            {isUpdate && setHoanLich && (
+              <div style={{ padding: '0.75rem 1rem', background: hoanLich ? '#fffbeb' : '#f8fafc', border: `1.5px solid ${hoanLich ? '#f59e0b' : '#e2e8f0'}`, borderRadius: '0.75rem', transition: 'all 0.2s' }}>
+                {bacSiChangeWarning && (
+                  <div style={{ padding: '0.6rem 0.85rem', background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '0.625rem', fontSize: 12, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>warning</span>
+                    {bacSiChangeWarning}
+                  </div>
+                )}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: hoanLich ? '#b45309' : '#374151' }}>
+                  <input
+                    type="checkbox"
+                    checked={hoanLich}
+                    onChange={e => {
+                      setHoanLich(e.target.checked);
+                      if (!e.target.checked) setLyDoHoan?.('');
+                    }}
+                    style={{ width: 16, height: 16, accentColor: '#f59e0b', cursor: 'pointer' }}
+                  />
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: hoanLich ? '#f59e0b' : '#9ca3af' }}>event_repeat</span>
+                  Hoãn lịch
+                </label>
+                {/* Lý do hoãn — chỉ hiển thị khi tick "Hoãn lịch" */}
+                {hoanLich && (
+                  <div style={{ marginTop: 10 }}>
+                    <textarea
+                      value={lyDoHoan}
+                      onChange={e => { setLyDoHoan?.(e.target.value); if (formErrors.lyDoHoan) clearError('lyDoHoan'); }}
+                      rows={2}
+                      placeholder="Nhập lý do hoãn lịch..."
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', background: '#fff', border: `1.5px solid ${formErrors.lyDoHoan ? '#ef4444' : '#fcd34d'}`, borderRadius: '0.625rem', fontSize: 13, color: '#374151', outline: 'none', boxSizing: 'border-box', resize: 'none' }}
+                      onFocus={e => e.target.style.borderColor = '#f59e0b'}
+                      onBlur={e => e.target.style.borderColor = formErrors.lyDoHoan ? '#ef4444' : '#fcd34d'}
+                    />
+                    {formErrors.lyDoHoan && (
+                      <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>error</span>
+                        {formErrors.lyDoHoan}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             </div>
             {/* /Cột phải */}
           </div>
@@ -575,15 +711,15 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
             </button>
             <button
               onClick={validateAndSubmit}
-              disabled={creating}
-              style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', borderRadius: '0.75rem', fontWeight: 700, fontSize: 14, color: '#fff', cursor: creating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 15px rgba(79,70,229,0.35)', opacity: creating ? 0.6 : 1 }}
+              disabled={creating || !canSave}
+              style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', borderRadius: '0.75rem', fontWeight: 700, fontSize: 14, color: '#fff', cursor: (creating || !canSave) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 15px rgba(79,70,229,0.35)', opacity: (creating || !canSave) ? 0.5 : 1 }}
             >
               {creating ? (
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" style={{ display: 'inline-block' }} />
               ) : (
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>check</span>
               )}
-              {creating ? 'Đang tạo...' : 'Xác nhận tạo'}
+              {creating ? (isUpdate ? 'Đang lưu...' : 'Đang tạo...') : (isUpdate ? 'Lưu thay đổi' : 'Xác nhận tạo')}
             </button>
           </div>
         </div>
@@ -687,6 +823,213 @@ const CancelModal = ({ onClose, onConfirm, lyDo, setLyDo, deletingId }) =>
     document.body
   );
 
+/* ─── Reschedule Modal (Portal) — Hoãn lịch khám ─── */
+const RescheduleModal = ({ appointment, onClose, onConfirm, ngayMoi, setNgayMoi, maCa, setMaCa, lyDo, setLyDo, rescheduling, doctorShifts, availableCaList }) => {
+  const [formErrors, setFormErrors] = useState({});
+
+  const errorStyle = { borderColor: '#ef4444', background: '#fef2f2' };
+
+  const clearError = (key) => {
+    setFormErrors(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const validateAndSubmit = () => {
+    const errors = {};
+    if (!ngayMoi) errors.ngayMoi = 'Chưa chọn ngày khám mới';
+    if (!maCa) errors.maCa = 'Chưa chọn ca khám mới';
+    if (!lyDo || !lyDo.trim()) errors.lyDo = 'Vui lòng nhập lý do hoãn lịch';
+    setFormErrors(errors);
+    if (Object.keys(errors).length === 0) {
+      onConfirm();
+    }
+  };
+
+  const getMinDate = () => {
+      const today = formatDateInput(new Date());
+      if (appointment?.ngayTaiKham && appointment.ngayTaiKham >= today) return appointment.ngayTaiKham;
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  };
+
+  return ReactDOM.createPortal(
+    <>
+      <style>{MODAL_STYLE}</style>
+      <div
+        style={{
+          position: 'fixed', top: 0, left: 0,
+          width: '100vw', height: '100vh',
+          zIndex: 99999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem',
+          background: 'rgba(15,23,42,0.6)',
+          backdropFilter: 'blur(8px)',
+          boxSizing: 'border-box',
+          overflowY: 'auto'
+        }}
+        onClick={onClose}
+      >
+        <div
+          style={{
+            width: '100%', maxWidth: '900px',
+            background: '#fff', borderRadius: '1.5rem',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.3)',
+            overflow: 'hidden',
+            animation: 'modalIn 0.28s cubic-bezier(.34,1.56,.64,1) both',
+            margin: 'auto'
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', padding: '1.25rem 1.5rem', position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: 44, height: 44, borderRadius: '0.875rem', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: 22 }}>event_repeat</span>
+              </div>
+              <div>
+                <h3 style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff', margin: 0 }}>Hoãn lịch khám</h3>
+                <p style={{ color: 'rgba(199,210,254,0.9)', fontSize: 12, margin: '2px 0 0' }}>
+                  Bác sĩ hoãn lịch - sẽ thông báo cho bệnh nhân
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{ position: 'absolute', top: '0.9rem', right: '0.9rem', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '0.625rem', padding: '0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#fff' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Thông tin lịch hiện tại */}
+            {appointment && (
+              <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '0.75rem' }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#1f2937' }}>
+                  {appointment.tenBenhNhan || `BN#${appointment.maBenhNhan}`}
+                </p>
+                <p style={{ margin: '3px 0 0', fontSize: 11, color: '#6b7280' }}>
+                  Ngày khám hiện tại:{' '}
+                  <strong style={{ color: '#4f46e5' }}>
+                    {appointment.ngayTaiKham ? new Date(appointment.ngayTaiKham).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                  </strong>
+                  {appointment.tenChuyenKhoa ? ` • ${appointment.tenChuyenKhoa}` : ''}
+                  {appointment.tenCa ? ` • ${appointment.tenCa}` : ''}
+                </p>
+              </div>
+            )}
+
+            {/* Chọn ngày mới */}
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>event</span>
+                Ngày khám mới <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <WorkScheduleDateCalendar
+                selectedDate={ngayMoi}
+                minDateStr={getMinDate()}
+                shifts={doctorShifts}
+                onSelect={(dateStr) => { setNgayMoi(dateStr); setMaCa(''); clearError('ngayMoi'); clearError('maCa'); }}
+              />
+              {formErrors.ngayMoi && (
+                <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>error</span>
+                  {formErrors.ngayMoi}
+                </p>
+              )}
+              {ngayMoi && (
+                <p style={{ fontSize: 11, color: '#4f46e5', display: 'flex', alignItems: 'center', gap: 3, marginTop: 6, fontWeight: 700 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>event_available</span>
+                  Đã chọn: {formatDateDisplay(ngayMoi)} ({getVietnameseDayFromDate(ngayMoi)})
+                </p>
+              )}
+              {doctorShifts && doctorShifts.length > 0 && (
+                <p style={{ fontSize: 10, color: '#10b981', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 12 }}>calendar_month</span>
+                  Bác sĩ làm việc: <strong>{getUniqueWorkingDays(doctorShifts).join(', ')}</strong>
+                </p>
+              )}
+            </div>
+
+            {/* Lý do hoãn */}
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 800, color: '#374151', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#4f46e5' }}>schedule</span>
+                Ca khám mới <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={maCa || ''}
+                onChange={e => { setMaCa(e.target.value ? Number(e.target.value) : ''); clearError('maCa'); }}
+                disabled={!ngayMoi}
+                style={formErrors.maCa ? { ...selectStyle, ...errorStyle } : selectStyle}
+              >
+                <option value="">{ngayMoi ? '-- Chọn ca khám --' : '-- Chọn ngày trước --'}</option>
+                {availableCaList.map(ca => (
+                  <option key={ca.id} value={ca.id}>{ca.tenCa} ({ca.gioBatDau} - {ca.gioKetThuc})</option>
+                ))}
+              </select>
+              {formErrors.maCa && <p style={{ fontSize: 11, color: '#ef4444', marginTop: 5, fontWeight: 600 }}>{formErrors.maCa}</p>}
+            </div>
+
+            {/* Lý do hoãn */}
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#818cf8' }}>notes</span>
+                Lý do hoãn <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <textarea
+                value={lyDo}
+                onChange={e => { setLyDo(e.target.value); clearError('lyDo'); }}
+                rows={3}
+                placeholder="VD: Bác sĩ nghỉ phép / thiết bị bảo trì / lịch quá tải..."
+                style={{ width: '100%', padding: '0.85rem 1rem', background: '#f9fafb', border: '1.5px solid #e5e7eb', borderRadius: '0.75rem', fontSize: 14, color: '#374151', outline: 'none', boxSizing: 'border-box', resize: 'none', ...(formErrors.lyDo ? errorStyle : {}) }}
+                onFocus={e => e.target.style.borderColor = '#818cf8'}
+                onBlur={e => e.target.style.borderColor = formErrors.lyDo ? '#ef4444' : '#e5e7eb'}
+              />
+              {formErrors.lyDo && (
+                <p style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, fontWeight: 600 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>error</span>
+                  {formErrors.lyDo}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ padding: '0 1.5rem 1.5rem', display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={onClose}
+              disabled={rescheduling}
+              style={{ flex: 1, padding: '0.75rem', background: '#f3f4f6', border: 'none', borderRadius: '0.75rem', fontWeight: 700, fontSize: 14, color: '#4b5563', cursor: rescheduling ? 'not-allowed' : 'pointer', opacity: rescheduling ? 0.5 : 1 }}
+            >
+              Quay lại
+            </button>
+            <button
+              onClick={validateAndSubmit}
+              disabled={rescheduling}
+              style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', borderRadius: '0.75rem', fontWeight: 700, fontSize: 14, color: '#fff', cursor: rescheduling ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 15px rgba(79,70,229,0.35)', opacity: rescheduling ? 0.6 : 1 }}
+            >
+              {rescheduling ? (
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" style={{ display: 'inline-block' }} />
+              ) : (
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>event_repeat</span>
+              )}
+              {rescheduling ? 'Đang hoãn...' : 'Xác nhận hoãn'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+};
+
 /* ═══════════════════════════════════════════════════════════════════════ */
 
 const FILTER_OPTS = [
@@ -696,7 +1039,7 @@ const FILTER_OPTS = [
   { value: 'HOAN', label: 'Hoãn' },
 ];
 
-const TabHenTaiKham = ({ user, patient }) => {
+const TabHenTaiKham = ({ user, patient, appointments: externalAppointments }) => {
   const { showSuccess, showError } = useNotification();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -705,19 +1048,29 @@ const TabHenTaiKham = ({ user, patient }) => {
   const [creating, setCreating] = useState(false);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelLyDo, setCancelLyDo] = useState('');
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleMaCa, setRescheduleMaCa] = useState('');
+  const [rescheduleLyDo, setRescheduleLyDo] = useState('');
+  const [rescheduling, setRescheduling] = useState(false);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterDate, setFilterDate] = useState('');
 
   // Dữ liệu dropdown
   const [chuyenKhoaList, setChuyenKhoaList] = useState([]);
   const [dichVuList, setDichVuList] = useState([]);
+  const [phongList, setPhongList] = useState([]);
   const [benhNhanList, setBenhNhanList] = useState([]);
+  const [caList, setCaList] = useState([]);
 
   const [formData, setFormData] = useState({
     maBenhNhan: patient?.maBenhNhan || '',
     maChuyenKhoa: user?.maChuyenKhoa || '',
+    maPhong: '',
     maDichVu: '',
     ngayTaiKham: '',
+    maCa: '',
     ghiChu: ''
   });
 
@@ -743,14 +1096,19 @@ const TabHenTaiKham = ({ user, patient }) => {
   useEffect(() => {
     const loadDropdowns = async () => {
       try {
-        const [ck, dv, bn] = await Promise.all([
+        const [ck, dv, ph, bn, ca] = await Promise.all([
           getAllChuyenKhoaApi(),
           getAllDichVuApi(),
-          getAllBenhNhanApi()
+          getAllPhongApi(),
+          getAllBenhNhanApi(),
+          getAllCaLamDanhMucApi()
         ]);
+        const normalizedPhongList = Array.isArray(ph) ? ph : [];
         setChuyenKhoaList(ck || []);
         setDichVuList(dv || []);
+        setPhongList(normalizedPhongList);
         setBenhNhanList(bn || []);
+        setCaList(Array.isArray(ca) ? ca : []);
       } catch (err) {
         console.error('Error loading dropdown data:', err);
       }
@@ -758,17 +1116,52 @@ const TabHenTaiKham = ({ user, patient }) => {
     loadDropdowns();
   }, []);
 
+  useEffect(() => {
+    if (!formData.maChuyenKhoa) {
+      setFormData(prev => ({ ...prev, maPhong: '' }));
+      return;
+    }
+
+    const matchingRooms = getAssignedRoomOptions({
+      doctorShifts,
+      selectedDate: formData.ngayTaiKham,
+      selectedCaId: formData.maCa,
+      chuyenKhoaId: formData.maChuyenKhoa,
+      phongList,
+    });
+
+    if (!matchingRooms.length) {
+      setFormData(prev => ({ ...prev, maPhong: '' }));
+      return;
+    }
+
+    setFormData(prev => {
+      if (!prev.maPhong || !matchingRooms.some(room => Number(room.maPhong) === Number(prev.maPhong))) {
+        return { ...prev, maPhong: matchingRooms[0].maPhong };
+      }
+      return prev;
+    });
+  }, [formData.maChuyenKhoa, formData.ngayTaiKham, formData.maCa, doctorShifts, phongList]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getAllApi();
-      setAppointments(data || []);
+      // Nếu có externalAppointments (truyền từ ngoài — ví dụ từ LichKham lễ tân)
+      // thì dùng trực tiếp, không gọi getByDoctorApi() (vì lễ tân không có maChuyenKhoa trong JWT)
+      const data = externalAppointments && externalAppointments.length > 0
+        ? externalAppointments
+        : await getByDoctorApi();
+      // Tab trong màn hình khám bệnh: chỉ hiển thị lịch hẹn của bệnh nhân ĐANG KHÁM
+      const filtered = patient?.maBenhNhan
+        ? (data || []).filter(a => Number(a.maBenhNhan) === Number(patient.maBenhNhan))
+        : (data || []);
+      setAppointments(filtered);
     } catch (err) {
       console.error('Error fetching appointments:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [patient, externalAppointments]);
 
   useEffect(() => {
     const timer = setTimeout(fetchData, 0);
@@ -786,8 +1179,10 @@ const TabHenTaiKham = ({ user, patient }) => {
       maBenhNhan: patient?.maBenhNhan || '',
       tenBenhNhan: patient?.hoTen || '',
       maChuyenKhoa: user?.maChuyenKhoa || '',
+      maPhong: '',
       maDichVu: '',
       ngayTaiKham: '',
+      maCa: '',
       ghiChu: ''
     });
     setShowModal(true);
@@ -795,8 +1190,8 @@ const TabHenTaiKham = ({ user, patient }) => {
 
   const handleCreate = async () => {
     if (creating) return;
-    if (!formData.maBenhNhan || !formData.maChuyenKhoa || !formData.maDichVu || !formData.ngayTaiKham) {
-      showError('Vui lòng nhập đầy đủ thông tin (bệnh nhân, chuyên khoa, dịch vụ, ngày)');
+    if (!formData.maBenhNhan || !formData.maChuyenKhoa || !formData.maPhong || !formData.maDichVu || !formData.ngayTaiKham || !formData.maCa) {
+      showError('Vui lòng nhập đầy đủ thông tin (bệnh nhân, chuyên khoa, phòng, dịch vụ, ngày)');
       return;
     }
     // Kiểm tra lại ngày tái khám có khớp với lịch làm việc của bác sĩ
@@ -811,10 +1206,12 @@ const TabHenTaiKham = ({ user, patient }) => {
       await createApi({
         maBenhNhan: Number(formData.maBenhNhan),
         maChuyenKhoa: Number(formData.maChuyenKhoa),
+        maPhong: Number(formData.maPhong),
         maDichVu: Number(formData.maDichVu),
         maNhanVien: Number(user?.maNhanVien),
         maPhieuKham: patient?.maPhieuKham,
         ngayTaiKham: formData.ngayTaiKham,
+        maCa: Number(formData.maCa),
         trangThai: 'CHUA_DEN',
         nguonTao: 'TAI_KHAM',
         ghiChu: formData.ghiChu
@@ -859,7 +1256,6 @@ const TabHenTaiKham = ({ user, patient }) => {
     try {
       await updateApi(cancelTarget, {
         trangThai: 'HUY',
-        nguoiHuy: 'BAC_SI',
         ghiChu: lyDoFinal
       });
       showSuccess('Đã hủy lịch hẹn và thông báo cho bệnh nhân');
@@ -870,6 +1266,53 @@ const TabHenTaiKham = ({ user, patient }) => {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const openRescheduleModal = (appointment) => {
+    setRescheduleTarget(appointment);
+    setRescheduleDate('');
+    setRescheduleMaCa('');
+    setRescheduleLyDo('');
+  };
+
+  const closeRescheduleModal = () => {
+    setRescheduleTarget(null);
+    setRescheduleDate('');
+    setRescheduleMaCa('');
+    setRescheduleLyDo('');
+  };
+
+  const confirmReschedule = async () => {
+    if (rescheduling) return;
+    if (!rescheduleDate) {
+      showError('Vui lòng chọn ngày khám mới');
+      return;
+    }
+    const lyDoFinal = rescheduleLyDo.trim();
+    if (!lyDoFinal) {
+      showError('Vui lòng nhập lý do hoãn lịch');
+      return;
+    }
+    setRescheduling(true);
+    try {
+      await hoanLichApi(rescheduleTarget.id, {
+        ngayTaiKham: rescheduleDate,
+        maCa: Number(rescheduleMaCa),
+        lyDo: lyDoFinal
+      });
+      showSuccess('Đã hoãn lịch và thông báo cho bệnh nhân');
+      closeRescheduleModal();
+      fetchData();
+    } catch (err) {
+      showError('Lỗi: ' + err.message);
+    } finally {
+      setRescheduling(false);
+    }
+  };
+
+  const getAvailableCa = (dateStr) => {
+    const ids = getAvailableShiftIds(doctorShifts, dateStr);
+    return caList.filter(ca => ids.includes(Number(ca.id)));
   };
 
   /* ── Derived ── */
@@ -884,9 +1327,10 @@ const TabHenTaiKham = ({ user, patient }) => {
   // tránh bị reset trang về 1 mỗi lần re-render (lỗi không chuyển trang được)
   const appointmentFilters = useCallback((a) => {
     const matchStatus = !filterStatus || a.trangThai === filterStatus;
+    const matchDate = !filterDate || a.ngayTaiKham === filterDate;
     const matchChuyenKhoa = !user?.maChuyenKhoa || a.maChuyenKhoa === user.maChuyenKhoa;
-    return matchStatus && matchChuyenKhoa;
-  }, [filterStatus, user?.maChuyenKhoa]);
+    return matchStatus && matchDate && matchChuyenKhoa;
+  }, [filterStatus, filterDate, user]);
 
   // Filter + search + phân trang dùng chung
   const {
@@ -896,7 +1340,6 @@ const TabHenTaiKham = ({ user, patient }) => {
     totalPages,
     currentPage,
     setCurrentPage,
-    safeCurrentPage,
     visiblePages,
     jumpPage,
     handleJumpPage,
@@ -905,7 +1348,7 @@ const TabHenTaiKham = ({ user, patient }) => {
   } = usePagination({
     data: appointments,
     pageSize: 8,
-    searchKeys: ['tenBenhNhan', 'maBenhNhan', 'tenChuyenKhoa', 'tenDichVu', 'tenNhanVien'],
+    searchKeys: ['tenBenhNhan', 'maBenhNhan', 'tenChuyenKhoa', 'tenDichVu', 'tenNhanVien', 'tenPhong'],
     searchTerm: search,
     filters: appointmentFilters,
   });
@@ -947,14 +1390,14 @@ const TabHenTaiKham = ({ user, patient }) => {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-3 mt-5 pt-5 border-t border-gray-100">
           {[
-            { label: 'Tổng lịch hẹn', value: stats.total, icon: 'calendar_month', color: 'text-indigo-600 bg-indigo-50' },
-            { label: 'Chưa đến', value: stats.chuaDen, icon: 'schedule', color: 'text-amber-600 bg-amber-50' },
-            { label: 'Đã đến', value: stats.daDen, icon: 'check_circle', color: 'text-emerald-600 bg-emerald-50' },
-            { label: 'Đã hoãn', value: stats.hoan, icon: 'cancel', color: 'text-red-500 bg-red-50' },
+            { label: 'Tổng lịch hẹn', value: stats.total, filterValue: '', icon: 'calendar_month', color: 'text-indigo-600 bg-indigo-50' },
+            { label: 'Chưa đến', value: stats.chuaDen, filterValue: 'CHUA_DEN', icon: 'schedule', color: 'text-amber-600 bg-amber-50' },
+            { label: 'Đã đến', value: stats.daDen, filterValue: 'DA_DEN', icon: 'check_circle', color: 'text-emerald-600 bg-emerald-50' },
+            { label: 'Đã hoãn', value: stats.hoan, filterValue: 'HOAN', icon: 'cancel', color: 'text-red-500 bg-red-50' },
           ].map(s => (
             <button
               key={s.label}
-              onClick={() => setFilterStatus(prev => prev === s.label.toUpperCase().replace(/ /g, '_') ? '' : '')}
+              onClick={() => { setCurrentPage(1); setFilterStatus(prev => prev === s.filterValue ? '' : s.filterValue); }}
               className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-indigo-200 transition-all text-left"
             >
               <span className={`material-symbols-outlined text-[20px] p-2 rounded-lg ${s.color}`}>{s.icon}</span>
@@ -985,6 +1428,39 @@ const TabHenTaiKham = ({ user, patient }) => {
             </button>
           )}
         </div>
+
+        {/* Date filter */}
+        <div className="relative">
+          <input
+            type="date"
+            value={filterDate}
+            onChange={e => { setCurrentPage(1); setFilterDate(e.target.value); }}
+            className="px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition-all shadow-sm"
+            title="Lọc theo ngày tái khám"
+          />
+          {filterDate && (
+            <button
+              onClick={() => { setCurrentPage(1); setFilterDate(''); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              title="Xóa lọc ngày"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          )}
+        </div>
+
+        {/* Status filter dropdown */}
+        <select
+          value={filterStatus}
+          onChange={e => { setCurrentPage(1); setFilterStatus(e.target.value); }}
+          className="px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition-all shadow-sm"
+          title="Lọc theo trạng thái"
+        >
+          <option value="">Tất cả trạng thái</option>
+          {FILTER_OPTS.filter(o => o.value).map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
 
         {/* Status filter pills */}
         <div className="flex items-center gap-2">
@@ -1018,17 +1494,17 @@ const TabHenTaiKham = ({ user, patient }) => {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
             <div className="w-20 h-20 rounded-3xl bg-gray-50 flex items-center justify-center border-2 border-dashed border-gray-200 text-gray-300">
-              <span className="material-symbols-outlined text-4xl">{search || filterStatus ? 'search_off' : 'calendar_month'}</span>
+              <span className="material-symbols-outlined text-4xl">{search || filterStatus || filterDate ? 'search_off' : 'calendar_month'}</span>
             </div>
             <div className="text-center">
               <p className="font-bold text-gray-500 text-base">
-                {search || filterStatus ? 'Không tìm thấy kết quả' : 'Chưa có lịch hẹn nào'}
+                {search || filterStatus || filterDate ? 'Không tìm thấy kết quả' : 'Chưa có lịch hẹn nào'}
               </p>
               <p className="text-sm text-gray-400 mt-1">
-                {search || filterStatus ? 'Thử thay đổi từ khóa hoặc bộ lọc' : 'Nhấn "Tạo lịch hẹn" để thêm mới'}
+                {search || filterStatus || filterDate ? 'Thử thay đổi từ khóa hoặc bộ lọc' : 'Nhấn "Tạo lịch hẹn" để thêm mới'}
               </p>
             </div>
-            {!search && !filterStatus && (
+            {!search && !filterStatus && !filterDate && (
               <button onClick={openModal} className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-sm hover:bg-indigo-700 transition-all flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px]">add</span>
                 Tạo lịch hẹn
@@ -1054,7 +1530,7 @@ const TabHenTaiKham = ({ user, patient }) => {
               <table className="w-full">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    {['ID', 'Bệnh nhân', 'Chuyên khoa', 'Dịch vụ', 'Bác sĩ', 'Ngày tái khám', 'Trạng thái', 'Ghi chú', ''].map(h => (
+                    {['ID', 'Bệnh nhân', 'Chuyên khoa', 'Dịch vụ', 'Bác sĩ', 'Ca khám', 'Phòng', 'Ngày tái khám', 'Trạng thái', 'Nguồn tạo', 'Ghi chú', 'Thao tác'].map(h => (
                       <th
                         key={h}
                         className={`px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 ${!h || h === 'Trạng thái' ? 'text-center' : 'text-left'}`}
@@ -1094,6 +1570,24 @@ const TabHenTaiKham = ({ user, patient }) => {
                       {/* Doctor */}
                       <td className="px-5 py-3.5 text-sm text-gray-600 whitespace-nowrap">{a.tenNhanVien || '—'}</td>
 
+                      {/* Shift */}
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        {a.tenCa ? (
+                          <div>
+                            <p className="text-sm font-bold text-gray-700">{a.tenCa}</p>
+                            <p className="text-[10px] text-gray-400">{a.gioBatDau || '—'} - {a.gioKetThuc || '—'}</p>
+                          </div>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+
+                      {/* Room */}
+                      <td className="px-5 py-3.5 text-sm text-gray-600 whitespace-nowrap">
+                        {(() => {
+                          const roomName = a.tenPhong || a.phong || (phongList.find(room => Number(room.maPhong) === Number(a.maPhong))?.tenPhong || '—');
+                          return roomName;
+                        })()}
+                      </td>
+
                       {/* Date */}
                       <td className="px-5 py-3.5">
                         <p className="text-sm font-bold text-gray-700 whitespace-nowrap">
@@ -1107,6 +1601,15 @@ const TabHenTaiKham = ({ user, patient }) => {
                         <StatusDropdown appointment={a} onUpdate={handleUpdate} />
                       </td>
 
+                      {/* Source */}
+                      <td className="px-5 py-3.5">
+                        {a.nguonTao ? (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-full border ${NGUON_TAO_CONFIG[a.nguonTao]?.cls || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                            {NGUON_TAO_CONFIG[a.nguonTao]?.label || a.nguonTao}
+                          </span>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+
                       {/* Note */}
                       <td className="px-5 py-3.5 max-w-[140px]">
                         {a.ghiChu
@@ -1114,18 +1617,32 @@ const TabHenTaiKham = ({ user, patient }) => {
                           : <span className="text-gray-300">—</span>}
                       </td>
 
-                      {/* Delete */}
+                      {/* Actions — chỉ hiển thị nút khi lịch còn CHUA_DEN (chưa check-in, chưa hủy, chưa quá hẹn) */}
                       <td className="px-5 py-3.5 text-center">
-                        <button
-                          onClick={() => openCancelModal(a.id)}
-                          disabled={deletingId === a.id}
-                          className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                          title="Hủy lịch hẹn"
-                        >
-                          <span className={`material-symbols-outlined text-[18px] ${deletingId === a.id ? 'animate-spin' : ''}`}>
-                            {deletingId === a.id ? 'refresh' : 'delete'}
-                          </span>
-                        </button>
+                        {a.trangThai === 'CHUA_DEN' ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => openRescheduleModal(a)}
+                              disabled={rescheduling}
+                              className="p-2 text-indigo-500 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all disabled:opacity-50"
+                              title="Hoãn lịch khám"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">event_repeat</span>
+                            </button>
+                            <button
+                              onClick={() => openCancelModal(a.id)}
+                              disabled={deletingId === a.id}
+                              className="p-2 text-red-400 bg-red-50 hover:bg-red-100 rounded-xl transition-all disabled:opacity-50"
+                              title="Hủy lịch hẹn"
+                            >
+                              <span className={`material-symbols-outlined text-[18px] ${deletingId === a.id ? 'animate-spin' : ''}`}>
+                                {deletingId === a.id ? 'refresh' : 'delete'}
+                              </span>
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1168,8 +1685,10 @@ const TabHenTaiKham = ({ user, patient }) => {
           chuyenKhoaList={chuyenKhoaList}
           dichVuList={dichVuList}
           benhNhanList={benhNhanList}
+          phongList={phongList}
           creating={creating}
           doctorShifts={doctorShifts}
+          availableCaList={getAvailableCa(formData.ngayTaiKham)}
         />
       )}
 
@@ -1183,8 +1702,28 @@ const TabHenTaiKham = ({ user, patient }) => {
           deletingId={deletingId}
         />
       )}
+
+      {/* ── Reschedule Modal ── */}
+      {rescheduleTarget !== null && (
+        <RescheduleModal
+          appointment={rescheduleTarget}
+          onClose={closeRescheduleModal}
+          onConfirm={confirmReschedule}
+          ngayMoi={rescheduleDate}
+          setNgayMoi={setRescheduleDate}
+          maCa={rescheduleMaCa}
+          setMaCa={setRescheduleMaCa}
+          lyDo={rescheduleLyDo}
+          setLyDo={setRescheduleLyDo}
+          rescheduling={rescheduling}
+          doctorShifts={doctorShifts}
+          availableCaList={getAvailableCa(rescheduleDate)}
+        />
+      )}
     </div>
   );
 };
+
+export { AppointmentModal, formatDateInput, formatDateDisplay, getVietnameseDayFromDate, getUniqueWorkingDays, getAssignedRoomOptions, getAvailableShiftIds, getShiftId };
 
 export default TabHenTaiKham;

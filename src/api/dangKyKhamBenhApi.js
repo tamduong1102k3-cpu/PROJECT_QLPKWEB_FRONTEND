@@ -14,11 +14,16 @@ export const getTodayApi = async (keyword = '') => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode || null;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -37,8 +42,12 @@ export const getAllApi = async () => {
     const response = await fetchClient(API_URL, { method: 'GET' });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
-      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
-      throw new Error(errorMsg);
+      let errorCode = null;
+      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; errorCode = errorData.errorCode || null; } catch (e) {}
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : [];
@@ -57,8 +66,12 @@ export const getByIdApi = async (id) => {
     const response = await fetchClient(`${API_URL}/${id}`, { method: 'GET' });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
-      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
-      throw new Error(errorMsg);
+      let errorCode = null;
+      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; errorCode = errorData.errorCode || null; } catch (e) {}
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -81,6 +94,7 @@ export const createApi = async (data) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       // Đọc full response body để debug
       let responseBody = null;
       try {
@@ -91,9 +105,13 @@ export const createApi = async (data) => {
           const errorData = JSON.parse(textBody);
           responseBody = errorData;
           errorMsg = errorData.message || errorMsg;
+          errorCode = errorData.errorCode || null;
         } catch (jsonParseError) {}
       } catch (readError) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -116,8 +134,12 @@ export const updateApi = async (id, data) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
-      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
-      throw new Error(errorMsg);
+      let errorCode = null;
+      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; errorCode = errorData.errorCode || null; } catch (e) {}
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -136,8 +158,12 @@ export const deleteApi = async (id) => {
     const response = await fetchClient(`${API_URL}/${id}`, { method: 'DELETE' });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
-      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
-      throw new Error(errorMsg);
+      let errorCode = null;
+      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; errorCode = errorData.errorCode || null; } catch (e) {}
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     return true;
   } catch (error) {
@@ -160,11 +186,16 @@ export const updateStatusApi = async (id, data) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode || null;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -174,61 +205,3 @@ export const updateStatusApi = async (id, data) => {
   }
 };
 
-/**
- * PATCH /{id}/xep-cuoi
- * Đánh dấu bệnh nhân xếp cuối danh sách chờ khám
- * @param {number|string} id - ID đăng ký khám bệnh
- */
-export const setXepCuoiApi = async (id) => {
-  try {
-    const response = await fetchClient(`${API_URL}/${id}/xep-cuoi`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
-  } catch (error) {
-    console.error("Error in setXepCuoiApi:", error);
-    throw error;
-  }
-};
-
-/**
- * PATCH /{id}/goi-lai?maChuyenKhoa={maChuyenKhoa}
- * Gọi lại bệnh nhân vắng mặt - đặt STT cuối danh sách cùng chuyên khoa + 1
- * @param {number|string} id - ID đăng ký khám bệnh
- * @param {number} maChuyenKhoa - Mã chuyên khoa của trợ lý
- */
-export const goiLaiApi = async (id, maChuyenKhoa) => {
-  try {
-    const response = await fetchClient(`${API_URL}/${id}/goi-lai?maChuyenKhoa=${maChuyenKhoa}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
-  } catch (error) {
-    console.error("Error in goiLaiApi:", error);
-    throw error;
-  }
-};

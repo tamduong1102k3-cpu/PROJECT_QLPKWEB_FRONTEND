@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getPendingTestsApi, getCompletedTestsTodayApi } from '../../api/phieuChiDinhApi';
-import { getTodayApi as getTodayDangKyApi, updateStatusApi, setXepCuoiApi } from '../../api/dangKyKhamBenhApi';
+import { getTodayApi as getTodayDangKyApi, updateStatusApi } from '../../api/dangKyKhamBenhApi';
 import { acceptClsPatientApi, updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
 import { getByPhieuKhamApi } from '../../api/chiSoKhamTongHopApi';
 import { getAllApi as getAllServicesApi } from '../../api/dichVuApi';
 import { removeVietnameseTones } from './component/TienIchKyThuatVien';
 import BangDanhSachCongViec from './component/BangDanhSachCongViec';
 import ModalNhapKetQua from './component/ModalNhapKetQua';
+import ModalNhapKetQuaXetNghiem from './component/ModalNhapKetQuaXetNghiem';
 import ModalXemKetQua from './component/ModalXemKetQua';
 import ModalKhamSinhHieu from './component/ModalKhamSinhHieu';
 import ModalNhapTiepNhanCls from './component/ModalNhapTiepNhanCls';
@@ -18,7 +19,6 @@ import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
 import { useNotification } from '../../components/NotificationContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import ModalGoiLai from '../../components/ModalGoiLai';
 
 const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   const { showWarning } = useNotification();
@@ -26,7 +26,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   const deptName = isImaging ? 'Chẩn Đoán Hình Ảnh' : 'Xét Nghiệm';
   const [activeTab, setActiveTab] = useState('worklist');
   const [worklistTab, setWorklistTab] = useState('pending');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1280);
   const [pendingTests, setPendingTests] = useState([]);
   const [completedTests, setCompletedTests] = useState([]);
   const [pendingRegistrations, setPendingRegistrations] = useState([]);
@@ -47,7 +47,9 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   // Danh sách toàn bộ dịch vụ để tra cứu loại dịch vụ
   const [servicesList, setServicesList] = useState([]);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, type: 'primary', icon: '' });
-  const [goiLaiState, setGoiLaiState] = useState({ isOpen: false, patient: null });
+  // Sidebar width state và ref để kéo dãn
+  const [sidebarWidth, setSidebarWidth] = useState(288); // 288px = w-72
+  const isResizing = useRef(false);
 
   // Fetch danh sách và kiểm tra sinh hiệu cho từng bệnh nhân
   const fetchWorklist = useCallback(async (showIndicator) => {
@@ -83,15 +85,18 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
       setCompletedTests(completed || []);
 
       // Lọc đăng ký mới (CHO_KHAM, chưa có maPhieuKham) theo chuyên khoa của KTV
+      // Và các đăng ký đang trong tiến trình tiếp nhận (DANG_KHAM, đã có maPhieuKham nhưng chưa được tạo phiếu chỉ định thực hiện)
       const newRegistrations = (registrations || []).filter(r =>
-        r.trangThai === 'CHO_KHAM' &&
-        !r.maPhieuKham &&
-        Number(r.maChuyenKhoa) === Number(maChuyenKhoa)
+        Number(r.maChuyenKhoa) === Number(maChuyenKhoa) &&
+        (
+          (r.trangThai === 'CHO_KHAM' && !r.maPhieuKham) ||
+          (r.trangThai === 'DANG_KHAM' && r.maPhieuKham && !pendingItems.some(p => p.maPhieuKham === r.maPhieuKham))
+        )
       );
       setPendingRegistrations(newRegistrations);
 
-      // Kiểm tra sinh hiệu cho tất cả bệnh nhân đang chờ
-      const allItems = [...(pending || []), ...(completed || [])];
+      // Kiểm tra sinh hiệu cho tất cả bệnh nhân đang chờ và các đăng ký đã tiếp nhận
+      const allItems = [...(pending || []), ...(completed || []), ...(registrations || [])];
       const maPhieuKhams = [...new Set(allItems.map(i => i.maPhieuKham).filter(Boolean))];
 
       const newVitalsMap = {};
@@ -188,9 +193,10 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
     fetchWorklist();
   };
 
-  // Đóng modal tiếp nhận CLS (không lưu)
+  // Đóng modal tiếp nhận CLS (không lưu) - cập nhật lại danh sách để không mất bệnh nhân
   const handleTiepNhanClsClose = () => {
     setTiepNhanClsPatient(null);
+    fetchWorklist();
   };
 
   // Đóng modal sinh hiệu (không lưu)
@@ -219,22 +225,24 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
     return item.id;
   };
 
-  const handleMarkAbsent = async (item, type = 'tam_thoi') => {
-    try {
-      const regId = getRegistrationId(item);
-      console.log('Mark absent - regId:', regId, 'type:', type, 'item:', item);
-      const result1 = await updateStatusApi(regId, { trangThai: 'VANG_MAT' });
-      console.log('Update status result:', result1);
-      // Nếu vắng quá lâu thì tự động đánh dấu xếp cuối
-      if (type === 'qua_lau') {
-        const result2 = await setXepCuoiApi(regId);
-        console.log('Set xep cuoi result:', result2);
+  const handleMarkAbsent = (item) => {
+    setConfirmState({
+      isOpen: true,
+      title: 'Xác nhận vắng mặt',
+      message: `Bạn có muốn đánh vắng bệnh nhân "${item.hoTen}"?`,
+      type: 'warning',
+      icon: 'person_off',
+      onConfirm: async () => {
+        setConfirmState(prev => ({ ...prev, isOpen: false }));
+        try {
+          const regId = getRegistrationId(item);
+          await updateStatusApi(regId, { trangThai: 'VANG_MAT' });
+          await fetchWorklist();
+        } catch (error) {
+          showWarning('Lỗi: ' + error.message);
+        }
       }
-      await fetchWorklist();
-    } catch (error) {
-      console.error('Error in handleMarkAbsent:', error);
-      showWarning('Lỗi: ' + error.message);
-    }
+    });
   };
 
   const handleMarkPresent = (item) => {
@@ -265,44 +273,29 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
     });
   };
 
-  const handleGoiLai_SauNguoiDangKham = async () => {
-    const item = goiLaiState.patient;
-    setGoiLaiState({ isOpen: false, patient: null });
-    try {
-      const regId = getRegistrationId(item);
-      await updateStatusApi(regId, { trangThai: 'CHO_KHAM' });
-      await fetchWorklist();
-    } catch (error) {
-      showWarning('Lỗi: ' + error.message);
-    }
-  };
-
-  const handleGoiLai_XepCuoiHang = async () => {
-    const item = goiLaiState.patient;
-    setGoiLaiState({ isOpen: false, patient: null });
-    try {
-      const regId = getRegistrationId(item);
-      await updateStatusApi(regId, { trangThai: 'CHO_KHAM' });
-      await setXepCuoiApi(regId);
-      await fetchWorklist();
-    } catch (error) {
-      showWarning('Lỗi: ' + error.message);
-    }
-  };
-
-  // KTV nhấn KHÁM - gộp: tạo Phiếu khám + mở đo sinh hiệu
+  // KTV nhấn KHÁM - gộp: tạo Phiếu khám (nếu chưa có) + mở đo sinh hiệu / tiếp nhận CLS
   const handleAcceptPatient = async (registration) => {
     try {
       const techId = user?.maNhanVien || '';
-      const result = await acceptClsPatientApi(registration.id, techId);
-      // Tự động mở modal đo sinh hiệu
-      const acceptedPatient = {
-        ...registration,
-        maPhieuKham: result.phieuKhamId,
-        trangThai: 'DANG_KHAM',
-        isDirectAcceptance: true // Đánh dấu là tiếp nhận trực tiếp từ lễ tân
-      };
-      setVitalsPatient(acceptedPatient);
+      let acceptedPatient = { ...registration };
+
+      // Nếu chưa có phiếu khám thì mới gọi API tiếp nhận để tạo mới
+      if (!registration.maPhieuKham) {
+        const result = await acceptClsPatientApi(registration.id, techId);
+        acceptedPatient.maPhieuKham = result.phieuKhamId;
+        acceptedPatient.trangThai = 'DANG_KHAM';
+        acceptedPatient.isDirectAcceptance = true; // Đánh dấu là tiếp nhận trực tiếp từ lễ tân
+      }
+
+      // Kiểm tra sinh hiệu của bệnh nhân
+      const hasVitals = vitalsMap[acceptedPatient.maPhieuKham];
+      if (hasVitals) {
+        // Nếu đã có sinh hiệu, mở trực tiếp form tiếp nhận CLS
+        setTiepNhanClsPatient(acceptedPatient);
+      } else {
+        // Nếu chưa có sinh hiệu, mở form đo sinh hiệu
+        setVitalsPatient(acceptedPatient);
+      }
       fetchWorklist();
     } catch (error) {
       showWarning('Lỗi: ' + error.message);
@@ -326,7 +319,32 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
           fetchWorklist(false);
         }}
       />
-      <aside className={`${isSidebarOpen ? 'w-72' : 'w-20'} bg-white/80 backdrop-blur-xl border-r border-slate-200/60 transition-all duration-300 flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20`}>
+      <aside style={{ width: isSidebarOpen ? sidebarWidth : 80 }} className={`bg-white/80 backdrop-blur-xl border-r border-slate-200/60 transition-[width] duration-150 flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20 relative shrink-0`}>
+        {/* Handle kéo dãn sidebar */}
+        {isSidebarOpen && (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              isResizing.current = true;
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+              const onMouseMove = (ev) => {
+                if (!isResizing.current) return;
+                const newWidth = Math.min(Math.max(startWidth + (ev.clientX - startX), 200), 480);
+                setSidebarWidth(newWidth);
+              };
+              const onMouseUp = () => {
+                isResizing.current = false;
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+              };
+              window.addEventListener('mousemove', onMouseMove);
+              window.addEventListener('mouseup', onMouseUp);
+            }}
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-400/50 active:bg-indigo-500/60 transition-colors z-30"
+            title="Kéo để thay đổi kích thước sidebar"
+          />
+        )}
         <div className="h-20 flex items-center justify-center border-b border-slate-100 px-6">
           <div className={`flex items-center gap-3 w-full ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
             <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 flex-shrink-0">
@@ -386,7 +404,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
             })} />
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2 2xl:gap-6">
                 <TheThongKe title="Chờ tiếp nhận" value={pendingRegistrations.length} icon="person_add" color="from-sky-400 to-blue-500" shadowColor="shadow-blue-500/20" />
                 <TheThongKe title="Chờ thực hiện" value={pendingTests.length} icon="pending_actions" color="from-amber-400 to-orange-500" shadowColor="shadow-orange-500/20" />
                 <TheThongKe title="Đã hoàn thành" value={completedTests.length} icon="task_alt" color="from-emerald-400 to-teal-500" shadowColor="shadow-teal-500/20" />
@@ -420,8 +438,9 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
         </main>
       </div>
 
-      {/* Modal nhập kết quả chuyên môn */}
-      {selectedTest && <ModalNhapKetQua test={selectedTest} user={user} isImaging={isImaging} onClose={() => setSelectedTest(null)} onSuccess={() => { setSelectedTest(null); fetchWorklist(); }} />}
+      {/* Modal nhập kết quả chuyên môn - XÉT NGHIỆM dùng ModalNhapKetQuaXetNghiem, CĐHA dùng ModalNhapKetQua */}
+      {selectedTest && !isImaging && <ModalNhapKetQuaXetNghiem test={selectedTest} user={user} servicesList={servicesList} onClose={() => setSelectedTest(null)} onSuccess={() => { setSelectedTest(null); fetchWorklist(); }} />}
+      {selectedTest && isImaging && <ModalNhapKetQua test={selectedTest} user={user} isImaging={isImaging} onClose={() => setSelectedTest(null)} onSuccess={() => { setSelectedTest(null); fetchWorklist(); }} />}
 
       {/* Modal xem kết quả */}
       {viewingResult && <ModalXemKetQua viewingResult={viewingResult} user={user} isImaging={isImaging} onClose={() => setViewingResult(null)} />}
@@ -456,25 +475,18 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
       />
-      <ModalGoiLai
-        isOpen={goiLaiState.isOpen}
-        patient={goiLaiState.patient}
-        onSauNguoiDangKham={handleGoiLai_SauNguoiDangKham}
-        onXepCuoiHang={handleGoiLai_XepCuoiHang}
-        onCancel={() => setGoiLaiState({ isOpen: false, patient: null })}
-      />
     </div>
   );
 };
 
 const TheThongKe = ({ title, value, icon, color, shadowColor }) => (
-  <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex items-center gap-5 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 transition-all duration-300 group">
-    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white bg-gradient-to-br ${color} shadow-lg ${shadowColor} group-hover:scale-110 transition-transform duration-300`}>
-      <span className="material-symbols-outlined text-[32px]">{icon}</span>
+  <div className="bg-white rounded-lg 2xl:rounded-3xl shadow-sm border border-slate-100 px-3 py-2 2xl:p-6 flex items-center gap-2 2xl:gap-5 group">
+    <div className={`w-8 h-8 2xl:w-16 2xl:h-16 rounded-lg 2xl:rounded-2xl flex items-center justify-center text-white bg-gradient-to-br ${color} shadow-sm 2xl:shadow-lg ${shadowColor} flex-shrink-0`}>
+      <span className="material-symbols-outlined text-[18px] 2xl:text-[32px]">{icon}</span>
     </div>
-    <div>
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">{title}</p>
-      <h3 className="text-3xl font-black text-slate-800">{value}</h3>
+    <div className="min-w-0">
+      <p className="text-[9px] 2xl:text-xs font-bold text-slate-400 uppercase tracking-wide 2xl:tracking-widest truncate leading-none 2xl:leading-normal mb-1 2xl:mb-1.5">{title}</p>
+      <h3 className="text-lg 2xl:text-3xl font-black text-slate-800 leading-none">{value}</h3>
     </div>
   </div>
 );

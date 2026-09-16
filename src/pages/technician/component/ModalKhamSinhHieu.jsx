@@ -86,6 +86,7 @@ const ModalKhamSinhHieu = ({ patient, user, onClose, onComplete }) => {
     try {
       const payload = {
         maPhieuKham: patient.maPhieuKham,
+        maChuyenKhoa: user?.maChuyenKhoa,
         nhietDo: parseFloat(vitals.nhietDo),
         nhipTim: parseInt(vitals.nhipTim),
         nhipTho: parseInt(vitals.nhipTho),

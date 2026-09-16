@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getCdhaResultApi } from '../../../api/phieuChiDinhApi';
 import { formatDateTime, formatDateOfBirth, calculateAge } from './TienIchKyThuatVien';
+import formatGender from '../../../utils/formatGender';
 
 const ModalXemKetQua = ({ viewingResult, user, isImaging, onClose }) => {
   const [cdhaResultData, setCdhaResultData] = useState(null);
@@ -83,7 +84,7 @@ const ModalXemKetQua = ({ viewingResult, user, isImaging, onClose }) => {
             {/* Thông tin BN */}
             <div className="grid grid-cols-2 gap-x-8 gap-y-4 bg-slate-50/80 p-6 rounded-2xl border border-slate-200/50 text-sm mb-8 print:bg-transparent print:border-black print:p-4">
               <div className="space-y-1"><span className="text-slate-400 font-bold block text-[10px] uppercase tracking-widest print:text-black">Họ và tên bệnh nhân</span><span className="font-black text-slate-800 text-base print:text-black">{viewingResult.hoTen}</span></div>
-              <div className="space-y-1"><span className="text-slate-400 font-bold block text-[10px] uppercase tracking-widest print:text-black">Giới tính / Ngày sinh</span><span className="font-bold text-slate-700 print:text-black">{viewingResult.gioiTinh} • {formatDateOfBirth(viewingResult.ngaySinh)} ({calculateAge(viewingResult.ngaySinh)})</span></div>
+              <div className="space-y-1"><span className="text-slate-400 font-bold block text-[10px] uppercase tracking-widest print:text-black">Giới tính / Ngày sinh</span><span className="font-bold text-slate-700 print:text-black">{formatGender(viewingResult.gioiTinh)} • {formatDateOfBirth(viewingResult.ngaySinh)} ({calculateAge(viewingResult.ngaySinh)})</span></div>
               <div className="space-y-1"><span className="text-slate-400 font-bold block text-[10px] uppercase tracking-widest print:text-black">Dịch vụ chỉ định</span><span className="font-black text-indigo-700 print:text-black">{viewingResult.tenDichVu}</span></div>
               <div className="space-y-1"><span className="text-slate-400 font-bold block text-[10px] uppercase tracking-widest print:text-black">Thời gian chỉ định</span><span className="font-bold text-slate-700 print:text-black">{formatDateTime(viewingResult.ngayChiDinh)}</span></div>
             </div>

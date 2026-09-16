@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { formatDateOfBirth, calculateAge, formatDateTime } from './TienIchKyThuatVien';
+import formatGender from '../../../utils/formatGender';
 
 // Sort patients: normal order by soThuTu ASC, but xepCuoi=true patients go to the end
 function sortPatientList(patients) {
@@ -21,7 +22,6 @@ const BangDanhSachCongViec = ({
   onEditResult, 
   onMarkAbsent, 
   onMarkPresent, 
-  onGoiLai,
   searchQuery, 
   setSearchQuery, 
   isRefreshing, 
@@ -31,7 +31,6 @@ const BangDanhSachCongViec = ({
 }) => {
   const [filterMode, setFilterMode] = useState('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [absentDropdown, setAbsentDropdown] = useState({ open: false, patient: null });
   const headerTitle = title || (isImaging ? 'Bệnh nhân chờ Chụp chiếu' : 'Bệnh nhân chờ Xét nghiệm');
 
   // Apply filter + sort before rendering
@@ -124,60 +123,14 @@ const BangDanhSachCongViec = ({
         </button>
       </div>
 
-      {/* Absent options dropdown */}
-      {absentDropdown.open && (
-        <>
-          <div className="fixed inset-0 z-30 bg-black/20" onClick={() => setAbsentDropdown({ open: false, patient: null })}></div>
-          <div className="fixed z-40 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 min-w-[240px]"
-               style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-            <div className="px-4 py-3 border-b border-slate-100">
-              <p className="font-bold text-slate-700">Xác nhận vắng mặt</p>
-              <p className="text-sm text-slate-500">{absentDropdown.patient?.hoTen}</p>
-            </div>
-            <button 
-              onClick={() => {
-                const p = absentDropdown.patient;
-                setAbsentDropdown({ open: false, patient: null });
-                onMarkAbsent && onMarkAbsent(p, 'tam_thoi');
-              }} 
-              className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl flex items-center gap-3 mt-1"
-            >
-              <span className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">
-                <span className="material-symbols-outlined text-xl">timer</span>
-              </span>
-              <div>
-                <p>Vắng tạm thời</p>
-                <p className="text-xs text-slate-400 font-normal">Vẫn giữ nguyên vị trí trong danh sách</p>
-              </div>
-            </button>
-            <button 
-              onClick={() => {
-                const p = absentDropdown.patient;
-                setAbsentDropdown({ open: false, patient: null });
-                onMarkAbsent && onMarkAbsent(p, 'qua_lau');
-              }} 
-              className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 rounded-xl flex items-center gap-3 mb-1"
-            >
-              <span className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-700">
-                <span className="material-symbols-outlined text-xl">schedule</span>
-              </span>
-              <div>
-                <p>Vắng quá lâu</p>
-                <p className="text-xs text-slate-400 font-normal">Đưa xuống cuối danh sách khi quay lại</p>
-              </div>
-            </button>
-          </div>
-        </>
-      )}
-
       <div className="overflow-x-auto rounded-2xl border border-slate-200/60 shadow-sm">
         <table className="w-full text-left border-collapse text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-[11px]">
               <th className="py-5 px-6 w-16">STT</th>
               <th className="py-5 px-6">Bệnh nhân</th>
-              <th className="py-5 px-6">SĐT</th>
-              <th className="py-5 px-6">CCCD</th>
+              <th className="py-5 px-6 hidden lg:table-cell">SĐT</th>
+              <th className="py-5 px-6 hidden xl:table-cell">CCCD</th>
               <th className="py-5 px-6">Dịch vụ</th>
               <th className="py-5 px-6 text-center w-56">Thao tác</th>
             </tr>
@@ -199,7 +152,7 @@ const BangDanhSachCongViec = ({
                 </td>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-4">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black shadow-sm flex-shrink-0 ${item.gioiTinh === 'Nam' || item.gioiTinh === 1 ? 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 border border-blue-200/50' : 'bg-gradient-to-br from-rose-100 to-pink-100 text-rose-700 border border-rose-200/50'}`}>
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black shadow-sm flex-shrink-0 ${formatGender(item.gioiTinh) === 'Nam' ? 'bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 border border-blue-200/50' : 'bg-gradient-to-br from-rose-100 to-pink-100 text-rose-700 border border-rose-200/50'}`}>
                       {item.hoTen ? item.hoTen[0].toUpperCase() : 'BN'}
                     </div>
                     <div className="min-w-0">
@@ -213,7 +166,7 @@ const BangDanhSachCongViec = ({
                         )}
                       </h4>
                       <div className="flex items-center gap-2 mt-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${item.gioiTinh === 'Nam' || item.gioiTinh === 1 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>{item.gioiTinh === 1 || item.gioiTinh === 'Nam' ? 'Nam' : 'Nữ'}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${formatGender(item.gioiTinh) === 'Nam' ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>{formatGender(item.gioiTinh)}</span>
                         <span>•</span>
                         <span>{formatDateOfBirth(item.ngaySinh)}</span>
                         <span className="text-slate-400">({calculateAge(item.ngaySinh)})</span>
@@ -221,10 +174,10 @@ const BangDanhSachCongViec = ({
                     </div>
                   </div>
                 </td>
-                <td className="py-4 px-6">
+                <td className="py-4 px-6 hidden lg:table-cell">
                   <span className="font-bold text-slate-700">{item.soDienThoai || item.sdt || '-'}</span>
                 </td>
-                <td className="py-4 px-6">
+                <td className="py-4 px-6 hidden xl:table-cell">
                   <span className="font-bold text-slate-700">{item.cccd || '-'}</span>
                 </td>
                 <td className="py-4 px-6">
@@ -235,16 +188,9 @@ const BangDanhSachCongViec = ({
                 </td>
                 <td className="py-4 px-6 text-center">
                   {worklistTab === 'pending' ? (
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex flex-col items-center justify-center gap-1.5">
                       {item.trangThai === 'VANG_MAT' ? (
-                        <button 
-                          onClick={() => {
-                            if (onGoiLai) onGoiLai(item);
-                          }} 
-                          className="px-4 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold rounded-xl hover:from-sky-600 hover:to-blue-700 shadow-md shadow-sky-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">forward_media</span> GỌI LẠI
-                        </button>
+                        <span className="px-3 py-2 text-xs font-bold text-red-500 italic">Đã vắng mặt</span>
                       ) : (
                         <>
                           <button 
@@ -255,12 +201,12 @@ const BangDanhSachCongViec = ({
                                 onOpenVitals(item);
                               }
                             }} 
-                            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-indigo-600 shadow-md shadow-indigo-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
+                            className="w-full px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-indigo-600 shadow-md shadow-indigo-500/20 text-xs flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
                           >
                             <span className="material-symbols-outlined text-[18px]">stethoscope</span> KHÁM BỆNH
                           </button>
                           {onMarkAbsent && (
-                            <button onClick={() => setAbsentDropdown({ open: true, patient: item })} className="px-3 py-2.5 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center gap-1.5 transition-all">
+                            <button onClick={() => onMarkAbsent(item)} className="w-full px-3 py-2 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center justify-center gap-1.5 transition-all">
                               <span className="material-symbols-outlined text-[18px]">person_off</span> VẮNG
                             </button>
                           )}
@@ -268,15 +214,15 @@ const BangDanhSachCongViec = ({
                       )}
                     </div>
                   ) : worklistTab === 'reception' ? (
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex flex-col items-center justify-center gap-1.5">
                       <button 
                         onClick={() => onAcceptPatient && onAcceptPatient(item)} 
-                        className="px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold rounded-xl hover:from-sky-600 hover:to-blue-700 shadow-md shadow-sky-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
+                        className="w-full px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold rounded-xl hover:from-sky-600 hover:to-blue-700 shadow-md shadow-sky-500/20 text-xs flex items-center justify-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm"
                       >
                         <span className="material-symbols-outlined text-[18px]">stethoscope_arrow</span> KHÁM
                       </button>
                       {onMarkAbsent && (
-                        <button onClick={() => setAbsentDropdown({ open: true, patient: item })} className="px-3 py-2.5 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center gap-1.5 transition-all">
+                        <button onClick={() => onMarkAbsent(item)} className="w-full px-3 py-2 bg-gradient-to-r from-red-50 to-red-100 text-red-600 font-bold rounded-xl border border-red-200 hover:from-red-100 hover:to-red-200 text-xs flex items-center justify-center gap-1.5 transition-all">
                           <span className="material-symbols-outlined text-[18px]">person_off</span> VẮNG
                         </button>
                       )}
@@ -318,9 +264,6 @@ const BangDanhSachCongViec = ({
                             title={item.hasVitals ? 'Nhập kết quả chuyên môn' : 'Cần nhập chỉ số sinh hiệu trước'}
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span> KẾT QUẢ
-                          </button>
-                          <button onClick={() => onOpenView(item)} className="px-3 py-2.5 bg-gradient-to-r from-slate-600 to-slate-500 text-white font-bold rounded-xl hover:from-slate-700 hover:to-slate-600 shadow-md shadow-slate-500/20 text-xs flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm">
-                            <span className="material-symbols-outlined text-[18px]">visibility</span> XEM
                           </button>
                         </>
                       ) : (

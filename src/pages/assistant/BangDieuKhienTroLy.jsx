@@ -1,16 +1,16 @@
-import { getTodayApi as _getTodayDangKy, updateStatusApi as _updateDangKyStatus, setXepCuoiApi as _setXepCuoiApi, goiLaiApi as _goiLaiApi } from '../../api/dangKyKhamBenhApi';
+import { getTodayApi as _getTodayDangKy, updateStatusApi as _updateDangKyStatus } from '../../api/dangKyKhamBenhApi';
 import { getCurrentRoomApi as _getCurrentRoomApi } from '../../api/shiftApi';
 import { updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
 // ĐẢM BẢO IMPORT apiClient
 import { apiClient } from "../../api/apiClient"; 
 import { useNotification } from '../../components/NotificationContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import ModalGoiLai from '../../components/ModalGoiLai';
 import React, { useState, useEffect, useCallback } from 'react';
 import { sqlLikeMatch } from '../../utils/searchUtils';
 import VitalSignsFormComponent from '../../components/VitalSignsForm';
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import TroLyRHMForm from './TroLyRHMForm';
+import formatGender from '../../utils/formatGender';
 import TroLyTMHForm from './TroLyTMHForm';
 import TroLyTimMachForm from './TroLyTimMachForm';
 import TroLyNhiForm from './TroLyNhiForm';
@@ -26,7 +26,9 @@ const API_BASE = 'https://qlpk-backend-spring-boot.onrender.com/api';
 
 const BangDieuKhienTroLy = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1280);
+  const [sidebarWidth, setSidebarWidth] = useState(256); // w-64 is 256px
+  const isResizing = React.useRef(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patients, setPatients] = useState({ pending: [], completed: [], absent: [] });
   const [loadingQueue, setLoadingQueue] = useState(true);
@@ -37,7 +39,6 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
   const [currentRoom, setCurrentRoom] = useState("Đang tải...");
   const { showSuccess, showError } = useNotification();
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
-  const [goiLaiState, setGoiLaiState] = useState({ isOpen: false, patient: null });
 
   const isRhmAssistant = Number(user?.maChuyenKhoa) === 5;
   const isTmhAssistant = Number(user?.maChuyenKhoa) === 4;
@@ -61,12 +62,12 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
         }
       const choKhamOrDangKham = filteredData.filter(r => r.trangThai === 'CHO_KHAM' || r.trangThai === 'DANG_KHAM');
       const absentList = filteredData.filter(r => r.trangThai === 'VANG_MAT');
-      const completedList = filteredData.filter(r => r.trangThai === 'CHO_BAC_SI' || r.trangThai === 'HOAN_THANH');
+      const completedList = filteredData.filter(r => r.trangThai === 'CHO_BAC_SI');
       // Gộp bệnh nhân VANG_MAT vào danh sách pending để không bị mất khỏi danh sách
       const pending = [...choKhamOrDangKham, ...absentList];
       
       setPatients({ pending, completed: completedList, absent: absentList });
-        setStats({ waitingToday: pending.length, processedToday: completedList.length, absentToday: absent.length });
+        setStats({ waitingToday: pending.length, processedToday: completedList.length, absentToday: absentList.length });
       }
       if (user?.maNhanVien) {
         const roomData = await _getCurrentRoomApi(user.maNhanVien);
@@ -130,24 +131,17 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
     handleSelectPatient(patient);
   };
 
-  const handleMarkAbsent = (patient, type = 'tam_thoi') => {
-    const isQuaLau = type === 'qua_lau';
+  const handleMarkAbsent = (patient) => {
     setConfirmState({
       isOpen: true,
       title: 'Xác nhận vắng mặt',
-      message: isQuaLau
-        ? `Đánh dấu bệnh nhân "${patient.hoTen}" vắng quá lâu? Bệnh nhân sẽ được xếp xuống cuối danh sách khi quay lại.`
-        : `Đánh dấu bệnh nhân "${patient.hoTen}" vắng mặt?`,
+      message: `Bạn có muốn đánh vắng bệnh nhân "${patient.hoTen}"?`,
       type: 'warning',
       icon: 'person_off',
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, isOpen: false }));
         try {
           await _updateDangKyStatus(patient.id, { trangThai: 'VANG_MAT' });
-          // Nếu vắng quá lâu thì đánh dấu xếp cuối
-          if (isQuaLau) {
-            await _setXepCuoiApi(patient.id);
-          }
           showSuccess(`Đã đánh dấu vắng mặt "${patient.hoTen}"`);
           fetchStats();
         } catch (e) {
@@ -180,41 +174,6 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
     });
   };
 
-  const handleGoiLai_SauNguoiDangKham = async () => {
-    const patient = goiLaiState.patient;
-    setGoiLaiState({ isOpen: false, patient: null });
-    try {
-      await _updateDangKyStatus(patient.id, { trangThai: 'CHO_KHAM' });
-      await fetchStats();
-      showSuccess(`Đã gọi lại "${patient.hoTen}"`);
-    } catch (e) {
-      showError("Lỗi: " + e.message);
-    }
-  };
-
-  const handleGoiLai_XepCuoiHang = async () => {
-    const patient = goiLaiState.patient;
-    setGoiLaiState({ isOpen: false, patient: null });
-    try {
-      await _updateDangKyStatus(patient.id, { trangThai: 'CHO_KHAM' });
-      await _setXepCuoiApi(patient.id);
-      await fetchStats();
-      showSuccess(`Đã xếp "${patient.hoTen}" xuống cuối hàng chờ`);
-    } catch (e) {
-      showError("Lỗi: " + e.message);
-    }
-  };
-
-  const handleGoiLai = async (patient) => {
-    try {
-      await _goiLaiApi(patient.id, user?.maChuyenKhoa);
-      await fetchStats();
-      showSuccess(`Đã gọi lại "${patient.hoTen}"`);
-    } catch (e) {
-      showError("Lỗi: " + e.message);
-    }
-  };
-
   const navItems = [
     { id: 'dashboard', label: 'Bàn Làm Việc', icon: 'desk' },
     { id: 'patients', label: 'Thông Tin Bệnh Nhân', icon: 'person_search' },
@@ -244,7 +203,6 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
                 onOpenResult={handleOpenResult}
                 onMarkAbsent={handleMarkAbsent}
                 onMarkPresent={handleMarkPresent}
-                onGoiLai={handleGoiLai}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 isRefreshing={loadingQueue}
@@ -262,7 +220,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
                       <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
                         <span>#{selectedPatient.maBenhNhan}</span>
                         <span>•</span>
-                        <span>{selectedPatient.gioiTinh ? 'Nam' : 'Nữ'}</span>
+                        <span>{formatGender(selectedPatient.gioiTinh)}</span>
                         <span>•</span>
                         <span>{new Date(selectedPatient.ngaySinh).toLocaleDateString("vi-VN")}</span>
                       </div>
@@ -303,7 +261,35 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
           fetchStats();
         }}
       />
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20`}>
+      <aside 
+        style={{ width: isSidebarOpen ? sidebarWidth : 80 }}
+        className="relative bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20"
+      >
+        {/* Handle kéo dãn sidebar */}
+        {isSidebarOpen && (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              isResizing.current = true;
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+              const onMouseMove = (ev) => {
+                if (!isResizing.current) return;
+                const newWidth = Math.min(Math.max(startWidth + (ev.clientX - startX), 200), 480);
+                setSidebarWidth(newWidth);
+              };
+              const onMouseUp = () => {
+                isResizing.current = false;
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+              };
+              window.addEventListener('mousemove', onMouseMove);
+              window.addEventListener('mouseup', onMouseUp);
+            }}
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-400/50 active:bg-indigo-500/60 transition-colors z-30"
+            title="Kéo để thay đổi kích thước sidebar"
+          />
+        )}
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-sm shadow-indigo-200">
@@ -350,13 +336,6 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
             icon={confirmState.icon}
             onConfirm={confirmState.onConfirm}
             onCancel={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
-          />
-          <ModalGoiLai
-            isOpen={goiLaiState.isOpen}
-            patient={goiLaiState.patient}
-            onSauNguoiDangKham={handleGoiLai_SauNguoiDangKham}
-            onXepCuoiHang={handleGoiLai_XepCuoiHang}
-            onCancel={() => setGoiLaiState({ isOpen: false, patient: null })}
           />
         </main>
       </div>

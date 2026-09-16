@@ -1,11 +1,13 @@
 /**
- * fetchClient - wrapper cho fetch() tự động gắn JWT token,
- * handle 401 auto-refresh + queue, và tự động bật/tắt loading overlay.
- * 
- * Khi gặp 401, thay vì logout ngay, tự động gọi refresh token.
- * Nếu nhiều request 401 cùng lúc, chỉ gọi refresh 1 lần, các request khác chờ.
+ * fetchClient - wrapper cho fetch() tự động gắn access token (từ memory),
+ * handle 401 auto-refresh (qua HttpOnly cookie) + queue, và tự động bật/tắt loading overlay.
+ *
+ * - Access token lưu trong memory (tokenStore), KHÔNG localStorage.
+ * - Refresh token (web) nằm trong HttpOnly cookie do backend quản lý.
+ * - Mọi request dùng credentials: 'include' để browser tự gửi cookie (chỉ với backend origin).
  */
 import { loadingManager } from './loadingManager';
+import { getAccessToken, setAccessToken, clearAccessToken } from './tokenStore';
 
 let isRefreshing = false;
 let refreshSubscribers = [];
@@ -21,53 +23,65 @@ const addRefreshSubscriber = (callback) => {
 };
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+  const token = getAccessToken();
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 };
 
+const getRefreshEndpoint = () => {
+  return '/api/taikhoan/refresh-token';
+};
+
+/**
+ * Gọi refresh qua HttpOnly cookie (web).
+ * Không gửi refresh token trong body - browser tự đính cookie.
+ * Thêm X-Requested-With cho CSRF protection.
+ *
+ * Timeout 30s: đủ lâu để chờ backend phản hồi (kể cả Render.com cold start),
+ * tránh treo vô hạn. Không dùng timeout ngắn (3s) vì sẽ cắt ngang request
+ * hợp lệ khi mạng chậm, gây refresh thất bại sai.
+ */
+const REFRESH_TIMEOUT_MS = 30000;
+
 const refreshTokenRequest = async () => {
-  const currentRefreshToken = localStorage.getItem('refreshToken');
-  if (!currentRefreshToken) return null;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
 
   try {
-    // Xác định endpoint dựa trên token type (patient hay employee)
-    // decode JWT để biết, fallback dùng employee nếu không decode được
-    let endpoint = '/api/taikhoan/refresh-token';
-    try {
-      const payload = JSON.parse(atob(currentRefreshToken.split('.')[1]));
-      if (payload.tokenType === 'refresh' && payload.maTaiKhoanBn !== undefined) {
-        endpoint = '/api/tai-khoan-benh-nhan/refresh-token';
-      }
-    } catch (e) {
-      // fallback: employee endpoint
-    }
-
     const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
+    const endpoint = getRefreshEndpoint();
+
     const response = await fetch(`${baseUrl}${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: currentRefreshToken })
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      signal: controller.signal
+      // Không body - refresh token nằm trong HttpOnly cookie
     });
 
     if (!response.ok) return null;
 
     const data = await response.json();
     if (data.token) {
-      localStorage.setItem('token', data.token);
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
+      setAccessToken(data.token);
       return data.token;
     }
     return null;
   } catch (error) {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
+const clearSession = () => {
+  clearAccessToken();
+};
+
 const handleUnauthorized = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('refreshToken');
+  clearSession();
   if (window.location.pathname !== '/') {
     window.location.href = '/';
   } else {
@@ -88,16 +102,16 @@ const getLoadingMessage = (method, url) => {
 };
 
 /**
- * fetchClient(url, options) - tự động gắn JWT, handle 401 + refresh queue, và bật loading overlay
- * 
- * options.skipLoading = true để bỏ qua loading overlay (dùng cho background polling)
+ * fetchClient(url, options) - tự động gắn access token, handle 401 + refresh queue, loading overlay.
+ *
+ * options.skipLoading = true để bỏ qua loading overlay
  * options.skipRefresh = true để bỏ qua auto-refresh (dùng cho chính request refresh token)
  */
 const fetchClient = async (url, options = {}) => {
   const method = (options.method || 'GET').toUpperCase();
   const defaultSkip = method === 'GET';
   const skipLoading = options.skipLoading !== undefined ? options.skipLoading === true : defaultSkip;
-  
+
   if (!skipLoading) {
     loadingManager.show(getLoadingMessage(method, url));
   }
@@ -105,6 +119,7 @@ const fetchClient = async (url, options = {}) => {
   const { skipLoading: _, ...cleanOptions } = options;
   const enhancedOptions = {
     ...cleanOptions,
+    credentials: 'include', // browser tự gửi HttpOnly refresh token cookie
     headers: {
       ...(options.headers || {}),
       ...getAuthHeaders()
@@ -118,14 +133,8 @@ const fetchClient = async (url, options = {}) => {
     if (response.status === 401 && !options.skipRefresh) {
       // Bỏ qua nếu là request login
       if (url.includes('/login')) {
-        handleUnauthorized();
+        clearSession();
         throw new Error('Sai tài khoản hoặc mật khẩu!');
-      }
-
-      // Nếu chưa có refresh token thì logout luôn
-      if (!localStorage.getItem('refreshToken')) {
-        handleUnauthorized();
-        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
       }
 
       // Queue cơ chế: nếu đang refresh thì chờ, nếu chưa thì refresh
@@ -134,13 +143,13 @@ const fetchClient = async (url, options = {}) => {
         const newToken = await refreshTokenRequest();
 
         if (newToken) {
-          // Refresh thành công
           isRefreshing = false;
           onRefreshed(newToken);
           // Retry request ban đầu với token mới
           const retryOptions = {
             ...cleanOptions,
             skipRefresh: true, // tránh loop refresh
+            credentials: 'include',
             headers: {
               ...(options.headers || {}),
               'Authorization': `Bearer ${newToken}`
@@ -150,7 +159,6 @@ const fetchClient = async (url, options = {}) => {
           if (!skipLoading) loadingManager.hide();
           return retryResponse;
         } else {
-          // Refresh thất bại
           isRefreshing = false;
           refreshSubscribers = [];
           handleUnauthorized();
@@ -164,6 +172,7 @@ const fetchClient = async (url, options = {}) => {
               const retryOptions = {
                 ...cleanOptions,
                 skipRefresh: true,
+                credentials: 'include',
                 headers: {
                   ...(options.headers || {}),
                   'Authorization': `Bearer ${newToken}`
@@ -188,14 +197,14 @@ const fetchClient = async (url, options = {}) => {
         const bodyText = await cloned.text();
         let bodyJson = null;
         try { bodyJson = JSON.parse(bodyText); } catch (e) {}
-        
+
         if (bodyJson && bodyJson.message && bodyJson.message.includes('quyền')) {
           throw new Error(bodyJson.message);
         }
       } catch (e) {
         if (e.message && e.message.includes('quyền')) throw e;
       }
-      
+
       handleUnauthorized();
       throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     }

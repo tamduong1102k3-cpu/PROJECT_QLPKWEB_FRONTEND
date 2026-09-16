@@ -3,7 +3,7 @@ import { saveAndUpdateApi as saveAndUpdatePhieuKhamApi } from '../../../api/chiS
 import { useNotification } from '../../../components/NotificationContext';
 
 
-const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
+const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham, user }) => {
   const { showSuccess, showError } = useNotification();
   const [selectedTooth, setSelectedTooth] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,13 +35,14 @@ const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham }) => {
     }
 
     setLoading(true);
-    const user = JSON.parse(localStorage.getItem('user'));
+    const u = user || {};
     
     // Đảm bảo Payload đầy đủ thông tin
     const payload = {
       ...examData,
       maPhieuKham: maPhieuKham,
-      maNhanVienNhap: user?.maNhanVien || user?.id
+      maChuyenKhoa: u.maChuyenKhoa,
+      maNhanVienNhap: u.maNhanVien || u.id
     };
 
     try {

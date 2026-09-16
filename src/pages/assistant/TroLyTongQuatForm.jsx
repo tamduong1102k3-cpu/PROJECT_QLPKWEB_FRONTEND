@@ -11,6 +11,10 @@ const TroLyTongQuatForm = ({ selectedPatient, user, onSaved, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
 
+  // Khi xem lại ca khám đã hoàn thành (HOAN_THANH) hoặc đang chờ bác sĩ (CHO_BAC_SI),
+  // chỉ LƯU THÔNG TIN, KHÔNG thay đổi trạng thái.
+  const isReviewing = selectedPatient?.trangThai === 'HOAN_THANH' || selectedPatient?.trangThai === 'CHO_BAC_SI';
+
   const handleFinishAssistant = async () => {
     if (!selectedPatient?.maPhieuKham) return;
     if (vitalsRef.current) {
@@ -19,19 +23,25 @@ const TroLyTongQuatForm = ({ selectedPatient, user, onSaved, onBack }) => {
     }
     setConfirmState({
       isOpen: true,
-      title: 'Xác nhận hoàn tất',
-      message: 'Xác nhận hoàn tất quy trình trợ lý và chuyển hồ sơ cho Bác sĩ?',
+      title: isReviewing ? 'Xác nhận lưu thông tin' : 'Xác nhận hoàn tất',
+      message: isReviewing
+        ? 'Bạn đang xem lại ca khám đã hoàn thành. Chỉ lưu thông tin, không thay đổi trạng thái. Xác nhận?'
+        : 'Xác nhận hoàn tất quy trình trợ lý và chuyển hồ sơ cho Bác sĩ?',
       type: 'primary',
-      icon: 'check_circle',
+      icon: isReviewing ? 'save' : 'check_circle',
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, isOpen: false }));
         setLoading(true);
         try {
-          await updateToWaitingForDoctorApi(selectedPatient.maPhieuKham);
-          showSuccess("✅ Đã hoàn tất quy trình trợ lý.");
+          if (!isReviewing) {
+            await updateToWaitingForDoctorApi(selectedPatient.maPhieuKham);
+            showSuccess("✅ Đã hoàn tất quy trình trợ lý.");
+          } else {
+            showSuccess("✅ Đã lưu thông tin. Trạng thái ca khám được giữ nguyên.");
+          }
           onSaved();
         } catch (e) {
-          showError("❌ Lỗi hoàn tất quy trình: " + e.message);
+          showError("❌ Lỗi: " + e.message);
         } finally { setLoading(false); }
       }
     });
@@ -55,7 +65,7 @@ const TroLyTongQuatForm = ({ selectedPatient, user, onSaved, onBack }) => {
 
       {/* Nội dung */}
       <div className="flex-1 overflow-y-auto min-h-0 px-6 pt-4 pb-4">
-        <VitalSignsFormComponent ref={vitalsRef} phieuKhamId={selectedPatient.maPhieuKham} assistantId={user?.maNhanVien || user?.id} initialGhiChu={selectedPatient?.ghiChu} showSaveOnly />
+        <VitalSignsFormComponent ref={vitalsRef} phieuKhamId={selectedPatient.maPhieuKham} assistantId={user?.maNhanVien || user?.id} maChuyenKhoa={user?.maChuyenKhoa} initialGhiChu={selectedPatient?.ghiChu} showSaveOnly />
       </div>
 
       {/* Bottom bar */}
@@ -63,8 +73,8 @@ const TroLyTongQuatForm = ({ selectedPatient, user, onSaved, onBack }) => {
         <button disabled={loading} onClick={handleFinishAssistant}
           className="px-8 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 flex items-center gap-2 shadow-lg transition-all text-sm"
         >
-          <span className="material-symbols-outlined text-xl">check_circle</span>
-          XÁC NHẬN HOÀN TẤT
+          <span className="material-symbols-outlined text-xl">{isReviewing ? 'save' : 'check_circle'}</span>
+          {isReviewing ? 'LƯU THÔNG TIN' : 'XÁC NHẬN HOÀN TẤT'}
         </button>
       </div>
 

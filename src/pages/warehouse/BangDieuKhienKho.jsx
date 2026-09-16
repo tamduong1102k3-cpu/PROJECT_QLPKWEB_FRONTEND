@@ -12,16 +12,17 @@ import NotificationBell from '../../components/NotificationBell';
 
 const BangDieuKhienKho = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('inventory');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1280);
+  const [sidebarWidth, setSidebarWidth] = useState(256); // w-64 is 256px
+  const isResizing = useRef(false);
   const [inventory, setInventory] = useState([]);
   const [phieuNhapList, setPhieuNhapList] = useState([]);
   const [allThuoc, setAllThuoc] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [notifications, setNotifications] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [alertStats, setAlertStats] = useState({ binhThuong: 0, sapHet: 0, canhBao: 0, hetHang: 0 });
   const [nvMap, setNvMap] = useState({});
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess, showError, bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
   const lastHandledRef = useRef({ maPhieu: null, ts: 0 });
 
   // ── Modal xem chi tiết ──
@@ -115,20 +116,6 @@ const BangDieuKhienKho = ({ onLogout, user }) => {
     return new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const handleMarkAsRead = (id) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    );
-  };
-
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
-  const handleClearAll = () => {
-    setNotifications([]);
-  };
-
   // WebSocket subscription for realtime inventory updates and alerts
   useWebSocket({
     topics: ['/topic/phieu-nhap', '/topic/kho-thuoc', '/topic/kho-alert'],
@@ -143,16 +130,14 @@ const BangDieuKhienKho = ({ onLogout, user }) => {
         }
         lastHandledRef.current = { maPhieu: data.maPhieuNhapThuoc, ts: now };
 
-        const newNotif = {
+        addBellNotification({
           id: Date.now() + Math.random(),
           title: 'Nhập kho thành công',
           message: `Phiếu nhập #${data.maPhieuNhapThuoc} đã được tạo và cập nhật kho.`,
           type: 'success',
           createdAt: new Date(),
           read: false
-        };
-
-        setNotifications(prev => [newNotif, ...prev]);
+        });
         fetchData();
         fetchAlertData();
         setRefreshTrigger(prev => prev + 1);
@@ -167,15 +152,14 @@ const BangDieuKhienKho = ({ onLogout, user }) => {
           'CẢNH_BÁO': { label: 'Cảnh báo' },
           'HẾT_HÀNG': { label: 'Hết hàng' },
         };
-        const newNotif = {
+        addBellNotification({
           id: Date.now() + Math.random(),
           title: `⚠️ Cảnh báo kho: ${badgeMap[data.trangThai]?.label || data.trangThai}`,
           message: `${data.tenThuoc || `#${data.maThuoc}`} - Tồn kho: ${data.soLuongTon}`,
           type: data.trangThai === 'HẾT_HÀNG' ? 'error' : data.trangThai === 'CẢNH_BÁO' ? 'warning' : 'info',
           createdAt: new Date(),
           read: false
-        };
-        setNotifications(prev => [newNotif, ...prev]);
+        });
         fetchData();
         fetchAlertData();
       }
@@ -199,10 +183,34 @@ const BangDieuKhienKho = ({ onLogout, user }) => {
     <div className="flex h-screen bg-[#f3f4f6] font-body-md text-on-background overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20`}
+        style={{ width: isSidebarOpen ? sidebarWidth : 80 }}
+        className="relative bg-white border-r border-gray-200 transition-all duration-300 flex flex-col shadow-sm z-20"
       >
+        {/* Handle kéo dãn sidebar */}
+        {isSidebarOpen && (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              isResizing.current = true;
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+              const onMouseMove = (ev) => {
+                if (!isResizing.current) return;
+                const newWidth = Math.min(Math.max(startWidth + (ev.clientX - startX), 200), 480);
+                setSidebarWidth(newWidth);
+              };
+              const onMouseUp = () => {
+                isResizing.current = false;
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+              };
+              window.addEventListener('mousemove', onMouseMove);
+              window.addEventListener('mouseup', onMouseUp);
+            }}
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-cyan-400/50 active:bg-cyan-500/60 transition-colors z-30"
+            title="Kéo để thay đổi kích thước sidebar"
+          />
+        )}
         <div className="h-16 flex items-center justify-center border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center text-white shadow-sm shadow-cyan-600/30">
@@ -283,10 +291,10 @@ const BangDieuKhienKho = ({ onLogout, user }) => {
           </div>
           <div className="flex items-center gap-4">
             <NotificationBell
-              notifications={notifications}
-              onMarkAsRead={handleMarkAsRead}
-              onMarkAllAsRead={handleMarkAllAsRead}
-              onClearAll={handleClearAll}
+              notifications={bellNotifications}
+              onMarkAsRead={markBellAsRead}
+              onMarkAllAsRead={markAllBellAsRead}
+              onClearAll={clearAllBell}
             />
             <UserMenu
               user={user}

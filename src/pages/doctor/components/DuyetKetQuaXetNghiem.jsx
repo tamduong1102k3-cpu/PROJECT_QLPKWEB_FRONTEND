@@ -6,21 +6,23 @@ import {
 } from "../../../api/phieuChiDinhApi";
 import { getTiepNhanClsByPhieuKhamApi } from "../../../api/tiepNhanClsApi";
 import { useNotification } from '../../../components/NotificationContext';
-import ConfirmDialog from '../../../components/ConfirmDialog';
 import PrintButton from '../../../components/PrintButton';
+import formatGender from '../../../utils/formatGender';
 
 const DuyetKetQuaXetNghiem = ({
   patient,
   user,
-  onBack
+  onBack,
+  readOnly = false
 }) => {
   const { showSuccess, showError, showWarning } = useNotification();
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState([]);
   const [tiepNhanCls, setTiepNhanCls] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'primary', icon: '' });
-  const [promptState, setPromptState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {}, value: '' });
+  // Modal hệ thống nhập lý do từ chối
+  const [rejectState, setRejectState] = useState({ isOpen: false, result: null, index: null });
+  const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -37,13 +39,11 @@ const DuyetKetQuaXetNghiem = ({
         setResults(data.map(item => ({
           ...item,
           ketLuan: item.ketLuan || '',
-          nhomMau: item.nhomMau || '',
-          dongMauCoBan: item.dongMauCoBan || '',
-          ghiChuThem: item.ghiChuThem || '',
-          chiSoList: item.chiSoList || []
+          ketQua: item.ketQua || '',
+          ghiChuThem: item.ghiChuThem || ''
         })));
       }
-      // Lấy bản ghi đầu tiên nếu có
+      
       if (tiepNhanData && tiepNhanData.length > 0) {
         setTiepNhanCls(tiepNhanData[0]);
       }
@@ -52,12 +52,6 @@ const DuyetKetQuaXetNghiem = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleValueChange = (resultIndex, chiSoIndex, field, value) => {
-    const updated = [...results];
-    updated[resultIndex].chiSoList[chiSoIndex][field] = value;
-    setResults(updated);
   };
 
   const handleMetaChange = (resultIndex, field, value) => {
@@ -76,17 +70,13 @@ const DuyetKetQuaXetNghiem = ({
       const payload = {
         maBsKetLuan: user?.maNhanVien || null,
         ketLuan: result.ketLuan,
-        nhomMau: result.nhomMau,
-        dongMauCoBan: result.dongMauCoBan,
+        ketQua: result.ketQua,
         ghiChuThem: result.ghiChuThem,
-        chiSoList: result.chiSoList.map(cs => ({
-          id: cs.id,
-          giaTri: cs.giaTri,
-          batThuong: cs.batThuong
-        }))
+       
+        updateOnly: readOnly
       };
       await approveTestResultApi(result.id, payload);
-      showSuccess("Đã ký duyệt kết quả xét nghiệm thành công!");
+      showSuccess(readOnly ? "Đã cập nhật kết quả thành công!" : "Đã ký duyệt kết quả xét nghiệm thành công!");
       fetchData();
     } catch (e) {
       console.error(e);
@@ -96,18 +86,28 @@ const DuyetKetQuaXetNghiem = ({
     }
   };
 
-  const handleReject = async (result, index) => {
-    const reason = prompt("Vui lòng nhập lý do không duyệt / yêu cầu làm lại xét nghiệm:");
-    if (reason === null) return;
-    if (!reason.trim()) {
+  // Mở modal hệ thống nhập lý do từ chối
+  const openRejectModal = (result, index) => {
+    setRejectReason('');
+    setRejectState({ isOpen: true, result, index });
+  };
+
+  const closeRejectModal = () => {
+    setRejectState({ isOpen: false, result: null, index: null });
+    setRejectReason('');
+  };
+
+  const confirmReject = async () => {
+    const reason = rejectReason.trim();
+    if (!reason) {
       showWarning("Lý do không duyệt không được để trống!");
       return;
     }
+    const { result } = rejectState;
     setSubmitting(true);
     try {
-      await rejectTestResultApi(result.id, {
-        reason: reason.trim()
-      });
+      await rejectTestResultApi(result.id, { reason });
+      closeRejectModal();
       showSuccess("Đã từ chối kết quả xét nghiệm và yêu cầu kỹ thuật viên làm lại!");
       onBack();
     } catch (e) {
@@ -126,6 +126,14 @@ const DuyetKetQuaXetNghiem = ({
   }
 
   return <div className="space-y-6 animate-scale-up">
+      {readOnly && (
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-xl px-5 py-3 flex items-center gap-3 text-amber-800">
+          <span className="material-symbols-outlined text-amber-600">visibility</span>
+          <span className="font-bold text-sm">
+            ĐANG XEM LẠI KẾT QUẢ ĐÃ DUYỆT — Mọi thay đổi chỉ cập nhật thông tin, KHÔNG thay đổi trạng thái.
+          </span>
+        </div>
+      )}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between bg-gradient-to-r from-white to-indigo-50/30">
         <div className="flex items-center gap-6">
           <div className="w-16 h-16 bg-rose-600 text-white rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg shadow-rose-200">
@@ -136,7 +144,7 @@ const DuyetKetQuaXetNghiem = ({
             <div className="flex items-center gap-4 mt-1 text-sm font-medium text-gray-500">
               <span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded-md">#{patient.maBenhNhan}</span>
               <span>•</span>
-              <span>{patient.gioiTinh ? 'Nam' : 'Nữ'}</span>
+              <span>{formatGender(patient.gioiTinh)}</span>
               <span>•</span>
               <span>{new Date(patient.ngaySinh).getFullYear()}</span>
             </div>
@@ -200,60 +208,41 @@ const DuyetKetQuaXetNghiem = ({
                 </div>
 
                 <div className="p-6 space-y-6">
-                  {result.chiSoList.length > 0 && <div className="border border-gray-100 rounded-xl overflow-hidden">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase">
-                            <th className="px-6 py-3">Tên Chỉ Số</th>
-                            <th className="px-6 py-3 w-40">Giá Trị</th>
-                            <th className="px-6 py-3 w-28 text-center">Bất ThưĐng</th>
-                            <th className="px-6 py-3">Đơn Vị</th>
-                            <th className="px-6 py-3">Khoảng Tham Chiếu</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 text-sm">
-                          {result.chiSoList.map((cs, csIdx) => <tr key={cs.id} className="hover:bg-gray-50/50">
-                              <td className="px-6 py-3.5 font-bold text-gray-700">{cs.tenChiSo}</td>
-                              <td className="px-6 py-3.5">
-                                <input type="text" value={cs.giaTri || ''} disabled={isApproved} onChange={e => handleValueChange(rIdx, csIdx, 'giaTri', e.target.value)} className={`w-full px-3 py-1.5 border rounded-lg text-sm transition-all focus:ring-2 focus:ring-indigo-100 ${cs.batThuong ? 'border-rose-300 bg-rose-50/20 text-rose-700 font-bold' : 'border-gray-200'}`} />
-                              </td>
-                              <td className="px-6 py-3.5 text-center">
-                                <input type="checkbox" checked={!!cs.batThuong} disabled={isApproved} onChange={e => handleValueChange(rIdx, csIdx, 'batThuong', e.target.checked)} className="w-4 h-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500 cursor-pointer" />
-                              </td>
-                              <td className="px-6 py-3.5 text-gray-500 font-medium">{cs.donVi || '---'}</td>
-                              <td className="px-6 py-3.5 text-gray-500 font-medium">{cs.chiSoThamChieu || '---'}</td>
-                            </tr>)}
-                        </tbody>
-                      </table>
-                    </div>}
+                  {/* Nội dung kết quả KTV nhập (gộp chỉ số + biên bản) */}
+                  <div className="border border-gray-100 rounded-xl overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-gray-400 text-sm">description</span>
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Kết quả xét nghiệm</span>
+                    </div>
+                    <div className="p-4">
+                      <pre className={`whitespace-pre-wrap text-sm font-medium leading-relaxed ${isApproved && !readOnly ? 'text-gray-700' : ''}`}>
+                        {result.ketQua || "Chưa có nội dung kết quả từ kỹ thuật viên."}
+                      </pre>
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nhóm Máu</label>
-                        <input type="text" value={result.nhomMau} disabled={isApproved} placeholder="VD: O, A, B, AB, Rh+..." onChange={e => handleMetaChange(rIdx, 'nhomMau', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-medium" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Đông Máu Cơ Bản</label>
-                        <input type="text" value={result.dongMauCoBan} disabled={isApproved} placeholder="VD: Thời gian đông máu bình thường" onChange={e => handleMetaChange(rIdx, 'dongMauCoBan', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-medium" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Ghi Chú Thêm</label>
-                        <textarea rows="2" value={result.ghiChuThem} disabled={isApproved} placeholder="Ghi chú thêm từ kỹ thuật viên hoặc bác sĩ..." onChange={e => handleMetaChange(rIdx, 'ghiChuThem', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-medium" />
-                      </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Ghi Chú Thêm</label>
+                      <textarea rows="3" value={result.ghiChuThem} disabled={isApproved && !readOnly} placeholder="Ghi chú thêm từ kỹ thuật viên hoặc bác sĩ..." onChange={e => handleMetaChange(rIdx, 'ghiChuThem', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-medium" />
                     </div>
 
                     <div className="flex flex-col justify-between">
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Kết Luận Của Bác Sĩ Xét Nghiệm <span className="text-rose-500">*</span></label>
-                        <textarea rows="6" value={result.ketLuan} disabled={isApproved} placeholder="VD: Các chỉ số huyết học trong giới hạn bình thường. Không có biểu hiện bệnh lý..." onChange={e => handleMetaChange(rIdx, 'ketLuan', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-bold text-gray-800" />
+                        <textarea rows="6" value={result.ketLuan} disabled={isApproved && !readOnly} placeholder="VD: Các chỉ số trong giới hạn bình thường. Không có biểu hiện bệnh lý..." onChange={e => handleMetaChange(rIdx, 'ketLuan', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-bold text-gray-800" />
                       </div>
 
                       <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 bg-gray-50/50 p-4 rounded-xl">
-                        <span className="text-xs text-gray-400 font-bold">KTV Thực hiện: ID #{result.nguoiThucHien}</span>
-                        {!isApproved ? (
+                        <span className="text-xs text-gray-400 font-bold">KTV Thực hiện: {result.tenNguoiThucHien || `ID #${result.nguoiThucHien || '---'}`}</span>
+                        {readOnly ? (
+                          <button type="button" disabled={submitting} onClick={() => handleApprove(result, rIdx)} className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-rose-100 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sm">save</span>
+                            LƯU CẬP NHẬT (GIỮ NGUYÊN TRẠNG THÁI)
+                          </button>
+                        ) : !isApproved ? (
                           <div className="flex gap-2">
-                            <button type="button" disabled={submitting} onClick={() => handleReject(result, rIdx)} className="px-5 py-2.5 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 text-xs font-bold rounded-xl transition-all border border-gray-200 flex items-center gap-1.5">
+                            <button type="button" disabled={submitting} onClick={() => openRejectModal(result, rIdx)} className="px-5 py-2.5 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 text-xs font-bold rounded-xl transition-all border border-gray-200 flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-sm">cancel</span>
                               KHÔNG DUYỆT
                             </button>
@@ -291,7 +280,7 @@ const DuyetKetQuaXetNghiem = ({
                       <div className="grid grid-cols-2 gap-4 mb-6 border bg-gray-50/50 p-4 rounded-xl text-xs">
                         <div>
                           <p><strong>Họ tên bệnh nhân:</strong> <span className="font-bold text-sm">{patient.hoTen}</span></p>
-                          <p><strong>Năm sinh:</strong> {new Date(patient.ngaySinh).getFullYear()} • <strong>Giới tính:</strong> {patient.gioiTinh ? 'Nam' : 'Nữ'}</p>
+                          <p><strong>Năm sinh:</strong> {new Date(patient.ngaySinh).getFullYear()} • <strong>Giới tính:</strong> {formatGender(patient.gioiTinh)}</p>
                           <p><strong>Mã bệnh nhân:</strong> #{patient.maBenhNhan}</p>
                         </div>
                         <div>
@@ -301,47 +290,9 @@ const DuyetKetQuaXetNghiem = ({
                         </div>
                       </div>
 
-                      {result.chiSoList.length > 0 && (
-                        <div className="mb-6">
-                          <h3 className="font-bold border-b border-gray-300 pb-1 mb-3 uppercase text-[11px] tracking-wider">Chỉ số xét nghiệm chi tiết</h3>
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="border-b border-gray-300 font-bold">
-                                <th className="py-2">Tên chỉ số</th>
-                                <th className="py-2 text-center w-28">Kết quả</th>
-                                <th className="py-2 text-center w-20">Bất thường</th>
-                                <th className="py-2">Đơn vị</th>
-                                <th className="py-2">Khoảng tham chiếu</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {result.chiSoList.map((cs, idx) => (
-                                <tr key={cs.id || idx} className="border-b border-gray-100">
-                                  <td className="py-2.5 font-semibold text-gray-700">{cs.tenChiSo}</td>
-                                  <td className={`py-2.5 text-center font-bold ${cs.batThuong ? 'text-red-600' : 'text-gray-800'}`}>{cs.giaTri || '---'}</td>
-                                  <td className="py-2.5 text-center">{cs.batThuong ? <span className="font-bold text-red-600">H</span> : 'Bình thường'}</td>
-                                  <td className="py-2.5 text-gray-600">{cs.donVi || '---'}</td>
-                                  <td className="py-2.5 text-gray-600">{cs.chiSoThamChieu || '---'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-6 mb-6">
-                        {result.nhomMau && (
-                          <div className="p-3 border rounded-lg bg-gray-50/20">
-                            <span className="text-[10px] font-bold text-gray-400 block uppercase">Nhóm máu</span>
-                            <span className="font-bold text-sm text-gray-800">{result.nhomMau}</span>
-                          </div>
-                        )}
-                        {result.dongMauCoBan && (
-                          <div className="p-3 border rounded-lg bg-gray-50/20">
-                            <span className="text-[10px] font-bold text-gray-400 block uppercase">Đông máu cơ bản</span>
-                            <span className="font-bold text-sm text-gray-800">{result.dongMauCoBan}</span>
-                          </div>
-                        )}
+                      <div className="mb-6 p-3 border rounded-xl bg-gray-50/30 text-xs">
+                        <strong className="text-[10px] text-gray-400 uppercase block mb-1">Kết quả xét nghiệm</strong>
+                        <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{result.ketQua}</p>
                       </div>
 
                       {result.ghiChuThem && (
@@ -359,7 +310,7 @@ const DuyetKetQuaXetNghiem = ({
                       <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-gray-100">
                         <div className="text-center min-w-[200px]">
                           <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-12">Kỹ thuật viên thực hiện</p>
-                          <span className="font-semibold text-xs text-gray-600">Mã nhân viên: #{result.nguoiThucHien}</span>
+                          <span className="font-semibold text-xs text-gray-600">{result.tenNguoiThucHien || `Mã NV: #${result.nguoiThucHien || '---'}`}</span>
                         </div>
                         <div className="text-center ml-auto min-w-[200px]">
                           <p className="text-xs italic mb-1">Ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
@@ -374,6 +325,56 @@ const DuyetKetQuaXetNghiem = ({
               </div>;
       })}
         </div>}
+
+      {/* Modal hệ thống nhập lý do không duyệt */}
+      {rejectState.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200/50 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            <div className="px-6 py-4 bg-red-50 border-b border-red-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                  <span className="material-symbols-outlined">cancel</span>
+                </span>
+                <div>
+                  <h3 className="font-black text-red-700 text-base">TỪ CHỐI KẾT QUẢ</h3>
+                  <p className="text-xs text-red-400 font-medium">Yêu cầu kỹ thuật viên làm lại xét nghiệm</p>
+                </div>
+              </div>
+              <button onClick={closeRejectModal} className="p-2 bg-white hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lý do không duyệt <span className="text-red-500">*</span></label>
+              <textarea
+                rows="4"
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                placeholder="Vui lòng nhập lý do không duyệt / yêu cầu làm lại xét nghiệm..."
+                autoFocus
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-red-300 outline-none text-sm font-medium text-slate-700 transition-all resize-none"
+              />
+              {rejectReason.trim() === '' && (
+                <p className="text-[11px] text-red-400 font-medium mt-1">Lý do không được để trống.</p>
+              )}
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button onClick={closeRejectModal} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 font-bold text-sm rounded-xl hover:bg-slate-100 transition-colors">
+                HỦY
+              </button>
+              <button
+                type="button"
+                disabled={submitting || !rejectReason.trim()}
+                onClick={confirmReject}
+                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-black rounded-xl shadow-md shadow-red-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">block</span>
+                XÁC NHẬN TỪ CHỐI
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>;
 };
 export default DuyetKetQuaXetNghiem;

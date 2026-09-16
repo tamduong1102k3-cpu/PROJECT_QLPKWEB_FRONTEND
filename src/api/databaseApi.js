@@ -1,6 +1,6 @@
-import fetchClient from './fetchClient';
+import fetchClient from "./fetchClient";
 
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/database';
+const API_URL = "https://qlpk-backend-spring-boot.onrender.com/api/database";
 
 const handleError = async (response) => {
   let errorMsg = `Lỗi: ${response.status}`;
@@ -14,7 +14,7 @@ const handleError = async (response) => {
         errorMsg = text;
       }
     }
-  } catch (e) {}
+  } catch { /* ignore */ }
   throw new Error(errorMsg);
 };
 
@@ -32,15 +32,18 @@ export const listBackupsApi = async () => {
 };
 
 export const createBackupApi = async () => {
-  const response = await fetchClient(`${API_URL}/backup`, { method: 'POST' });
+  const response = await fetchClient(`${API_URL}/backup`, { method: "POST" });
   if (!response.ok) await handleError(response);
   return response.json();
 };
 
 export const restoreBackupApi = async (filename) => {
-  const response = await fetchClient(`${API_URL}/restore/${encodeURIComponent(filename)}`, {
-    method: 'POST'
-  });
+  const response = await fetchClient(
+    `${API_URL}/restore/${encodeURIComponent(filename)}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) await handleError(response);
   return response.json();
 };

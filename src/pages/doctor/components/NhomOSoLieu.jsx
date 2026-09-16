@@ -121,7 +121,7 @@ const NhomOSoLieu = ({ user }) => {
 
   if (isLeTan) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 animate-fade-in">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 animate-fade-in">
         <TheThongKe title="Hẹn Hôm Nay" value={stats.appointmentsToday} icon="event" color="bg-blue-500" />
         <TheThongKe title="Đang Chờ Khám" value={stats.waitingToday} icon="hourglass_empty" color="bg-orange-500" />
         <TheThongKe title="Đã Hoàn Thành" value={stats.processedToday} icon="check_circle" color="bg-emerald-500" />
@@ -132,7 +132,7 @@ const NhomOSoLieu = ({ user }) => {
 
   if (isTroLy) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 animate-fade-in">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 animate-fade-in">
         <TheThongKe title="Chờ Trợ Lý" value={stats.waitingToday} icon="hourglass_top" color="bg-orange-500" />
         <TheThongKe title="Vắng Mặt" value={stats.absentToday} icon="person_off" color="bg-red-500" />
         <TheThongKe title="Đã Chuyển BS" value={stats.processedToday} icon="task_alt" color="bg-green-500" />
@@ -142,7 +142,7 @@ const NhomOSoLieu = ({ user }) => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 animate-fade-in">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 animate-fade-in">
       <TheThongKe 
         title="Đang Chờ Khám" 
         value={stats.waitingToday} 

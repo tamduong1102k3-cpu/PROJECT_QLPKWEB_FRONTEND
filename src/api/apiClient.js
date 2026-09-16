@@ -109,10 +109,14 @@ const dispatchToApi = async (path, method, body, url) => {
     else if (method === 'POST') return await khoThuocApi.createPhieuNhapApi(body);
   }
   else if (path.startsWith('/thuoc') || path.startsWith('/kho-thuoc/thuoc')) {
+    // ID nằm ở vị trí khác nhau tùy đường dẫn:
+    // - /thuoc/{id}           -> id ở index [2]
+    // - /kho-thuoc/thuoc/{id}  -> id ở index [3]
+    const thuocId = path.startsWith('/kho-thuoc/thuoc') ? path.split('/')[3] : path.split('/')[2];
     if (method === 'GET') return await khoThuocApi.getAllThuocApi();
     else if (method === 'POST') return await khoThuocApi.createThuocApi(body);
-    else if (method === 'PUT') return await khoThuocApi.updateThuocApi(path.split('/')[2] || path.split('/')[3], body);
-    else if (method === 'DELETE') return await khoThuocApi.deleteThuocApi(path.split('/')[2] || path.split('/')[3]);
+    else if (method === 'PUT') return await khoThuocApi.updateThuocApi(thuocId, body);
+    else if (method === 'DELETE') return await khoThuocApi.deleteThuocApi(thuocId);
   }
   else if (path.startsWith('/phieu-nhap')) {
     if (path.includes('/chi-tiet')) return await khoThuocApi.getChiTietPhieuNhapApi(path.split('/')[2]);

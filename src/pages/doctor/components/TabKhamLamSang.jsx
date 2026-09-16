@@ -63,7 +63,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
           if (data) {
             setExamData({
               lyDoKham: data.lyDoKham || selectedPatient.ghiChu || '',
-              tienSuBanThan: data.tienSuBanThan || '',
+              tienSuBanThan: data.tienSuBanThan || selectedPatient.tienSuBenh || '',
               benhSu: data.benhSu || '',
               chanDoanSoBo: data.chanDoanSoBo || '',
               loiDanBacSi: data.loiDanBacSi || '',
@@ -73,7 +73,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
           } else {
             setExamData({
               lyDoKham: selectedPatient.ghiChu || '',
-              tienSuBanThan: '',
+              tienSuBanThan: selectedPatient.tienSuBenh || '',
               benhSu: '',
               chanDoanSoBo: '',
               loiDanBacSi: '',

@@ -65,9 +65,9 @@ const TroLyNhiForm = ({ selectedPatient, user, onSaved, initialTab = 'vitals', o
       setExamData={setExamData}
       validateExamData={validateNhiExam}
       confirmMessage="Xác nhận hoàn tất quy trình trợ lý và chuyển hồ sơ cho Bác sĩ Nhi khoa?"
-      specialtyForm={
-        <TabKhamNhi maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} isAssistant={true} />
-      }
+        specialtyForm={
+          <TabKhamNhi maPhieuKham={selectedPatient.maPhieuKham} examData={examData} setExamData={setExamData} isAssistant={true} user={user} />
+        }
     />
   );
 };
