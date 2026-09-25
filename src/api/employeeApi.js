@@ -37,6 +37,25 @@ export const getAllNhanVienApi = async () => {
 };
 
 /**
+ * GET /search - tìm kiếm bằng LIKE và lọc theo chuyên khoa/vai trò
+ */
+export const searchNhanVienApi = async ({ keyword = '', chuyenKhoa = '', vaiTro = '' } = {}) => {
+  const params = new URLSearchParams();
+  if (keyword.trim()) params.set('keyword', keyword.trim());
+  if (chuyenKhoa) params.set('chuyenKhoa', chuyenKhoa);
+  if (vaiTro) params.set('vaiTro', vaiTro);
+
+  try {
+    const response = await fetchClient(`${API_URL}/search?${params.toString()}`, { method: 'GET' });
+    if (!response.ok) await handleError(response);
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error in searchNhanVienApi:", error);
+    throw error;
+  }
+};
+
+/**
  * POST /
  */
 export const addNhanVienApi = async data => {

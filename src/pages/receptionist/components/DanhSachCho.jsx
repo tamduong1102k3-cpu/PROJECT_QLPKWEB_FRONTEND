@@ -61,7 +61,10 @@ const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0, compact = false }) 
             })}</p>
           </div>
         </div>
-        <span className="text-[10px] font-bold px-2 py-1 bg-red-50 text-red-600 rounded-lg uppercase">{p.tenChuyenKhoa}</span>
+        <div className="flex items-center gap-2">
+          {p.tenPhong && <span className="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg uppercase">{p.tenPhong}</span>}
+          <span className="text-[10px] font-bold px-2 py-1 bg-red-50 text-red-600 rounded-lg uppercase">{p.tenChuyenKhoa}</span>
+        </div>
       </div>) : <div className="text-center text-gray-400 text-sm">Hiện không có bệnh nhân đã hủy</div>}
     </>;
   }
@@ -81,7 +84,10 @@ const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0, compact = false }) 
             })}</p>
           </div>
         </div>
-        <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded uppercase shrink-0">{p.tenChuyenKhoa}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          {p.tenPhong && <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded uppercase">{p.tenPhong}</span>}
+          <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded uppercase">{p.tenChuyenKhoa}</span>
+        </div>
       </div>
     ) : <div key={p.soThuTu} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:border-primary/30 hover:shadow-md transition-all">
       <div className="flex items-center gap-4">
@@ -97,6 +103,7 @@ const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0, compact = false }) 
           </div>
       </div>
       <div className="flex items-center gap-2">
+        {p.tenPhong && <span className="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg uppercase">{p.tenPhong}</span>}
         <span className="text-[10px] font-bold px-2 py-1 bg-blue-50 text-blue-600 rounded-lg uppercase">{p.tenChuyenKhoa}</span>
         <button onClick={() => cancelRegistration(p.id)} className="ml-2 text-red-600 hover:underline text-sm">Hủy</button>
       </div>

@@ -1134,7 +1134,7 @@ export default function LichLamViecTab({ user }) {
                             }}
                           >
                             <div style={{ fontWeight: 700 }}>
-                              📍 {it.data.phong || "—"}
+                              📍 {it.data.tenPhong || "—"}
                             </div>
                             <div>
                               {isDoi
@@ -1327,7 +1327,7 @@ export default function LichLamViecTab({ user }) {
                           marginBottom: "4px",
                         }}
                       >
-                        📍 {m.phong || "—"}
+                        📍 {m.tenPhong || "—"}
                         <br />
                         {(() => {
                           const ca = m.ca;
@@ -1422,7 +1422,7 @@ export default function LichLamViecTab({ user }) {
                           {ex.caThayThe?.tenCa
                             ? ` · ${ex.caThayThe.tenCa}`
                             : ""}
-                          {ex.phong ? ` · 📍 ${ex.phong}` : ""}
+                          {ex.tenPhong ? ` · 📍 ${ex.tenPhong}` : ""}
                           {ex.gioLam
                             ? ` · 🕗 ${fmtGio(ex.gioLam)}–${fmtGio(ex.gioKetThuc)}`
                             : ""}

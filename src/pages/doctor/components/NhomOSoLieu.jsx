@@ -104,7 +104,7 @@ const NhomOSoLieu = ({ user }) => {
 
       if (user?.maNhanVien) {
         const roomData = await getCurrentRoomApi(user.maNhanVien);
-        setCurrentRoom(roomData?.phong || 'Chưa có lịch trực');
+        setCurrentRoom(roomData?.tenPhong || 'Chưa có lịch trực');
       } else {
         setCurrentRoom(isLeTan ? 'Quầy tiếp đón' : 'Chưa xác định');
       }

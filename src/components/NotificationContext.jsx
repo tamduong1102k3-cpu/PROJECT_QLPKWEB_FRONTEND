@@ -40,6 +40,17 @@ export const NotificationProvider = ({ children }) => {
     addNotification(message, 'warning');
   }, [addNotification]);
 
+  // ── Toast xác nhận (có nút Đồng ý / Hủy) ──
+  const [confirmNotification, setConfirmNotification] = useState(null);
+
+  const showConfirm = useCallback((message, onConfirm, onCancel) => {
+    setConfirmNotification({ message, onConfirm, onCancel });
+  }, []);
+
+  const closeConfirm = useCallback(() => {
+    setConfirmNotification(null);
+  }, []);
+
   // ── Thông báo chuông (NotificationBell) ──
   const addBellNotification = useCallback((notif) => {
     setBellNotifications(prev => {
@@ -65,7 +76,7 @@ export const NotificationProvider = ({ children }) => {
 
   return (
     <NotificationContext.Provider value={{
-      showSuccess, showError, showInfo, showWarning,
+      showSuccess, showError, showInfo, showWarning, showConfirm,
       bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell,
     }}>
       {children}
@@ -81,6 +92,21 @@ export const NotificationProvider = ({ children }) => {
           />
         ))}
       </div>
+      {confirmNotification && (
+        <div className="confirm-overlay">
+          <div className="confirm-container">
+            <Notification
+              message={confirmNotification.message}
+              type="confirm"
+              show={true}
+              onConfirm={confirmNotification.onConfirm}
+              onCancel={confirmNotification.onCancel}
+              onClose={closeConfirm}
+              duration={0}
+            />
+          </div>
+        </div>
+      )}
     </NotificationContext.Provider>
   );
 };

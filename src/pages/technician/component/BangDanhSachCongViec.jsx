@@ -127,7 +127,7 @@ const BangDanhSachCongViec = ({
         <table className="w-full text-left border-collapse text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-[11px]">
-              <th className="py-5 px-6 w-16">STT</th>
+              <th className="py-5 px-6 min-w-[220px]">STT</th>
               <th className="py-5 px-6">Bệnh nhân</th>
               <th className="py-5 px-6 hidden lg:table-cell">SĐT</th>
               <th className="py-5 px-6 hidden xl:table-cell">CCCD</th>
@@ -147,8 +147,13 @@ const BangDanhSachCongViec = ({
               </tr>
             ) : displayData.map((item, idx) => (
               <tr key={item.id || idx} className={`hover:bg-slate-50/80 transition-colors duration-200 group ${item.trangThai === 'VANG_MAT' ? 'bg-red-50/60' : ''}`}>
-                <td className="py-4 px-6">
-                  <span className={`font-extrabold px-3 py-1.5 rounded-lg border ${item.trangThai === 'VANG_MAT' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200/50'}`}>{item.soThuTu || idx + 1}</span>
+                <td className="py-4 px-6 min-w-[220px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`font-extrabold px-3 py-1.5 rounded-lg border ${item.trangThai === 'VANG_MAT' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200/50'}`}>{item.soThuTu || idx + 1}</span>
+                    {item.tenPhong && (
+                      <span className="whitespace-nowrap px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{item.tenPhong}</span>
+                    )}
+                  </div>
                 </td>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-4">
