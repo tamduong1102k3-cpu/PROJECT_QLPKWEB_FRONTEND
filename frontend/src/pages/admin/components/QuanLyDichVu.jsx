@@ -1,13 +1,13 @@
 import { apiClient } from "../../../api/apiClient";
+import { API_BASE_URL } from '../../../api/config';
 import { createApi, updateApi, deleteApi } from '../../../api/dichVuApi';
 import React, { useState, useEffect } from 'react';
-const BASE_DV = 'https://qlpk-backend-spring-boot.onrender.com/api/dich-vu';
-const BASE_DM = 'https://qlpk-backend-spring-boot.onrender.com/api/danhmuc';
+const BASE_DV = `${API_BASE_URL}/dich-vu`;
+const BASE_DM = `${API_BASE_URL}/danhmuc`;
 const empty = {
   tenDichVu: '',
   donGia: '',
   loaiDichVu: '',
-  phong: '',
   maChuyenKhoa: '',
   version: undefined
 };
@@ -26,7 +26,6 @@ const fmtLoai = val => {
 };
 export default function QuanLyDichVu() {
   const [list, setList] = useState([]);
-  const [phongList, setPhongList] = useState([]);
   const [ckList, setCkList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -42,9 +41,8 @@ export default function QuanLyDichVu() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [dv, ph, ck] = await Promise.all([apiClient(BASE_DV).then(r => r.json()), apiClient(`${BASE_DM}/phong`).then(r => r.json()), apiClient(`${BASE_DM}/chuyen-khoa`).then(r => r.json())]);
+      const [dv, ck] = await Promise.all([apiClient(BASE_DV).then(r => r.json()), apiClient(`${BASE_DM}/chuyen-khoa`).then(r => r.json())]);
       setList(dv || []);
-      setPhongList(ph || []);
       setCkList(ck || []);
     } catch (e) {
       console.error(e);
@@ -54,7 +52,6 @@ export default function QuanLyDichVu() {
   };
 
   // Helpers
-  const tenPhong = id => phongList.find(p => p.maPhong === id)?.tenPhong || '—';
   const tenCK = id => ckList.find(c => c.maChuyenKhoa === id)?.tenChuyenKhoa || '—';
 
   // Unique loai for filter
@@ -74,7 +71,6 @@ export default function QuanLyDichVu() {
       tenDichVu: d.tenDichVu || '',
       donGia: d.donGia ?? '',
       loaiDichVu: d.loaiDichVu || '',
-      phong: d.phong ?? '',
       maChuyenKhoa: d.maChuyenKhoa ?? '',
       version: d.version ?? undefined
     });
@@ -95,7 +91,6 @@ export default function QuanLyDichVu() {
       tenDichVu: form.tenDichVu.trim(),
       donGia: Number(form.donGia),
       loaiDichVu: form.loaiDichVu || null,
-      phong: form.phong !== '' ? Number(form.phong) : null,
       maChuyenKhoa: form.maChuyenKhoa !== '' ? Number(form.maChuyenKhoa) : null,
       version: form.version
     };
@@ -292,7 +287,7 @@ export default function QuanLyDichVu() {
               <tr style={{
             background: '#faf5ff'
           }}>
-                {['#', 'Tên Dịch Vụ', 'Loại', 'Đơn Giá', 'Phòng', 'Chuyên Khoa', 'Thao Tác'].map(h => <th key={h} style={{
+                {['#', 'Tên Dịch Vụ', 'Loại', 'Đơn Giá', 'Chuyên Khoa', 'Thao Tác'].map(h => <th key={h} style={{
               padding: '12px 14px',
               textAlign: h === 'Thao Tác' || h === 'Đơn Giá' ? 'center' : 'left',
               color: '#6b7280',
@@ -303,7 +298,7 @@ export default function QuanLyDichVu() {
               </tr>
             </thead>
             <tbody>
-              {displayed.length === 0 ? <tr><td colSpan={7} style={{
+              {displayed.length === 0 ? <tr><td colSpan={6} style={{
               padding: '50px',
               textAlign: 'center',
               color: '#9ca3af'
@@ -346,13 +341,6 @@ export default function QuanLyDichVu() {
               color: '#059669'
             }}>
                     {fmtGia(d.donGia)}
-                  </td>
-                  <td style={{
-              padding: '10px 14px',
-              color: '#374151',
-              fontSize: '12px'
-            }}>
-                    {d.phong ? tenPhong(d.phong) : '—'}
                   </td>
                   <td style={{
               padding: '10px 14px',
@@ -531,59 +519,29 @@ export default function QuanLyDichVu() {
                 </label>
               </div>
 
-              <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '12px'
+              <label style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '5px',
+            fontSize: '13px'
           }}>
-                <label style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '5px',
+                <span style={{
+              fontWeight: 600,
+              color: '#374151'
+            }}>Chuyên Khoa</span>
+                <select value={form.maChuyenKhoa} onChange={e => setForm({
+              ...form,
+              maChuyenKhoa: e.target.value
+            })} style={{
+              padding: '10px 12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
               fontSize: '13px'
             }}>
-                  <span style={{
-                fontWeight: 600,
-                color: '#374151'
-              }}>Phòng</span>
-                  <select value={form.phong} onChange={e => setForm({
-                ...form,
-                phong: e.target.value
-              })} style={{
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '13px'
-              }}>
-                    <option value="">-- Không có --</option>
-                    {phongList.map(p => <option key={p.maPhong} value={p.maPhong}>{p.tenPhong}</option>)}
-                  </select>
-                </label>
-
-                <label style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '5px',
-              fontSize: '13px'
-            }}>
-                  <span style={{
-                fontWeight: 600,
-                color: '#374151'
-              }}>Chuyên Khoa</span>
-                  <select value={form.maChuyenKhoa} onChange={e => setForm({
-                ...form,
-                maChuyenKhoa: e.target.value
-              })} style={{
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '13px'
-              }}>
-                    <option value="">-- Không có --</option>
-                    {ckList.map(c => <option key={c.maChuyenKhoa} value={c.maChuyenKhoa}>{c.tenChuyenKhoa}</option>)}
-                  </select>
-                </label>
-              </div>
+                  <option value="">-- Không có --</option>
+                  {ckList.map(c => <option key={c.maChuyenKhoa} value={c.maChuyenKhoa}>{c.tenChuyenKhoa}</option>)}
+                </select>
+              </label>
             </div>
 
             <div style={{

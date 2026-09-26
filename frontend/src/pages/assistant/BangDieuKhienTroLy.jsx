@@ -1,4 +1,5 @@
 import { getTodayApi as _getTodayDangKy, updateStatusApi as _updateDangKyStatus } from '../../api/dangKyKhamBenhApi';
+import { API_BASE_URL } from '../../api/config';
 import { getCurrentRoomApi as _getCurrentRoomApi } from '../../api/shiftApi';
 import { updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
 // ĐẢM BẢO IMPORT apiClient
@@ -22,7 +23,7 @@ import LichLamViecTab from '../../components/LichLamViecTab';
 import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
 
 // KHAI BÁO API_BASE
-const API_BASE = 'https://qlpk-backend-spring-boot.onrender.com/api';
+const API_BASE = `${API_BASE_URL}`;
 
 const BangDieuKhienTroLy = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -71,7 +72,7 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
       }
       if (user?.maNhanVien) {
         const roomData = await _getCurrentRoomApi(user.maNhanVien);
-        setCurrentRoom(roomData?.phong || "Chưa có lịch trực");
+        setCurrentRoom(roomData?.tenPhong || "Chưa có lịch trực");
       }
     } catch (error) { console.error(error); } finally { if (shouldShowLoading) setLoadingQueue(false); }
   }, [user]);
@@ -359,7 +360,7 @@ const PatientQueue = ({ list, loading, onSelectPatient, selectedId, isAbsentQueu
         <button onClick={() => onSelectPatient(p)} className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left ${selectedId === p.maBenhNhan ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white border-gray-100 hover:border-indigo-300 hover:shadow-md'}`}>
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${selectedId === p.maBenhNhan ? 'bg-white/20' : (isAbsentQueue ? 'bg-red-50 text-red-600' : 'bg-indigo-50 text-indigo-600')}`}>{p.soThuTu}</div>
-            <div className="min-w-0"><p className="font-bold text-sm truncate">{p.hoTen}</p><p className={`text-[10px] truncate ${selectedId === p.maBenhNhan ? 'text-indigo-100' : 'text-gray-500'}`}>#{p.maBenhNhan} • {p.tenChuyenKhoa}</p></div>
+            <div className="min-w-0"><p className="font-bold text-sm truncate">{p.hoTen}</p><p className={`text-[10px] truncate ${selectedId === p.maBenhNhan ? 'text-indigo-100' : 'text-gray-500'}`}>#{p.maBenhNhan} • {p.tenChuyenKhoa}{p.tenPhong ? ` • ${p.tenPhong}` : ''}</p></div>
           </div>
           {!isAbsentQueue && <span className="material-symbols-outlined text-lg opacity-50">chevron_right</span>}
         </button>

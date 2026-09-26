@@ -1,9 +1,11 @@
 import { apiClient } from "../../api/apiClient";
+import { API_BASE_URL } from '../../api/config';
 import React, { useState, useEffect, useRef } from 'react';
 import UserMenu from '../../components/UserMenu';
 import NotificationBell from '../../components/NotificationBell';
 import { useNotification } from '../../components/NotificationContext';
 import useWebSocket from '../../hooks/useWebSocket';
+import { getKhoCanhBaoApi } from '../../api/khoThuocApi';
 import QuanLyNhanVien from './components/QuanLyNhanVien';
 import QuanLyTaiKhoan from './components/QuanLyTaiKhoan';
 import QuanLyNhaThuoc from './components/QuanLyNhaThuoc';
@@ -35,28 +37,59 @@ const BangDieuKhienAdmin = ({
   const { bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
   const lastHandledRef = useRef({ key: null, ts: 0 });
 
+  const addMedicineNotifications = (items) => {
+    const now = new Date();
+    const expiryLimit = new Date(now);
+    expiryLimit.setMonth(expiryLimit.getMonth() + 1);
+
+    (items || []).forEach((item) => {
+      const quantity = Number(item.soLuongTon);
+      if (quantity < 20) {
+        addBellNotification({
+          id: `medicine-stock-${item.maThuoc}-${item.soLuongTon}`,
+          title: quantity <= 0 ? 'Thuốc hết hàng' : 'Thuốc sắp hết',
+          message: `${item.tenThuoc || `Thuốc #${item.maThuoc}`} còn ${Math.max(quantity, 0)} ${item.donViTinh || 'đơn vị'}.`,
+          type: quantity <= 0 ? 'error' : 'warning',
+          createdAt: new Date(),
+          read: false,
+        });
+      }
+
+      if (item.hanSuDung) {
+        const expiryDate = new Date(item.hanSuDung);
+        if (expiryDate < now || expiryDate <= expiryLimit) {
+          const expired = expiryDate < now;
+          addBellNotification({
+            id: `medicine-expiry-${item.maThuoc}-${item.hanSuDung}`,
+            title: expired ? 'Thuốc đã hết hạn' : 'Thuốc sắp hết hạn',
+            message: `${item.tenThuoc || `Thuốc #${item.maThuoc}`} ${expired ? 'đã hết hạn' : 'sắp hết hạn'} ngày ${item.hanSuDung}.`,
+            type: expired ? 'error' : 'warning',
+            createdAt: new Date(),
+            read: false,
+          });
+        }
+      }
+    });
+  };
+
   // WebSocket subscription for realtime admin notifications
   useWebSocket({
-    topics: ['/topic/phieu-kham', '/topic/hoa-don', '/topic/dang-ky-kham', '/topic/payment'],
+    topics: ['/topic/kho-alert'],
     onMessage: (topic, data) => {
       const now = Date.now();
-      const eventKey = `${topic}:${data?.maPhieu || data?.maHoaDon || data?.id || ''}`;
+      const eventKey = `${topic}:${data?.maThuoc || data?.action || ''}:${data?.soLuongTon ?? ''}`;
       if (lastHandledRef.current.key === eventKey && now - lastHandledRef.current.ts < 2000) {
         return;
       }
       lastHandledRef.current = { key: eventKey, ts: now };
 
-      const titleMap = {
-        '/topic/phieu-kham': 'Phiếu khám mới',
-        '/topic/hoa-don': 'Hóa đơn cập nhật',
-        '/topic/dang-ky-kham': 'Đăng ký khám mới',
-        '/topic/payment': 'Thanh toán mới',
-      };
+      const quantity = Number(data?.soLuongTon);
+      const outOfStock = data?.action === 'HET_HANG_KHI_CAP' || quantity <= 0;
       addBellNotification({
         id: `${topic}-${Date.now()}-${Math.random()}`,
-        title: titleMap[topic] || 'Thông báo mới',
-        message: data?.message || 'Có hoạt động mới trên hệ thống.',
-        type: 'info',
+        title: outOfStock ? 'Thuốc hết hàng' : 'Cập nhật tồn kho thuốc',
+        message: data?.message || `${data?.tenThuoc || `Thuốc #${data?.maThuoc}`} còn ${Math.max(quantity, 0)} ${data?.donViTinh || 'đơn vị'}.`,
+        type: outOfStock ? 'error' : 'warning',
         createdAt: new Date(),
         read: false,
       });
@@ -64,14 +97,17 @@ const BangDieuKhienAdmin = ({
   });
 
   useEffect(() => {
-    // Fetch thuốc sắp hết
-    apiClient('https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc/sap-het?threshold=20').then(r => r.ok ? r.json() : []).then(data => {
-      setSapHet(data);
+    // Fetch cảnh báo thuốc ban đầu cho chuông admin
+    getKhoCanhBaoApi().then(data => {
+      addMedicineNotifications(data);
+      return data;
+    }).then(data => {
+      setSapHet((data || []).filter(item => Number(item.soLuongTon) < 20));
       setSapHetLoading(false);
     }).catch(() => setSapHetLoading(false));
 
     // Fetch dashboard summary
-    apiClient('https://qlpk-backend-spring-boot.onrender.com/api/thong-ke/dashboard-summary').then(res => res.ok ? res.json() : null).then(data => {
+    apiClient(`${API_BASE_URL}/thong-ke/dashboard-summary`).then(res => res.ok ? res.json() : null).then(data => {
       if (data) {
         setSummary({
           tongBenhNhan: data.tongBenhNhan ?? 0,
@@ -111,10 +147,6 @@ const BangDieuKhienAdmin = ({
     id: 'dashboard',
     label: 'Tổng Quan',
     icon: 'dashboard'
-  }, {
-    id: 'patients',
-    label: 'Thông Tin Bệnh Nhân',
-    icon: 'patient_list'
   }, {
     id: 'employees',
     label: 'Nhân Viên',

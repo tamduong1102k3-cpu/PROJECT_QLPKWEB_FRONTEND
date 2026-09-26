@@ -150,7 +150,7 @@ export default function WorkScheduleDateCalendar({ selectedDate, minDateStr, shi
                   const color = isExtra ? '#854d0e' : isReplacement ? '#5b21b6' : '#1e40af';
                   return (
                     <div key={`${dateStr}-${itemIndex}`} style={{ background, border: `1px solid ${border}`, borderRadius: 4, padding: '3px 4px', fontSize: 9, lineHeight: 1.2, color, overflowWrap: 'anywhere' }}>
-                      <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📍 {item?.phong || '—'}</div>
+                      <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📍 {item?.tenPhong || '—'}</div>
                       <div>{isReplacement ? item?.caThayThe?.tenCa || 'Đổi ca' : `${getShiftName(item)} ${String(item?.ca?.gioBatDau || item?.gioLam || '').substring(0, 5)}-${String(item?.ca?.gioKetThuc || item?.gioKetThuc || '').substring(0, 5)}`}</div>
                       {isExtra && <div style={{ fontSize: 7, fontStyle: 'italic' }}>Thêm ca ngoại lệ</div>}
                     </div>

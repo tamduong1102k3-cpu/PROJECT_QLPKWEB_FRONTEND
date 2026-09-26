@@ -11,8 +11,10 @@ import {
   deleteShiftApi,
   updateShiftApi,
   updateShiftActionApi,
+  updateShiftNghiPhepApi,
   updateDefaultShiftMonthApi,
 } from "../../../api/shiftApi";
+import { getAppointmentsByDoctorAndDateApi } from "../../../api/lichKhamApi";
 import {
   getAllCaLamDanhMucApi,
   createCaLamDanhMucApi,
@@ -64,7 +66,7 @@ const TD = {
 const emptyCalForm = () => ({
   loai: null,
   id: null,
-  phong: "",
+  phong: null,
   gioLam: "",
   gioKetThuc: "",
   lyDo: "",
@@ -73,7 +75,7 @@ const emptyCalForm = () => ({
 });
 
 const emptyDefaultForm = () => ({
-  phong: "",
+  phong: null,
   caIds: [""],
 });
 
@@ -267,7 +269,7 @@ export default function QuanLyCaLamViec() {
   const [calNghiPhepModal, setCalNghiPhepModal] = useState(null);
   const [calShowEditAllThu, setCalShowEditAllThu] = useState(false);
   const [calEditAllThuForm, setCalEditAllThuForm] = useState({
-    phong: "",
+    phong: null,
     caIds: [""],
   });
 
@@ -282,7 +284,7 @@ export default function QuanLyCaLamViec() {
   const [openCaLamModal, setOpenCaLamModal] = useState(false);
   const [caLamSaving, setCaLamSaving] = useState(false);
 
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess, showError, showConfirm } = useNotification();
 
   /* ============================================================
      SECTION: DATA FETCH
@@ -403,41 +405,93 @@ export default function QuanLyCaLamViec() {
       loai: "THEM_CA",
       caIds: [""],
       phong:
-        filteredCalRooms[0]?.ten_phong ||
-        filteredCalRooms[0]?.tenPhong ||
-        "",
+        filteredCalRooms[0]?.ma_phong ??
+        filteredCalRooms[0]?.maPhong ??
+        null,
     });
   };
 
-  // Xác nhận nghỉ phép — UPDATE từng id (tuần tự, an toàn)
+  // Đếm số lịch khám CHUA_DEN của bác sĩ trong ngày — lỗi API bỏ qua (coi như 0)
+  const calCountLichKhamChuaDen = async (maBacSi, ngay) => {
+    try {
+      const lichList = await getAppointmentsByDoctorAndDateApi(maBacSi, ngay);
+      return (Array.isArray(lichList) ? lichList : []).filter(
+        (l) => l.trangThai === "CHUA_DEN",
+      ).length;
+    } catch (e) {
+      console.warn("Không thể đếm lịch khám trước nghỉ phép: " + e.message);
+      return 0;
+    }
+  };
+
+  // Xác nhận nghỉ phép — đếm lịch khám trùng ngày, confirm, UPDATE từng id (tuần tự, an toàn)
   const calConfirmNghiPhep = async () => {
     if (!calNghiPhepModal?.open || calSelectedShiftIds.length === 0) return;
-    setCalSaving(true);
     try {
-      for (const id of calSelectedShiftIds) {
-        await updateShiftActionApi(id, {
-          hanhDong: "NGHI_PHEP",
-          lyDo: calNghiPhepModal.lyDo || null,
-        });
+      // 1. Lấy danh sách selected shifts theo id
+      const selectedShifts = (calSelectedDay?.macDinh || []).filter((m) =>
+        calSelectedShiftIds.includes(m.id),
+      );
+
+      // 2. Group theo (maNhanVien, ngay) — mỗi cặp gọi API đếm MỘT LẦN
+      const pairMap = new Map();
+      for (const s of selectedShifts) {
+        const maNhanVien = s.maNhanVien ?? calSelectedMaNV;
+        const ngay = s.ngay ?? calSelectedDay?.ngay;
+        const key = `${maNhanVien}|${ngay}`;
+        if (!pairMap.has(key)) pairMap.set(key, { maNhanVien, ngay });
       }
-      setCalNghiPhepModal(null);
-      setCalSelectedShiftIds([]);
-      const data = await fetchCalMonth();
-      if (calSelectedDay) {
-        const key = calSelectedDay.ngay;
-        setCalSelectedDay(data?.days?.find((x) => x.ngay === key) || null);
+
+      // 3. Đếm tổng lịch CHUA_DEN — lỗi API bỏ qua (coi như 0)
+      let M = 0;
+      for (const { maNhanVien, ngay } of pairMap.values()) {
+        M += await calCountLichKhamChuaDen(maNhanVien, ngay);
       }
-      showSuccess("Đã đánh dấu nghỉ phép");
+      const N = pairMap.size;
+
+      // 4. Hàm thực hiện nghỉ phép sau khi xác nhận
+      const doNghiPhep = async () => {
+        setCalSaving(true);
+        try {
+          // Loop từng ca — xuLyNghiDotXuat chỉ hủy lịch lần đầu, các lần sau idempotent không lỗi
+          for (const id of calSelectedShiftIds) {
+            await updateShiftNghiPhepApi(id, calNghiPhepModal.lyDo || null);
+          }
+          setCalNghiPhepModal(null);
+          setCalSelectedShiftIds([]);
+          const data = await fetchCalMonth();
+          if (calSelectedDay) {
+            const key = calSelectedDay.ngay;
+            setCalSelectedDay(data?.days?.find((x) => x.ngay === key) || null);
+          }
+          const toastMsg = M > 0
+            ? `Đã nghỉ phép và hủy ${M} lịch khám`
+            : "Đã nghỉ phép";
+          showSuccess(toastMsg);
+        } catch (e) {
+          showError("Lỗi nghỉ phép: " + e.message);
+        } finally {
+          setCalSaving(false);
+        }
+      };
+
+      // 5. Confirm trước nghỉ phép bằng toast — không silent hủy lịch
+      if (M > 0) {
+        showConfirm(
+          `Bác sĩ ${calSelectedMaNV} có ${M} lịch khám chưa đến trong ${N} ngày. Xác nhận nghỉ phép sẽ hủy các lịch này và gửi thông báo cho bệnh nhân. Tiếp tục?`,
+          doNghiPhep,
+        );
+      } else {
+        await doNghiPhep();
+      }
     } catch (e) {
       showError("Lỗi nghỉ phép: " + e.message);
-    } finally {
-      setCalSaving(false);
     }
   };
 
   const calSaveException = async () => {
     if (!calForm.loai || !calSelectedDay || !calSelectedMaNV) return;
-    if (calForm.loai === "THEM_CA" && !calForm.phong.trim()) {
+    if (calForm.loai === "THEM_CA" && calForm.phong == null) {
       showError("Vui lòng chọn phòng!");
       return;
     }
@@ -475,49 +529,77 @@ export default function QuanLyCaLamViec() {
       maNhanVien: Number(calSelectedMaNV),
       ngay: calSelectedDay.ngay,
       loai: calForm.loai,
-      phong: calForm.loai === "NGHI_PHEP" ? null : calForm.phong.trim(),
+      phong: calForm.loai === "NGHI_PHEP" ? null : calForm.phong,
       gioLam: calForm.loai === "NGHI_PHEP" ? null : null,
       gioKetThuc: calForm.loai === "NGHI_PHEP" ? null : null,
       lyDo: calForm.lyDo.trim() || null,
       maCaMacDinh: calForm.maCaMacDinh,
     };
-    setCalSaving(true);
-    try {
-      if (calForm.id) {
+    // Xác định thao tác lưu và kiểm tra lịch khám trước khi nghỉ phép
+    let saveOp;
+    let confirmMessage = null;
+
+    if (calForm.id) {
+      saveOp = async () => {
         await updateExceptionApi(calForm.id, payload);
-      } else if (calForm.loai === "NGHI_PHEP" && calForm.maCaMacDinh) {
-        const existingShift = (calSelectedDay.macDinh || []).find(
-          (m) => m.ca?.id === calForm.maCaMacDinh,
-        );
-        if (existingShift?.id) {
-          await updateShiftActionApi(existingShift.id, {
-            hanhDong: "NGHI_PHEP",
-            lyDo: payload.lyDo,
-          });
-        } else {
-          // Nghỉ phép là UPDATE bản ghi ca hiện có — không CREATE record mới
-          throw new Error("Không tìm thấy ca mặc định để đánh dấu nghỉ phép");
-        }
-      } else {
-        await createExceptionApi(payload);
+      };
+    } else if (calForm.loai === "NGHI_PHEP" && calForm.maCaMacDinh) {
+      const existingShift = (calSelectedDay.macDinh || []).find(
+        (m) => m.ca?.id === calForm.maCaMacDinh,
+      );
+      if (!existingShift?.id) {
+        // Nghỉ phép là UPDATE bản ghi ca hiện có — không CREATE record mới
+        showError("Không tìm thấy ca mặc định để đánh dấu nghỉ phép");
+        return;
       }
-      setCalForm({
-        loai: null,
-        id: null,
-        phong: "",
-        gioLam: "",
-        gioKetThuc: "",
-        lyDo: "",
-        maCaMacDinh: null,
-        caIds: [""],
-      });
-      setCalSelectedDay(null);
-      await fetchCalMonth();
-      showSuccess("Đã lưu ngoại lệ thành công");
-    } catch (e) {
-      showError("Lỗi lưu ngoại lệ: " + e.message);
-    } finally {
-      setCalSaving(false);
+      // Đếm lịch khám trùng ngày (nhất quán với calConfirmNghiPhep)
+      const M = await calCountLichKhamChuaDen(
+        existingShift.maNhanVien ?? calSelectedMaNV,
+        existingShift.ngay ?? calSelectedDay.ngay,
+      );
+      saveOp = async () => {
+        // xuLyNghiDotXuat chỉ hủy lịch lần đầu, các lần sau idempotent không lỗi
+        await updateShiftNghiPhepApi(existingShift.id, payload.lyDo);
+      };
+      if (M > 0) {
+        confirmMessage = `Bác sĩ ${calSelectedMaNV} có ${M} lịch khám chưa đến trong ngày. Xác nhận nghỉ phép sẽ hủy các lịch này và gửi thông báo cho bệnh nhân. Tiếp tục?`;
+      }
+    } else {
+      saveOp = async () => {
+        await createExceptionApi(payload);
+      };
+    }
+
+    // Thực hiện lưu sau khi xác nhận
+    const doSave = async () => {
+      setCalSaving(true);
+      try {
+        await saveOp();
+        setCalForm({
+          loai: null,
+          id: null,
+          phong: null,
+          gioLam: "",
+          gioKetThuc: "",
+          lyDo: "",
+          maCaMacDinh: null,
+          caIds: [""],
+        });
+        setCalSelectedDay(null);
+        await fetchCalMonth();
+        showSuccess("Đã lưu ngoại lệ thành công");
+      } catch (e) {
+        showError("Lỗi lưu ngoại lệ: " + e.message);
+      } finally {
+        setCalSaving(false);
+      }
+    };
+
+    // Confirm bằng toast nếu có lịch khám, ngược lại lưu trực tiếp
+    if (confirmMessage) {
+      showConfirm(confirmMessage, doSave);
+    } else {
+      await doSave();
     }
   };
 
@@ -551,7 +633,7 @@ export default function QuanLyCaLamViec() {
       ...emptyCalForm(),
       loai: ex.loai,
       id: ex.id,
-      phong: ex.phong || "",
+      phong: ex.phong ?? null,
       gioLam: ex.gioLam ? ex.gioLam.substring(0, 5) : "",
       gioKetThuc: ex.gioKetThuc ? ex.gioKetThuc.substring(0, 5) : "",
       lyDo: ex.lyDo || "",
@@ -562,7 +644,7 @@ export default function QuanLyCaLamViec() {
 
   const calAddDefault = async () => {
     if (!calSelectedDay) return;
-    if (!calDefaultForm.phong.trim()) {
+    if (calDefaultForm.phong == null) {
       showError("Vui lòng chọn phòng!");
       return;
     }
@@ -580,11 +662,11 @@ export default function QuanLyCaLamViec() {
         nam: calYear,
         thang: calMonth,
         thu: calSelectedDay.thu,
-        phong: calDefaultForm.phong.trim(),
+        phong: calDefaultForm.phong,
         maCaIds: selectedCaIds,
       });
       setCalShowAddDefault(false);
-      setCalDefaultForm({ phong: "", caIds: [""], gioLam: "", gioKetThuc: "" });
+      setCalDefaultForm({ phong: null, caIds: [""], gioLam: "", gioKetThuc: "" });
       const data = await fetchCalMonth();
       if (calSelectedDay) {
         const key = calSelectedDay.ngay;
@@ -600,7 +682,7 @@ export default function QuanLyCaLamViec() {
 
   const calAddDefaultThroughYearEnd = async () => {
     if (!calSelectedDay || !calSelectedMaNV) return;
-    if (!calDefaultForm.phong.trim()) {
+    if (calDefaultForm.phong == null) {
       showError("Vui lòng chọn phòng!");
       return;
     }
@@ -618,7 +700,7 @@ export default function QuanLyCaLamViec() {
         maNhanVien: Number(calSelectedMaNV),
         thangBatDau: `${calYear}-${String(calMonth).padStart(2, "0")}`,
         thu: calSelectedDay.thu,
-        phong: calDefaultForm.phong.trim(),
+        phong: calDefaultForm.phong,
         danhSachMaCa: selectedCaIds,
       });
       setCalShowAddDefault(false);
@@ -647,7 +729,7 @@ const calDeleteDefault = async (m) => {
       open: true,
       mode: "delete",
       id: m.id,
-      message: `Xóa ca làm việc defaulted này?${m?.phong ? ` (${m.phong})` : ""}`,
+      message: `Xóa ca làm việc defaulted này?${m?.tenPhong ? ` (${m.tenPhong})` : ""}`,
     });
   };
 
@@ -713,7 +795,7 @@ const calDeleteDefault = async (m) => {
   const calStartEditDefault = (m) => {
     setCalEditingDefaultId(m.id);
     setCalEditDefaultForm({
-      phong: m.phong || "",
+      phong: m.phong ?? null,
       caIds: [m.ca?.id || m.maCa || ""],
     });
     // Close bulk-edit form to avoid conflicts
@@ -723,7 +805,7 @@ const calDeleteDefault = async (m) => {
 
   const calSaveEditDefault = async () => {
     if (!calEditingDefaultId) return;
-    if (!calEditDefaultForm.phong.trim()) {
+    if (calEditDefaultForm.phong == null) {
       showError("Vui lòng chọn phòng!");
       return;
     }
@@ -745,13 +827,13 @@ const calDeleteDefault = async (m) => {
       await updateShiftApi(calEditingDefaultId, {
         maNhanVien: Number(calSelectedMaNV),
         maCa: selectedCaIds[0],
-        phong: calEditDefaultForm.phong.trim(),
+        phong: calEditDefaultForm.phong,
         ngay: editingRecord.ngay,
         thu: editingRecord.thu,
         kieuPhanCong: "MAC_DINH",
       });
       setCalEditingDefaultId(null);
-      setCalEditDefaultForm({ phong: "", caIds: [""] });
+      setCalEditDefaultForm({ phong: null, caIds: [""] });
       const data = await fetchCalMonth();
       if (calSelectedDay) {
         const key = calSelectedDay.ngay;
@@ -783,7 +865,7 @@ const calDeleteDefault = async (m) => {
       .filter(Boolean);
 
     setCalEditAllThuForm({
-      phong: firstDefault.phong || "",
+      phong: firstDefault.phong ?? null,
       caIds: caIds.length > 0 ? caIds : [""],
     });
     setCalShowEditAllThu(true);
@@ -794,12 +876,12 @@ const calDeleteDefault = async (m) => {
 
   const calCancelEditAllThu = () => {
     setCalShowEditAllThu(false);
-    setCalEditAllThuForm({ phong: "", caIds: [""] });
+    setCalEditAllThuForm({ phong: null, caIds: [""] });
   };
 
   const calSaveEditAllThu = async () => {
     if (!calSelectedDay || !calSelectedMaNV) return;
-    if (!calEditAllThuForm.phong.trim()) {
+    if (calEditAllThuForm.phong == null) {
       showError("Vui lòng chọn phòng!");
       return;
     }
@@ -817,11 +899,11 @@ const calDeleteDefault = async (m) => {
         nam: calYear,
         thang: calMonth,
         thu: calSelectedDay.thu,
-        phong: calEditAllThuForm.phong.trim(),
+        phong: calEditAllThuForm.phong,
         maCaIds: selectedCaIds,
       });
       setCalShowEditAllThu(false);
-      setCalEditAllThuForm({ phong: "", caIds: [""] });
+      setCalEditAllThuForm({ phong: null, caIds: [""] });
       const data = await fetchCalMonth();
       if (calSelectedDay) {
         const key = calSelectedDay.ngay;
@@ -1432,7 +1514,7 @@ const calDeleteDefault = async (m) => {
                         marginBottom: "4px",
                       }}
                     >
-                      {name} · {start}–{end} · 📍 {m.phong || "—"}
+                      {name} · {start}–{end} · 📍 {m.tenPhong || "—"}
                     </div>
                   );
                 })}
@@ -2000,7 +2082,7 @@ const calDeleteDefault = async (m) => {
                               }}
                             >
                               <div style={{ fontWeight: 700 }}>
-                                📍 {it.data.phong || "—"}
+                                📍 {it.data.tenPhong || "—"}
                               </div>
                               <div>
                                 {isDoi
@@ -2226,7 +2308,7 @@ const calDeleteDefault = async (m) => {
                                    />
                                  )}
                                  <span>
-                                   📍 {m.phong || "—"}
+                                   📍 {m.tenPhong || "—"}
                                    <br />
                                    {(() => {
                                      const ca = m.ca;
@@ -2459,11 +2541,13 @@ const calDeleteDefault = async (m) => {
                             >
                               Phòng khám:
                               <select
-                                value={calEditAllThuForm.phong}
+                                value={calEditAllThuForm.phong ?? ""}
                                 onChange={(e) =>
                                   setCalEditAllThuForm({
                                     ...calEditAllThuForm,
-                                    phong: e.target.value,
+                                    phong: e.target.value
+                                      ? Number(e.target.value)
+                                      : null,
                                   })
                                 }
                                 disabled={calSaving}
@@ -2478,8 +2562,8 @@ const calDeleteDefault = async (m) => {
                                 <option value="">-- Chọn phòng --</option>
                                 {filteredCalRooms.map((p) => (
                                   <option
-                                    key={p.ma_phong || p.maPhong}
-                                    value={p.ten_phong || p.tenPhong}
+                                    key={p.ma_phong ?? p.maPhong}
+                                    value={p.ma_phong ?? p.maPhong}
                                   >
                                     {p.ten_phong || p.tenPhong}
                                   </option>
@@ -2694,11 +2778,13 @@ const calDeleteDefault = async (m) => {
                             >
                               Phòng:
                               <select
-                                value={calEditDefaultForm.phong}
+                                value={calEditDefaultForm.phong ?? ""}
                                 onChange={(e) =>
                                   setCalEditDefaultForm({
                                     ...calEditDefaultForm,
-                                    phong: e.target.value,
+                                    phong: e.target.value
+                                      ? Number(e.target.value)
+                                      : null,
                                   })
                                 }
                                 style={{
@@ -2712,8 +2798,8 @@ const calDeleteDefault = async (m) => {
                                 <option value="">-- Chọn phòng --</option>
                                 {filteredCalRooms.map((p) => (
                                   <option
-                                    key={p.ma_phong || p.maPhong}
-                                    value={p.ten_phong || p.tenPhong}
+                                    key={p.ma_phong ?? p.maPhong}
+                                    value={p.ma_phong ?? p.maPhong}
                                   >
                                     {p.ten_phong || p.tenPhong}
                                   </option>
@@ -2876,9 +2962,9 @@ const calDeleteDefault = async (m) => {
                                 setCalShowAddDefault(true);
                                 setCalDefaultActionMode("month");
                                 const firstRoom =
-                                  filteredCalRooms[0]?.ten_phong ||
-                                  filteredCalRooms[0]?.tenPhong ||
-                                  "";
+                                  filteredCalRooms[0]?.ma_phong ??
+                                  filteredCalRooms[0]?.maPhong ??
+                                  null;
                                 setCalDefaultForm({
                                   phong: firstRoom,
                                   caIds: [""],
@@ -2903,9 +2989,9 @@ const calDeleteDefault = async (m) => {
                                 setCalShowAddDefault(true);
                                 setCalDefaultActionMode("yearEnd");
                                 const firstRoom =
-                                  filteredCalRooms[0]?.ten_phong ||
-                                  filteredCalRooms[0]?.tenPhong ||
-                                  "";
+                                  filteredCalRooms[0]?.ma_phong ??
+                                  filteredCalRooms[0]?.maPhong ??
+                                  null;
                                 setCalDefaultForm({
                                   phong: firstRoom,
                                   caIds: [""],
@@ -2956,11 +3042,13 @@ const calDeleteDefault = async (m) => {
                             >
                               Phòng:
                               <select
-                                value={calDefaultForm.phong}
+                                value={calDefaultForm.phong ?? ""}
                                 onChange={(e) =>
                                   setCalDefaultForm({
                                     ...calDefaultForm,
-                                    phong: e.target.value,
+                                    phong: e.target.value
+                                      ? Number(e.target.value)
+                                      : null,
                                   })
                                 }
                                 style={{
@@ -2974,8 +3062,8 @@ const calDeleteDefault = async (m) => {
                                 <option value="">-- Chọn phòng --</option>
                                 {filteredCalRooms.map((p) => (
                                   <option
-                                    key={p.ma_phong || p.maPhong}
-                                    value={p.ten_phong || p.tenPhong}
+                                    key={p.ma_phong ?? p.maPhong}
+                                    value={p.ma_phong ?? p.maPhong}
                                   >
                                     {p.ten_phong || p.tenPhong}
                                   </option>
@@ -3205,7 +3293,7 @@ const calDeleteDefault = async (m) => {
                                   {ex.caThayThe?.tenCa
                                     ? ` · ${ex.caThayThe.tenCa}`
                                     : ""}
-                                  {ex.phong ? ` · 📍 ${ex.phong}` : ""}
+                                  {ex.tenPhong ? ` · 📍 ${ex.tenPhong}` : ""}
                                   {ex.gioLam
                                     ? ` · 🕗 ${fmtGio(ex.gioLam)}–${fmtGio(ex.gioKetThuc)}`
                                     : ""}
@@ -3229,9 +3317,6 @@ const calDeleteDefault = async (m) => {
                                   </button>
                                   {calDeleteConfirmId !== ex.id && (
                                     <button
-                                      onClick={() =>
-                                        setCalDeleteConfirmId(ex.id)
-                                      }
                                       disabled={calSaving}
                                       style={{
                                         background: "#fee2e2",
@@ -3513,11 +3598,13 @@ const calDeleteDefault = async (m) => {
                                 >
                                   Phòng:
                                   <select
-                                    value={calForm.phong}
+                                    value={calForm.phong ?? ""}
                                     onChange={(e) =>
                                       setCalForm({
                                         ...calForm,
-                                        phong: e.target.value,
+                                        phong: e.target.value
+                                          ? Number(e.target.value)
+                                          : null,
                                       })
                                     }
                                     disabled={calSaving}
@@ -3532,8 +3619,8 @@ const calDeleteDefault = async (m) => {
                                     <option value=""></option>
                                     {filteredCalRooms.map((p) => (
                                       <option
-                                        key={p.ma_phong || p.maPhong}
-                                        value={p.ten_phong || p.tenPhong}
+                                        key={p.ma_phong ?? p.maPhong}
+                                        value={p.ma_phong ?? p.maPhong}
                                       >
                                         {p.ten_phong || p.tenPhong}
                                       </option>

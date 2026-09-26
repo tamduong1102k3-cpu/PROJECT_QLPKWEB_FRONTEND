@@ -7,6 +7,7 @@
  * - Mọi request dùng credentials: 'include' để browser tự gửi cookie (chỉ với backend origin).
  */
 import { loadingManager } from './loadingManager';
+import { API_BASE_URL } from './config';
 import { getAccessToken, setAccessToken, clearAccessToken } from './tokenStore';
 
 let isRefreshing = false;
@@ -47,7 +48,7 @@ const refreshTokenRequest = async () => {
   const timeoutId = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
 
   try {
-    const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
+    const baseUrl = localStorage.getItem('apiBaseUrl') || API_BASE_URL.replace(/\/api$/, '');
     const endpoint = getRefreshEndpoint();
 
     const response = await fetch(`${baseUrl}${endpoint}`, {

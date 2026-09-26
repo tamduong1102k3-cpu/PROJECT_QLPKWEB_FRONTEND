@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../../api/config';
 import { createPortal } from 'react-dom';
 import { apiClient } from '../../../api/apiClient';
 import { useNotification } from '../../../components/NotificationContext';
 
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/chuyen-khoa';
+const API = `${API_BASE_URL}/chuyen-khoa`;
 
 const QuanLyChuyenKhoa = () => {
   const [chuyenKhoas, setChuyenKhoas] = useState([]);

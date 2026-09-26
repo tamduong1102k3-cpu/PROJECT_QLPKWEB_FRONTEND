@@ -191,7 +191,7 @@ const StatusDropdown = ({ appointment, onUpdate }) => {
 };
 
 /* ─── Create/Update Modal (Portal) ─── */
-const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate, patient, chuyenKhoaList, dichVuList, benhNhanList, phongList, creating, doctorShifts, availableCaList, mode = 'create', nhanVienList = [], onBacSiChange, hoanLich = false, setHoanLich, lyDoHoan = '', setLyDoHoan }) => {
+const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate, patient, chuyenKhoaList, dichVuList, benhNhanList, phongList, creating, doctorShifts, availableCaList, mode = 'create', nhanVienList = [], onBacSiChange, hoanLich = false, setHoanLich, lyDoHoan = '', setLyDoHoan, originalDate = '' }) => {
   const isUpdate = mode === 'update';
   const [patientSearch, setPatientSearch] = useState('');
   const [showPatientList, setShowPatientList] = useState(false);
@@ -235,6 +235,17 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
     });
   };
 
+  // Normalize ngày — cắt bỏ phần giờ nếu có (ISO datetime → yyyy-MM-dd)
+  const normalizeDate = (v) => v ? String(v).split('T')[0] : '';
+
+  // Tính xem người dùng có đổi ngày so với ngày gốc không
+  const oldDate = normalizeDate(originalDate);
+  const newDate = normalizeDate(formData.ngayTaiKham);
+  const dateChanged = isUpdate && newDate !== '' && newDate !== oldDate;
+
+  // Nút Lưu chỉ disable khi: đổi ngày mà chưa tick "Hoãn"
+  const canSave = !dateChanged || hoanLich;
+
   const validateAndSubmit = () => {
     const errors = {};
     // Validate đầy đủ mọi field — không phân nhánh theo hoanLich
@@ -248,6 +259,10 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
     // Tick "Hoãn" → trạng thái HOAN, bắt buộc nhập lý do
     if (isUpdate && hoanLich && !lyDoHoan?.trim()) {
       errors.lyDoHoan = 'Vui lòng nhập lý do hoãn lịch';
+    }
+    // Đổi ngày mà chưa tick "Hoãn" → chặn
+    if (dateChanged && !hoanLich) {
+      errors.ngayTaiKham = 'Bạn đã đổi ngày khám. Vui lòng tick "Hoãn lịch" và nhập lý do để lưu.';
     }
     setFormErrors(errors);
     if (Object.keys(errors).length === 0) {
@@ -696,8 +711,8 @@ const AppointmentModal = ({ formData, setFormData, onClose, onCreate, getMinDate
             </button>
             <button
               onClick={validateAndSubmit}
-              disabled={creating}
-              style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', borderRadius: '0.75rem', fontWeight: 700, fontSize: 14, color: '#fff', cursor: creating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 15px rgba(79,70,229,0.35)', opacity: creating ? 0.6 : 1 }}
+              disabled={creating || !canSave}
+              style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', borderRadius: '0.75rem', fontWeight: 700, fontSize: 14, color: '#fff', cursor: (creating || !canSave) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 15px rgba(79,70,229,0.35)', opacity: (creating || !canSave) ? 0.5 : 1 }}
             >
               {creating ? (
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" style={{ display: 'inline-block' }} />

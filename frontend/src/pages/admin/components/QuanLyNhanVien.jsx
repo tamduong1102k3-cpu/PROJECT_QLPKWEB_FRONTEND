@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  getAllNhanVienApi as getAllEmployeesApi, 
+  searchNhanVienApi,
   addNhanVienApi as createEmployeeApi, 
   updateNhanVienApi as updateEmployeeApi, 
   deleteNhanVienApi as deleteEmployeeApi 
@@ -13,6 +13,10 @@ import {
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
 
+const isPatientRole = role => {
+  const normalized = String(role || '').trim().toLowerCase();
+  return normalized === 'patient' || normalized === 'benh_nhan' || normalized === 'bệnh nhân';
+};
 
 const QuanLyNhanVien = () => {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -20,6 +24,8 @@ const QuanLyNhanVien = () => {
   const [editId, setEditId] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterChuyenKhoa, setFilterChuyenKhoa] = useState('');
+  const [filterVaiTro, setFilterVaiTro] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   // --- DỮ LIỆU DANH MỤC TỪ DATABASE ---
@@ -27,11 +33,13 @@ const QuanLyNhanVien = () => {
   const [dsChucVu, setDsChucVu] = useState([]);
   const [dsVaiTro, setDsVaiTro] = useState([]);
 
-  // Giả lập gọi API GET ALL nhân viên khi load trang
   useEffect(() => {
-    fetchEmployees();
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    fetchEmployees({ keyword: searchTerm, chuyenKhoa: filterChuyenKhoa, vaiTro: filterVaiTro });
+  }, [searchTerm, filterChuyenKhoa, filterVaiTro]);
 
   // Khóa cuộn trang nền khi mở Modal
   useEffect(() => {
@@ -71,10 +79,12 @@ const QuanLyNhanVien = () => {
       ];
 
       if (vaiTroData && vaiTroData.length > 0) {
-        const processed = vaiTroData.map(vt => ({
-          ...vt,
-          tenBienThe: vt.tenBienThe || (fallbackVaiTro.find(f => f.maVaiTro === vt.maVaiTro)?.tenBienThe || vt.maVaiTro)
-        }));
+        const processed = vaiTroData
+          .filter(vt => !isPatientRole(vt.maVaiTro) && !isPatientRole(vt.tenBienThe))
+          .map(vt => ({
+            ...vt,
+            tenBienThe: vt.tenBienThe || (fallbackVaiTro.find(f => f.maVaiTro === vt.maVaiTro)?.tenBienThe || vt.maVaiTro)
+          }));
         setDsVaiTro(processed);
       } else {
         setDsVaiTro(fallbackVaiTro);
@@ -98,11 +108,15 @@ const QuanLyNhanVien = () => {
     }
   };
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (filters = {
+    keyword: searchTerm,
+    chuyenKhoa: filterChuyenKhoa,
+    vaiTro: filterVaiTro
+  }) => {
     setIsLoading(true);
     try {
-      const data = await getAllEmployeesApi();
-      setEmployees(data);
+      const data = await searchNhanVienApi(filters);
+      setEmployees(data || []);
     } catch (error) {
       console.error("Lỗi khi fetch danh sách nhân viên:", error);
     } finally {
@@ -177,20 +191,7 @@ const QuanLyNhanVien = () => {
     }
   };
 
-  // Derived state: Lọc nhân viên theo từ khóa tìm kiếm
-  const filteredEmployees = employees.filter(emp => {
-    if (!searchTerm) return true;
-    const lowerTerm = searchTerm.toLowerCase();
-    const hoTen = (emp.hoTen || '').toLowerCase();
-    const email = (emp.email || '').toLowerCase();
-    const cccd = (emp.cccd || '').toLowerCase();
-    const sdt = (emp.soDienThoai || '').toLowerCase();
-    
-    return hoTen.includes(lowerTerm) || 
-           email.includes(lowerTerm) || 
-           cccd.includes(lowerTerm) || 
-           sdt.includes(lowerTerm);
-  });
+  const filteredEmployees = employees;
 
   const {
     paginatedData: pagedEmployees,
@@ -261,15 +262,41 @@ const QuanLyNhanVien = () => {
     <div className="animate-fade-in space-y-6">
       {/* Top action bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div className="relative w-full sm:w-96">
+        <div className="flex flex-1 flex-col sm:flex-row gap-3 w-full">
+          <div className="relative w-full sm:w-80">
           <input 
             type="text" 
-            placeholder="Tìm kiếm nhân viên theo tên, email, SDT, CCCD..." 
+            placeholder="Tìm theo tên, email, SĐT, CCCD..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
           />
           <span className="material-symbols-outlined absolute left-3 top-2.5 text-gray-400">search</span>
+          </div>
+          <select
+            value={filterChuyenKhoa}
+            onChange={(e) => setFilterChuyenKhoa(e.target.value)}
+            className="w-full sm:w-52 px-3 py-2 rounded-lg border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-white"
+          >
+            <option value="">Tất cả chuyên khoa</option>
+            {dsChuyenKhoa.map((ck) => (
+              <option key={ck.maChuyenKhoa} value={ck.maChuyenKhoa}>
+                {ck.tenChuyenKhoa}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterVaiTro}
+            onChange={(e) => setFilterVaiTro(e.target.value)}
+            className="w-full sm:w-60 px-3 py-2 rounded-lg border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-white"
+          >
+            <option value="">Tất cả vai trò</option>
+            {dsVaiTro.map((vt) => (
+              <option key={vt.maVaiTro} value={vt.maVaiTro}>
+                {vt.tenBienThe}
+              </option>
+            ))}
+          </select>
         </div>
         <button 
           onClick={handleOpenAdd}

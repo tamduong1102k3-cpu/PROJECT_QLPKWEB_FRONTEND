@@ -1,9 +1,10 @@
+import { API_BASE_URL } from './config';
 /**
  * Cloudinary API - Upload ảnh lên Cloudinary thông qua backend
  * Backend endpoint: POST /api/images/upload
  */
 
-const CLOUDINARY_UPLOAD_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/images/upload';
+const CLOUDINARY_UPLOAD_URL = `${API_BASE_URL}/images/upload`;
 
 /**
  * Upload file ảnh lên Cloudinary

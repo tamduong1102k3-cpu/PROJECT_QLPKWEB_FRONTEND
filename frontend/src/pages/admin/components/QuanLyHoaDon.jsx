@@ -1,8 +1,9 @@
 import { apiClient } from "../../../api/apiClient";
+import { API_BASE_URL } from '../../../api/config';
 import { getAllApi, getChiTietApi } from '../../../api/hoaDonApi';
 import React, { useState, useEffect } from 'react';
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/hoa-don';
-const NV_API = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
+const API = `${API_BASE_URL}/hoa-don`;
+const NV_API = `${API_BASE_URL}/nhan_vien`;
 const formatCurrency = amount => {
   if (amount == null) return '—';
   return new Intl.NumberFormat('vi-VN', {

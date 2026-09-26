@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { API_BASE_URL } from '../../api/config';
 import { getAllApi } from '../../api/hoaDonApi';
 import { getTodayApi } from '../../api/phieuKhamApi';
 import fetchClient from '../../api/fetchClient';
@@ -26,7 +27,7 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { showSuccess, showError, bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
   const lastHandledRef = useRef({ maHoaDon: null, ts: 0 });
-  const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
+  const baseUrl = localStorage.getItem('apiBaseUrl') || API_BASE_URL.replace(/\/api$/, '');
 
   // Lấy maTaiKhoan của nhân viên (bảng tai_khoan) từ token
   const getMaTaiKhoanNhanVien = () => {

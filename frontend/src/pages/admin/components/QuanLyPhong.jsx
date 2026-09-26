@@ -1,7 +1,8 @@
 import { getAllPhongApi as _getAllPhongApi, getAllChucVuApi as _getAllChucVuApi, getAllChuyenKhoaApi as _getAllChuyenKhoaApi, deletePhongApi as _deletePhongApi } from '../../../api/danhMucApi';
+import { API_BASE_URL } from '../../../api/config';
 import { apiClient } from "../../../api/apiClient";
 import React, { useState, useEffect } from 'react';
-const BASE = 'https://qlpk-backend-spring-boot.onrender.com/api/danhmuc';
+const BASE = `${API_BASE_URL}/danhmuc`;
 const empty = {
   tenPhong: '',
   loaiPhong: '',
@@ -12,28 +13,29 @@ const fmtLoaiPhong = val => {
   if (!val) return '—';
   const map = {
     'KHOA_NOI': 'Khoa nội',
-    'KHOA_NGOAI': 'Khoa ngoại',
-    'NHA_THUOC': 'Nhà thuốc',
+    'CLS_CHAN_DOAN_HINH_ANH': 'CLS Chẩn đoán hình ảnh',
+    'CLS_XET_NGHIEM': 'CLS Xét nghiệm',
+    'KHAM_CHUYEN_KHOA': 'Khám chuyên khoa',
     'LE_TAN': 'Lễ tân',
-    'CAP_CUU': 'Cấp cứu',
+    'NHA_THUOC': 'Nhà thuốc',
+    'KHO_DUOC': 'Kho dược',
+    'THU_TIEN': 'Thu tiền',
+    'KHOA_NGOAI': 'Khoa ngoại',
     'XET_NGHIEM': 'Xét nghiệm',
     'CHAN_DOAN_HINH_ANH': 'Chẩn đoán hình ảnh',
-    'DIEU_TRI': 'Điều trị',
-    'PHONG_KHAM': 'Phòng khám'
+  
   };
   return map[val] || val.replace(/_/g, ' ');
 };
 const LOAI_PHONG_OPTIONS = [
   { value: 'KHOA_NOI', label: 'Khoa nội' },
-  { value: 'KHOA_NGOAI', label: 'Khoa ngoại' },
-  { value: 'NHA_THUOC', label: 'Nhà thuốc' },
+  { value: 'CLS_CHAN_DOAN_HINH_ANH', label: 'CLS Chẩn đoán hình ảnh' },
+  { value: 'CLS_XET_NGHIEM', label: 'CLS Xét nghiệm' },
+  { value: 'KHAM_CHUYEN_KHOA', label: 'Khám chuyên khoa' },
   { value: 'LE_TAN', label: 'Lễ tân' },
-  { value: 'CAP_CUU', label: 'Cấp cứu' },
-  { value: 'XET_NGHIEM', label: 'Xét nghiệm' },
-  { value: 'CHAN_DOAN_HINH_ANH', label: 'Chẩn đoán hình ảnh' },
-  { value: 'DIEU_TRI', label: 'Điều trị' },
-  { value: 'PHONG_KHAM', label: 'Phòng khám' },
-  { value: 'OTHER', label: 'Khác' }
+  { value: 'NHA_THUOC', label: 'Nhà thuốc' },
+  { value: 'KHO_DUOC', label: 'Kho dược' },
+  { value: 'THU_TIEN', label: 'Thu tiền' }
 ];
 export default function QuanLyPhong() {
   const [phongList, setPhongList] = useState([]);

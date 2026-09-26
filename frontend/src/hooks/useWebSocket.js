@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { WS_BASE_URL } from '../api/config';
 import SockJS from 'sockjs-client/dist/sockjs.min.js';
 import Stomp from 'stompjs';
 
@@ -8,14 +9,14 @@ import Stomp from 'stompjs';
  * @param {Object} options
  * @param {string[]} options.topics - Danh sách topic cần subscribe, ví dụ ['/topic/phieu-kham', '/topic/vitals']
  * @param {function} options.onMessage - Callback khi nhận được message, signature: (topic, data) => void
- * @param {string} options.url - URL WebSocket endpoint (mặc định: https://qlpk-backend-spring-boot.onrender.com/ws)
+ * @param {string} options.url - URL WebSocket endpoint (mặc định: VITE_WS_URL)
  * @param {function} options.onConnect - Callback khi kết nối thành công
  * @param {function} options.onDisconnect - Callback khi mất kết nối
  */
 const useWebSocket = ({
   topics = [],
   onMessage,
-  url = 'https://qlpk-backend-spring-boot.onrender.com/ws',
+  url = WS_BASE_URL,
   onConnect,
   onDisconnect,
 } = {}) => {

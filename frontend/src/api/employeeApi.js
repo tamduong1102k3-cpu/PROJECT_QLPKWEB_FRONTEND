@@ -1,6 +1,7 @@
 import fetchClient from './fetchClient';
+import { API_BASE_URL } from './config';
 
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
+const API_URL = `${API_BASE_URL}/nhan_vien`;
 
 /**
  * Helper: parse response text hoặc JSON
@@ -32,6 +33,25 @@ export const getAllNhanVienApi = async () => {
     return await handleResponse(response);
   } catch (error) {
     console.error("Error in getAllNhanVienApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * GET /search - tìm kiếm bằng LIKE và lọc theo chuyên khoa/vai trò
+ */
+export const searchNhanVienApi = async ({ keyword = '', chuyenKhoa = '', vaiTro = '' } = {}) => {
+  const params = new URLSearchParams();
+  if (keyword.trim()) params.set('keyword', keyword.trim());
+  if (chuyenKhoa) params.set('chuyenKhoa', chuyenKhoa);
+  if (vaiTro) params.set('vaiTro', vaiTro);
+
+  try {
+    const response = await fetchClient(`${API_URL}/search?${params.toString()}`, { method: 'GET' });
+    if (!response.ok) await handleError(response);
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error in searchNhanVienApi:", error);
     throw error;
   }
 };

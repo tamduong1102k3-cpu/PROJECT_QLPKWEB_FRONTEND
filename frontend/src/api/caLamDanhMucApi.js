@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
-const CA_LAM_DANH_MUC_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/ca-lam-danh-muc';
+import { API_BASE_URL } from './config';
+const CA_LAM_DANH_MUC_URL = `${API_BASE_URL}/ca-lam-danh-muc`;
 
 /**
  * Lấy danh sách ca làm việc

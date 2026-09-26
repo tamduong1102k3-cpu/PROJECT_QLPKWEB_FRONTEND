@@ -3,6 +3,7 @@
  * Sử dụng fetchClient thay vì fetch trực tiếp
  */
 import fetchClient, { handleUnauthorized } from './fetchClient';
+import { API_BASE_URL } from './config';
 
 export { handleUnauthorized };
 
@@ -12,7 +13,7 @@ export { handleUnauthorized };
 export const apiClient = async (url, options = {}) => {
   const method = options.method ? options.method.toUpperCase() : 'GET';
   const body = options.body ? JSON.parse(options.body) : null;
-  const path = url.replace('https://qlpk-backend-spring-boot.onrender.com/api', '');
+  const path = url.replace(API_BASE_URL, '');
 
   try {
     // Thử dispatch qua các API chuyên biệt (các function này đã dùng fetchClient)

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../../api/config';
 import { apiClient } from "../../../api/apiClient";
 import ThuocTab from './ThuocTab';
 import KhoThuocTab from './KhoThuocTab';
 import PhieuNhapTab from './PhieuNhapTab';
 
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
-const NV_API = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
+const API = `${API_BASE_URL}/kho-thuoc`;
+const NV_API = `${API_BASE_URL}/nhan_vien`;
 
 // ── Hook: load lookup maps ────────────────────────────────────────────────────
 const useLookups = refreshTrigger => {

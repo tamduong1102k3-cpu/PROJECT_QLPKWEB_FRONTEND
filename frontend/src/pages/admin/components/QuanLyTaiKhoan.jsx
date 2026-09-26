@@ -1,4 +1,6 @@
 import { getAllApi, updateApi, deleteApi } from '../../../api/accountApi'; 
+import { getAllNhanVienApi } from '../../../api/employeeApi';
+import { getAllChuyenKhoaApi, getAllVaiTroApi } from '../../../api/danhMucApi';
 import React, { useState, useEffect } from 'react';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
@@ -34,6 +36,10 @@ const roleLabel = role => {
   };
   return map[role] || role;
 };
+const isPatientRole = role => {
+  const normalized = String(role || '').trim().toLowerCase();
+  return normalized === 'patient' || normalized === 'benh_nhan' || normalized === 'bệnh nhân';
+};
 const roleBadgeClass = role => {
   const map = {
     QUAN_TRI_VIEN: 'bg-purple-100 text-purple-700',
@@ -55,6 +61,11 @@ const QuanLyTaiKhoan = () => {
   const [accounts, setAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterVaiTro, setFilterVaiTro] = useState('');
+  const [filterChuyenKhoa, setFilterChuyenKhoa] = useState('');
+  const [employees, setEmployees] = useState([]);
+  const [chuyenKhoaList, setChuyenKhoaList] = useState([]);
+  const [vaiTroList, setVaiTroList] = useState([]);
 
   // Edit modal
   const [showModal, setShowModal] = useState(false);
@@ -78,12 +89,33 @@ const QuanLyTaiKhoan = () => {
       setIsLoading(false);
     }
   };
+  const fetchFilterData = async () => {
+    try {
+      const [employeeData, specialtyData, roleData] = await Promise.all([
+        getAllNhanVienApi(),
+        getAllChuyenKhoaApi(),
+        getAllVaiTroApi()
+      ]);
+      setEmployees(employeeData || []);
+      setChuyenKhoaList(specialtyData || []);
+      const availableRoles = (roleData || VAI_TRO_OPTIONS.map(maVaiTro => ({ maVaiTro, tenBienThe: roleLabel(maVaiTro) })))
+        .filter(role => !isPatientRole(role.maVaiTro) && !isPatientRole(role.tenBienThe));
+      setVaiTroList(availableRoles);
+    } catch (err) {
+      console.error('Không thể tải danh mục bộ lọc tài khoản:', err);
+      setVaiTroList(VAI_TRO_OPTIONS.map(maVaiTro => ({ maVaiTro, tenBienThe: roleLabel(maVaiTro) })));
+    }
+  };
   useEffect(() => {
     fetchAccounts();
+    fetchFilterData();
   }, []);
 
   // ── Filter ────────────────────────────────────────────────────
   const filtered = accounts.filter(acc => {
+    const employee = employees.find(emp => String(emp.maNhanVien) === String(acc.maNhanVien));
+    if (filterVaiTro && acc.vaiTro !== filterVaiTro) return false;
+    if (filterChuyenKhoa && String(employee?.chuyenKhoa ?? '') !== String(filterChuyenKhoa)) return false;
     if (!searchTerm) return true;
     const t = searchTerm.toLowerCase();
     return (acc.username || '').toLowerCase().includes(t) || (acc.email || '').toLowerCase().includes(t) || (acc.vaiTro || '').toLowerCase().includes(t);
@@ -202,8 +234,14 @@ const QuanLyTaiKhoan = () => {
         {/* Search */}
         <div style={{
         marginTop: '16px',
+        display: 'flex',
+        gap: '10px',
+        flexWrap: 'wrap',
+        alignItems: 'center'
+      }}>
+        <div style={{
         position: 'relative',
-        maxWidth: '400px'
+        width: 'min(100%, 400px)'
       }}>
           <span className="material-symbols-outlined" style={{
           position: 'absolute',
@@ -240,6 +278,33 @@ const QuanLyTaiKhoan = () => {
           }}>close</span>
             </button>}
         </div>
+        <select value={filterVaiTro} onChange={e => setFilterVaiTro(e.target.value)} style={{
+          padding: '8px 12px',
+          border: '1px solid #d1d5db',
+          borderRadius: '8px',
+          fontSize: '14px',
+          background: '#fff',
+          minWidth: '190px'
+        }}>
+          <option value="">Tất cả vai trò</option>
+          {vaiTroList.map(vaiTro => <option key={vaiTro.maVaiTro} value={vaiTro.maVaiTro}>
+            {vaiTro.tenBienThe || roleLabel(vaiTro.maVaiTro)}
+          </option>)}
+        </select>
+        <select value={filterChuyenKhoa} onChange={e => setFilterChuyenKhoa(e.target.value)} style={{
+          padding: '8px 12px',
+          border: '1px solid #d1d5db',
+          borderRadius: '8px',
+          fontSize: '14px',
+          background: '#fff',
+          minWidth: '210px'
+        }}>
+          <option value="">Tất cả chuyên khoa</option>
+          {chuyenKhoaList.map(chuyenKhoa => <option key={chuyenKhoa.maChuyenKhoa} value={chuyenKhoa.maChuyenKhoa}>
+            {chuyenKhoa.tenChuyenKhoa}
+          </option>)}
+        </select>
+      </div>
       </div>
 
       {/* Table Card */}

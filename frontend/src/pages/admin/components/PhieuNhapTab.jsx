@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../../api/config';
 import { apiClient } from '../../../api/apiClient';
 import { card, th, td, formatCurrency, formatDate } from './styles';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
 
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
+const API = `${API_BASE_URL}/kho-thuoc`;
 
 export const suppliers = [
   { id: 1, name: 'Công ty Cổ phần Dược Hậu Giang (DHG)' },

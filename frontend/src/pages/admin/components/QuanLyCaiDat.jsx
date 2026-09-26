@@ -1,4 +1,5 @@
 import  { useEffect, useRef, useState } from 'react';
+import { API_BASE_URL } from '../../../api/config';
 import {
   createBackupApi,
   getDatabaseInfoApi,
@@ -96,7 +97,7 @@ const QuanLyCaiDat = () => {
     setMessage({ type: '', text: '' });
     try {
       const response = await fetchClient(
-        'https://qlpk-backend-spring-boot.onrender.com/api/database/restore/upload',
+        `${API_BASE_URL}/database/restore/upload`,
         { method: 'POST', body: formData, skipLoading: false }
       );
       const data = await response.json();

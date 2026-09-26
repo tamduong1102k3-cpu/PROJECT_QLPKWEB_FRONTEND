@@ -226,6 +226,7 @@ const InPhieuTiepDon = ({ printData, className = '' }) => {
     <div class="number-box">
       <div class="number-label">Số thứ tự khám</div>
       <div class="number-val">#${printData.soThuTu}</div>
+      ${printData.tenPhong ? `<div class="number-room" style="margin-top: 4px; font-size: 13px; font-weight: 700; color: #4f46e5;">${printData.tenPhong}</div>` : ''}
     </div>
     
     <div class="info-list">

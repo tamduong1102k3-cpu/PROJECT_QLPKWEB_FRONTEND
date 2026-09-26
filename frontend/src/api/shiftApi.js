@@ -1,6 +1,7 @@
 import fetchClient from "./fetchClient";
-const API_URL = "https://qlpk-backend-spring-boot.onrender.com/api/phan-cong";
-const CA_LAM_URL = "https://qlpk-backend-spring-boot.onrender.com/api/ca-lam";
+import { API_BASE_URL } from './config';
+const API_URL = `${API_BASE_URL}/phan-cong`;
+const CA_LAM_URL = `${API_BASE_URL}/ca-lam`;
 
 /**
  * Lấy tất cả danh sách phân công ca làm
@@ -326,6 +327,37 @@ export const getCurrentRoomApi = async (maNhanVien) => {
 };
 
 /**
+ * Lấy phòng làm việc của bác sĩ theo ca hiện tại và ngày chỉ định.
+ * Endpoint: GET /api/phan-cong/phong-theo-bac-si?maBacSi=X&ngay=YYYY-MM-DD
+ * Trả: { maCa, maPhong, tenPhong } hoặc throw Error kèm message lỗi từ backend.
+ */
+export const getPhongTheoBacSiApi = async (maBacSi, ngay) => {
+  try {
+    const params = new URLSearchParams({
+      maBacSi: String(maBacSi),
+      ngay,
+    });
+    const response = await fetchClient(
+      `${API_URL}/phong-theo-bac-si?${params.toString()}`,
+      {
+        method: "GET",
+      },
+    );
+    if (!response.ok) {
+      const err = await parseJsonResponse(response);
+      throw new Error(
+        err?.message ||
+          `Lỗi: ${response.status} - Không thể lấy phòng theo bác sĩ`,
+      );
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error in getPhongTheoBacSiApi:", error);
+    throw error;
+  }
+};
+
+/**
  * Lấy lịch làm việc (các thứ trong tuần) của một nhân viên theo mã nhân viên
  * Endpoint: GET /api/phan-cong/by-nhan-vien/{maNhanVien}
  */
@@ -470,6 +502,31 @@ export const updateShiftActionApi = async (id, { hanhDong, lyDo }) => {
     return await parseJsonResponse(response);
   } catch (error) {
     console.error("Error in updateShiftActionApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * Đánh dấu nghỉ phép đột xuất — gọi endpoint chuyên dụng /{id}/nghi-phep.
+ * Body CHỈ có lyDo (endpoint chỉ đọc body.get("lyDo")).
+ * Backend tự động hủy hàng loạt lịch khám CHUA_DEN của bác sĩ trong ngày nghỉ
+ * và gửi thông báo cho bệnh nhân bị hủy lịch.
+ */
+export const updateShiftNghiPhepApi = async (id, lyDo) => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}/nghi-phep`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lyDo }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(response, `Lỗi: ${response.status}`),
+      );
+    }
+    return await parseJsonResponse(response);
+  } catch (error) {
+    console.error("Error in updateShiftNghiPhepApi:", error);
     throw error;
   }
 };

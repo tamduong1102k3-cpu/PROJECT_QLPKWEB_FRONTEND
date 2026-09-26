@@ -133,12 +133,41 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
     setLyDoHoan('');
   };
 
+  // Helper normalize ngày — cắt bỏ phần giờ nếu có (ISO datetime → yyyy-MM-dd)
+  const normalizeDate = (v) => v ? String(v).split('T')[0] : '';
+
   // Lưu thông tin đã sửa — CHỈ gọi updateApi()
   // - KHÔNG tick "Hoãn" → update() bình thường, giữ nguyên trạng thái
-  // - TICK "Hoãn" → update() với trangThai='HOAN' + append lý do hoãn vào ghiChu
+  // - TICK "Hoãn" → update() với trangThai='HOAN' + lyDoHoan field riêng
+  //   → Backend tự tạo lịch mới + đánh dấu lịch cũ HOAN
   const handleSaveEdit = async () => {
     const appointment = editModal.appointment;
     if (!appointment) return;
+
+    // Normalize ngày cũ + mới để so sánh đúng (tránh lệch format)
+    const oldDate = normalizeDate(appointment.ngayKham);
+    const newDate = normalizeDate(editFormData.ngayTaiKham);
+    const dateChanged = newDate !== '' && newDate !== oldDate;
+
+    // Validation ngày — CHỈ khi thực sự đổi ngày
+    if (dateChanged) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (newDate < todayStr) {
+        alert('Không thể chọn ngày trong quá khứ');
+        return;
+      }
+      if (newDate === todayStr) {
+        alert('Không thể chọn ngày hôm nay. Vui lòng chọn từ ngày mai trở đi.');
+        return;
+      }
+    }
+
+    // Nếu đổi ngày mà chưa tick "Hoãn" → chặn
+    if (dateChanged && !hoanLich) {
+      alert('Bạn đã đổi ngày khám. Vui lòng tick "Hoãn lịch" và nhập lý do để lưu.');
+      return;
+    }
+
     setSavingEdit(true);
     try {
       const payload = {
@@ -153,13 +182,9 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
       };
 
       if (hoanLich) {
-        // Tick "Hoãn" → trạng thái là HOAN, append lý do vào ghiChu
+        // Tick "Hoãn" → trạng thái HOAN + lý do hoãn field RIÊNG (không nhét vào ghiChu)
         payload.trangThai = 'HOAN';
-        const lyDo = lyDoHoan?.trim();
-        payload.ghiChu = [
-          editFormData.ghiChu?.trim(),
-          lyDo ? `Hoãn: ${lyDo}` : ''
-        ].filter(Boolean).join(' | ') || null;
+        payload.lyDoHoan = lyDoHoan?.trim();
       }
 
       await updateAppointmentApi(appointment.id, payload);
@@ -183,6 +208,7 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
     HOAN_THANH: { label: 'Hoàn thành', color: 'bg-green-100 text-green-700' },
     HUY: { label: 'Đã hủy', color: 'bg-red-100 text-red-700' },
     QUA_HEN: { label: 'Quá hẹn', color: 'bg-orange-100 text-orange-700' },
+    HOAN: { label: 'Hoãn', color: 'bg-amber-100 text-amber-700' },
   };
 
   const getStatus = (status) => statusLabels[status] || { label: status || 'Chưa xác định', color: 'bg-gray-100 text-gray-700' };
@@ -292,6 +318,7 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
                 <option value="HOAN_THANH">Hoàn thành</option>
                 <option value="HUY">Đã hủy</option>
                 <option value="QUA_HEN">Quá hẹn</option>
+                <option value="HOAN">Hoãn</option>
               </select>
             </div>
           </div>
@@ -352,7 +379,21 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-4"><span className={`px-3 py-1 rounded-full text-xs font-semibold ${status.color}`}>{status.label}</span></td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${status.color}`}>{status.label}</span>
+                        {a.maLichKhamGoc && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold w-fit">
+                            <span className="material-symbols-outlined text-[11px]">link</span>Hoãn từ #{a.maLichKhamGoc}
+                          </span>
+                        )}
+                        {a.trangThai === 'HOAN' && a.maLichKhamMoi && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold w-fit">
+                            <span className="material-symbols-outlined text-[11px]">arrow_forward</span>Đã hoãn sang #{a.maLichKhamMoi}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-4 text-sm text-gray-400 max-w-[200px] truncate">{a.ghiChu || '--'}</td>
                     <td className="px-4 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -421,6 +462,7 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
           setHoanLich={setHoanLich}
           lyDoHoan={lyDoHoan}
           setLyDoHoan={setLyDoHoan}
+          originalDate={editModal.appointment.ngayKham}
         />
       )}
     </div>

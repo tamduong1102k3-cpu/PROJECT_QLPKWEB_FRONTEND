@@ -1,1 +1,1 @@
-fix(responsive): tối ưu giao diện màn hình laptop hẹp (1024px - 1440px)
+refactor: dùng config.js trung tâm cho API/WS URL

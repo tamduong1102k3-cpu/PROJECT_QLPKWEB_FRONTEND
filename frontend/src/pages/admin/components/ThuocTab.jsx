@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../../../api/config';
 import { deleteThuocApi as _deleteThuocApi } from '../../../api/khoThuocApi';
 import { apiClient } from "../../../api/apiClient";
 import { useNotification } from '../../../components/NotificationContext';
@@ -7,7 +8,7 @@ import { card, th, td, formatCurrency } from './styles';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
 
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
+const API = `${API_BASE_URL}/kho-thuoc`;
 
 const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
   const { showSuccess, showError, showWarning } = useNotification();

@@ -193,6 +193,38 @@
     max-width: 400px;
   }
 
+  /* Confirm overlay - giữa màn hình */
+  .confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 10000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .confirm-container {
+    max-width: 460px;
+    width: 100%;
+  }
+
+  .confirm-container .toast-notification.confirm {
+    animation: confirmScaleIn 0.25s ease-out forwards;
+  }
+
+  @keyframes confirmScaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
   .toast-notification {
     display: flex;
     align-items: center;
@@ -229,6 +261,46 @@
     color: #92400e;
   }
 
+  .toast-notification.confirm {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+    max-width: 420px;
+  }
+
+  .toast-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: 4px;
+  }
+
+  .toast-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.2s;
+  }
+
+  .toast-btn:hover {
+    opacity: 0.85;
+  }
+
+  .toast-btn-confirm {
+    background: #2563eb;
+    color: #fff;
+  }
+
+  .toast-btn-cancel {
+    background: #fff;
+    color: #374151;
+    border: 1px solid #d1d5db;
+  }
+
   .toast-icon {
     width: 28px;
     height: 28px;
@@ -257,6 +329,11 @@
   }
 
   .toast-notification.warning .toast-icon {
+    background: #fef3c7;
+    color: #d97706;
+  }
+
+  .toast-notification.confirm .toast-icon {
     background: #fef3c7;
     color: #d97706;
   }

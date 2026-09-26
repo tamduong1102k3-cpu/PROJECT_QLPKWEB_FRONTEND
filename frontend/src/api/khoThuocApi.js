@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
+import { API_BASE_URL } from './config';
+const API_URL = `${API_BASE_URL}/kho-thuoc`;
 
 /**
  * GET /thuoc
