@@ -13,7 +13,6 @@ import QuanLyThongKe from './components/QuanLyThongKe';
 import QuanLyPhong from './components/QuanLyPhong';
 import QuanLyDichVu from './components/QuanLyDichVu';
 import QuanLyBenhNhan from './components/QuanLyBenhNhan';
-import QuanLyCaiDat from './components/QuanLyCaiDat';
 import QuanLyChuyenKhoa from './components/QuanLyChuyenKhoa';
 const BangDieuKhienAdmin = ({
   onLogout,
@@ -178,10 +177,6 @@ const BangDieuKhienAdmin = ({
     id: 'specialties',
     label: 'Chuyên Khoa',
     icon: 'local_hospital'
-  }, {
-    id: 'settings',
-    label: 'Cài Đặt',
-    icon: 'settings'
   }];
   return <div className="flex h-screen bg-[#f3f4f6] font-body-md text-on-background overflow-hidden">
       
@@ -394,7 +389,7 @@ const BangDieuKhienAdmin = ({
                     </table>
                   </div>}
               </div>
-      </div> : activeTab === 'patients' ? <QuanLyBenhNhan title="Thông Tin Bệnh Nhân" /> : activeTab === 'employees' ? <QuanLyNhanVien /> : activeTab === 'accounts' ? <QuanLyTaiKhoan /> : activeTab === 'pharmacy' ? <QuanLyNhaThuoc /> : activeTab === 'shifts' ? <QuanLyCaLamViec /> : activeTab === 'statistics' ? <QuanLyThongKe /> : activeTab === 'rooms' ? <QuanLyPhong /> : activeTab === 'services' ? <QuanLyDichVu /> : activeTab === 'specialties' ? <QuanLyChuyenKhoa /> : activeTab === 'settings' ? <QuanLyCaiDat /> :
+      </div> : activeTab === 'patients' ? <QuanLyBenhNhan title="Thông Tin Bệnh Nhân" /> : activeTab === 'employees' ? <QuanLyNhanVien /> : activeTab === 'accounts' ? <QuanLyTaiKhoan /> : activeTab === 'pharmacy' ? <QuanLyNhaThuoc /> : activeTab === 'shifts' ? <QuanLyCaLamViec /> : activeTab === 'statistics' ? <QuanLyThongKe /> : activeTab === 'rooms' ? <QuanLyPhong /> : activeTab === 'services' ? <QuanLyDichVu /> : activeTab === 'specialties' ? <QuanLyChuyenKhoa /> :
         // Placeholder for other tabs
         <div className="flex flex-col items-center justify-center h-full text-gray-400 animate-fade-in">
               <span className="material-symbols-outlined text-6xl mb-4 opacity-50">
