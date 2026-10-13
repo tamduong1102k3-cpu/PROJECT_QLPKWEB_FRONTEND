@@ -1,7 +1,5 @@
-import { getAllApi as _getAllAppointments, deleteApi } from '../../../api/appointmentApi';
-import { apiClient } from "../../../api/apiClient";
+import * as appointmentApi from '../../../api/appointmentApi';
 import React, { useState, useEffect } from 'react';
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/appointments';
 const formatStatus = status => {
   switch (status) {
     case 'CHUA_DEN':
@@ -36,14 +34,8 @@ const QuanLyLichHen = ({ showActions = 'all', onQuickCheckIn }) => {
   const fetchAppointments = async () => {
     setLoading(true);
     try {
-      const res = await (async () => ({
-        ok: true,
-        json: async () => await _getAllAppointments()
-      }))();
-      if (res.ok) {
-        const data = await res.json();
-        setAppointments(data);
-      }
+      const data = await appointmentApi.getAllApi();
+      setAppointments(data || []);
     } catch (error) {
       console.error("Error fetching appointments:", error);
     } finally {
@@ -56,17 +48,9 @@ const QuanLyLichHen = ({ showActions = 'all', onQuickCheckIn }) => {
   const handleUpdate = async e => {
     e.preventDefault();
     try {
-      const res = await apiClient(`${API}/${editing.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(editing)
-      });
-      if (res.ok) {
-        setEditing(null);
-        fetchAppointments();
-      }
+      await appointmentApi.updateApi(editing.id, editing);
+      setEditing(null);
+      fetchAppointments();
     } catch (error) {
       alert("Lỗi khi cập nhật lịch hẹn");
     }
@@ -78,7 +62,7 @@ const QuanLyLichHen = ({ showActions = 'all', onQuickCheckIn }) => {
         ok: false
       };
       try {
-        await deleteApi(id);
+        await appointmentApi.deleteApi(id);
         res.ok = true;
       } catch (e) {}
       if (res.ok) {

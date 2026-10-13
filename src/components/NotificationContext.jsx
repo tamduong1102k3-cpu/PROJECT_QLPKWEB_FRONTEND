@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import Notification from './Notification';
+import fetchClient from '../api/fetchClient';
+import { getAccessToken, decodeTokenPayload } from '../api/tokenStore';
+import { API_BASE_URL } from '../api/config';
 
 const NotificationContext = createContext();
 
@@ -66,7 +69,21 @@ export const NotificationProvider = ({ children }) => {
     );
   }, []);
 
-  const markAllBellAsRead = useCallback(() => {
+  const markAllBellAsRead = useCallback(async () => {
+    // Gọi BE mark-all-read theo role của token hiện tại (QUAN_TRI_VIEN hoặc NHAN_VIEN)
+    try {
+      const payload = decodeTokenPayload(getAccessToken());
+      const ma = payload?.maTaiKhoan || payload?.maTaiKhoanBn || null;
+      const role = payload?.role || '';
+      const loai = role === 'QUAN_TRI_VIEN' ? 'QUAN_TRI_VIEN'
+        : (role === 'BENH_NHAN' ? 'BENH_NHAN' : 'NHAN_VIEN');
+      if (ma) {
+        await fetchClient(
+          `${API_BASE_URL}/thong-bao/${ma}/${loai}/mark-all-read`,
+          { method: 'PUT', skipLoading: true }
+        );
+      }
+    } catch (e) { console.error('markAllBellAsRead:', e); }
     setBellNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }, []);
 

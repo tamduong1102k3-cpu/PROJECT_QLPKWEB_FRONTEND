@@ -1,10 +1,13 @@
-import { apiClient } from "../../api/apiClient";
-import React, { useState, useEffect, useRef } from 'react';
+import * as statisticsApi from '../../api/statisticsApi';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import UserMenu from '../../components/UserMenu';
 import NotificationBell from '../../components/NotificationBell';
 import { useNotification } from '../../components/NotificationContext';
 import useWebSocket from '../../hooks/useWebSocket';
 import { getKhoCanhBaoApi } from '../../api/khoThuocApi';
+import fetchClient from '../../api/fetchClient';
+import { getAccessToken, decodeTokenPayload } from '../../api/tokenStore';
+import { API_BASE_URL } from '../../api/config';
 import QuanLyNhanVien from './components/QuanLyNhanVien';
 import QuanLyTaiKhoan from './components/QuanLyTaiKhoan';
 import QuanLyNhaThuoc from './components/QuanLyNhaThuoc';
@@ -33,79 +36,102 @@ const BangDieuKhienAdmin = ({
   });
 
   const { bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
-  const lastHandledRef = useRef({ key: null, ts: 0 });
+  const thongBaoLoadedRef = useRef(false);
 
-  const addMedicineNotifications = (items) => {
-    const now = new Date();
-    const expiryLimit = new Date(now);
-    expiryLimit.setMonth(expiryLimit.getMonth() + 1);
+  // Lấy maTaiKhoan admin từ JWT (claim maTaiKhoan cho NHAN_VIEN/QUAN_TRI_VIEN)
+  const getMaTaiKhoanAdmin = () => {
+    const payload = decodeTokenPayload(getAccessToken());
+    return payload?.maTaiKhoan || null;
+  };
 
-    (items || []).forEach((item) => {
-      const quantity = Number(item.soLuongTon);
-      if (quantity < 20) {
+  // Fetch thông báo persistent từ bảng thong_bao (do scheduler tạo)
+  const fetchThongBaoAdmin = useCallback(async () => {
+    const ma = getMaTaiKhoanAdmin();
+    if (!ma) return;
+    try {
+      const res = await fetchClient(
+        `${API_BASE_URL}/thong-bao/${ma}/QUAN_TRI_VIEN`,
+        { skipLoading: true }
+      );
+      if (!res.ok) return;
+      const result = await res.json();
+      const list = result?.data ?? result ?? [];
+      (Array.isArray(list) ? list : []).forEach(tb => {
+        if (tb.id == null) return;
         addBellNotification({
-          id: `medicine-stock-${item.maThuoc}-${item.soLuongTon}`,
-          title: quantity <= 0 ? 'Thuốc hết hàng' : 'Thuốc sắp hết',
-          message: `${item.tenThuoc || `Thuốc #${item.maThuoc}`} còn ${Math.max(quantity, 0)} ${item.donViTinh || 'đơn vị'}.`,
-          type: quantity <= 0 ? 'error' : 'warning',
+          id: tb.id,
+          title: tb.tieuDe || 'Thông báo',
+          message: tb.noiDung || '',
+          type: 'warning',
+          createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
+          read: tb.daDoc || false,
+        });
+      });
+    } catch (e) { console.error('fetchThongBaoAdmin:', e); }
+  }, [addBellNotification]);
+
+  // Đánh dấu TẤT CẢ đã đọc: gọi BE mark-all-read rồi mới update local
+  const handleMarkAllBellAsRead = useCallback(async () => {
+    const ma = getMaTaiKhoanAdmin();
+    if (ma) {
+      try {
+        await fetchClient(
+          `${API_BASE_URL}/thong-bao/${ma}/QUAN_TRI_VIEN/mark-all-read`,
+          { method: 'PUT', skipLoading: true }
+        );
+      } catch (e) { console.error('handleMarkAllBellAsRead:', e); }
+    }
+    markAllBellAsRead();
+  }, [markAllBellAsRead]);
+
+  // Lấy maTaiKhoan admin để subscribe topic thông báo riêng
+  const [maTaiKhoanAdmin, setMaTaiKhoanAdmin] = useState(null);
+  useEffect(() => {
+    setMaTaiKhoanAdmin(getMaTaiKhoanAdmin());
+  }, []);
+
+  // (Bỏ bell synthetic: chuông admin đọc từ bảng thong_bao do scheduler tạo)
+
+  // WebSocket subscription: topic kho chung (giữ bảng số liệu) + topic thong-bao riêng (persistent)
+  const wsTopics = useRef(['/topic/kho-alert']).current;
+  if (maTaiKhoanAdmin && !wsTopics.includes(`/topic/thong-bao/${maTaiKhoanAdmin}`)) {
+    wsTopics.push(`/topic/thong-bao/${maTaiKhoanAdmin}`);
+  }
+  useWebSocket({
+    topics: wsTopics,
+    onMessage: (topic, data) => {
+      // Thông báo persistent từ scheduler → id DB thật
+      if (topic.startsWith('/topic/thong-bao/') && data) {
+        if (data.id == null) return;
+        addBellNotification({
+          id: data.id,
+          title: data.tieuDe || 'Thông báo',
+          message: data.noiDung || '',
+          type: 'warning',
           createdAt: new Date(),
           read: false,
         });
-      }
-
-      if (item.hanSuDung) {
-        const expiryDate = new Date(item.hanSuDung);
-        if (expiryDate < now || expiryDate <= expiryLimit) {
-          const expired = expiryDate < now;
-          addBellNotification({
-            id: `medicine-expiry-${item.maThuoc}-${item.hanSuDung}`,
-            title: expired ? 'Thuốc đã hết hạn' : 'Thuốc sắp hết hạn',
-            message: `${item.tenThuoc || `Thuốc #${item.maThuoc}`} ${expired ? 'đã hết hạn' : 'sắp hết hạn'} ngày ${item.hanSuDung}.`,
-            type: expired ? 'error' : 'warning',
-            createdAt: new Date(),
-            read: false,
-          });
-        }
-      }
-    });
-  };
-
-  // WebSocket subscription for realtime admin notifications
-  useWebSocket({
-    topics: ['/topic/kho-alert'],
-    onMessage: (topic, data) => {
-      const now = Date.now();
-      const eventKey = `${topic}:${data?.maThuoc || data?.action || ''}:${data?.soLuongTon ?? ''}`;
-      if (lastHandledRef.current.key === eventKey && now - lastHandledRef.current.ts < 2000) {
         return;
       }
-      lastHandledRef.current = { key: eventKey, ts: now };
-
-      const quantity = Number(data?.soLuongTon);
-      const outOfStock = data?.action === 'HET_HANG_KHI_CAP' || quantity <= 0;
-      addBellNotification({
-        id: `${topic}-${Date.now()}-${Math.random()}`,
-        title: outOfStock ? 'Thuốc hết hàng' : 'Cập nhật tồn kho thuốc',
-        message: data?.message || `${data?.tenThuoc || `Thuốc #${data?.maThuoc}`} còn ${Math.max(quantity, 0)} ${data?.donViTinh || 'đơn vị'}.`,
-        type: outOfStock ? 'error' : 'warning',
-        createdAt: new Date(),
-        read: false,
-      });
+      // Topic kho-alert: không tạo bell synthetic nữa (chuông đọc từ DB)
     },
   });
 
   useEffect(() => {
-    // Fetch cảnh báo thuốc ban đầu cho chuông admin
+    // Fetch cảnh báo thuốc cho BẢNG dashboard (giữ nguyên), KHÔNG tạo bell synthetic
     getKhoCanhBaoApi().then(data => {
-      addMedicineNotifications(data);
-      return data;
-    }).then(data => {
       setSapHet((data || []).filter(item => Number(item.soLuongTon) < 20));
       setSapHetLoading(false);
     }).catch(() => setSapHetLoading(false));
 
+    // Fetch thông báo persistent từ DB cho chuông
+    if (!thongBaoLoadedRef.current) {
+      thongBaoLoadedRef.current = true;
+      fetchThongBaoAdmin();
+    }
+
     // Fetch dashboard summary
-    apiClient('https://qlpk-backend-spring-boot.onrender.com/api/thong-ke/dashboard-summary').then(res => res.ok ? res.json() : null).then(data => {
+    statisticsApi.getDashboardSummaryApi().then(data => {
       if (data) {
         setSummary({
           tongBenhNhan: data.tongBenhNhan ?? 0,
@@ -116,7 +142,7 @@ const BangDieuKhienAdmin = ({
         });
       }
     }).catch(err => console.error("Error fetching dashboard summary:", err));
-  }, []);
+  }, [fetchThongBaoAdmin]);
 
   // Dữ liệu cho Dashboard
   const stats = [{
@@ -145,6 +171,10 @@ const BangDieuKhienAdmin = ({
     id: 'dashboard',
     label: 'Tổng Quan',
     icon: 'dashboard'
+  }, {
+    id: 'patients',
+    label: 'Bệnh Nhân',
+    icon: 'person_search'
   }, {
     id: 'employees',
     label: 'Nhân Viên',
@@ -249,7 +279,7 @@ const BangDieuKhienAdmin = ({
               <NotificationBell
               notifications={bellNotifications}
               onMarkAsRead={markBellAsRead}
-              onMarkAllAsRead={markAllBellAsRead}
+              onMarkAllAsRead={handleMarkAllBellAsRead}
               onClearAll={clearAllBell}
             />
             <UserMenu

@@ -1,6 +1,8 @@
-import { getAllApi, searchApi, getHoSoApi } from "../../../api/benhNhanApi";
+import { getAllApi, searchApi, getHoSoApi, resetQuaHenApi } from "../../../api/benhNhanApi";
 import { useState, useEffect, useCallback } from "react";
 import ChiTietKhamModal from "../../../components/ChiTietKhamModal";
+import { useNotification } from "../../../components/NotificationContext";
+import { getRoleFromAccessToken } from "../../../api/tokenStore";
 import usePagination from "../../../hooks/usePagination";
 import Pagination from "../../../components/Pagination";
 import formatGender from "../../../utils/formatGender";
@@ -105,6 +107,10 @@ const QuanLyBenhNhan = ({
   const [hoSoLoading, setHoSoLoading] = useState(false);
   const [activeHoSoTab, setActiveHoSoTab] = useState("lich-su");
 
+  const { showSuccess, showError, showConfirm } = useNotification();
+  const role = getRoleFromAccessToken();
+  const isAdmin = role === 'QUAN_TRI_VIEN';
+
   // Phân trang + search dùng chung
   const {
     paginatedData: paged,
@@ -157,6 +163,19 @@ const QuanLyBenhNhan = ({
     } finally {
       setHoSoLoading(false);
     }
+  };
+
+  const handleResetQuaHen = async (bn, e) => {
+    if (e) e.stopPropagation();
+    showConfirm(`Reset số lần quá hẹn của "${bn.hoTen}" về 0?`, async () => {
+      try {
+        await resetQuaHenApi(bn.maBenhNhan);
+        showSuccess(`Đã reset quá hẹn cho ${bn.hoTen}`);
+        loadPatients(search);
+      } catch (err) {
+        showError('Lỗi: ' + err.message);
+      }
+    });
   };
 
   const paidInvoices = hoSo.filter(
@@ -295,13 +314,15 @@ const QuanLyBenhNhan = ({
                   <th style={S.th}>Ngày Sinh</th>
                   <th style={S.th}>Số ĐT</th>
                   <th style={S.th}>Nhóm Máu</th>
+                  {isAdmin && <th style={{ ...S.th, textAlign: "center" }}>Quá Hẹn</th>}
+                  {isAdmin && <th style={{ ...S.th, textAlign: "center" }}>Thao Tác</th>}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
                     <td
-                      colSpan="6"
+                      colSpan={isAdmin ? 8 : 6}
                       style={{
                         ...S.td,
                         textAlign: "center",
@@ -315,7 +336,7 @@ const QuanLyBenhNhan = ({
                 ) : patients.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="6"
+                      colSpan={isAdmin ? 8 : 6}
                       style={{
                         ...S.td,
                         textAlign: "center",
@@ -372,6 +393,37 @@ const QuanLyBenhNhan = ({
                             "—"
                           )}
                         </td>
+                        {isAdmin && (
+                          <td style={{ ...S.td, textAlign: "center" }}>
+                            {(p.soLanQuaHen ?? 0) > 0 ? (
+                              <span style={{ color: "#dc2626", fontWeight: 700 }}>
+                                {p.soLanQuaHen}
+                              </span>
+                            ) : (
+                              <span style={{ color: "#9ca3af" }}>—</span>
+                            )}
+                          </td>
+                        )}
+                        {isAdmin && (
+                          <td style={{ ...S.td, textAlign: "center" }}>
+                            {(p.soLanQuaHen ?? 0) > 0 && (
+                              <button
+                                onClick={(e) => handleResetQuaHen(p, e)}
+                                title="Reset số lần quá hẹn về 0"
+                                style={{
+                                  color: "#ea580c",
+                                  fontSize: "13px",
+                                  fontWeight: 600,
+                                  background: "transparent",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Reset
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   })

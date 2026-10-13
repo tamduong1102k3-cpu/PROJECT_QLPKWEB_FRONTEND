@@ -45,7 +45,11 @@ const ChiTietHoaDon = ({ invoice, selectedPatient, invoiceDetails, onPay }) => {
             <p className="font-bold text-emerald-600 text-lg">{formatCurrency(invoice.tongTien)}</p>
           </div>
         </div>
-        {invoice.maGiaoDich && (
+        {invoice.maGiaoDich
+          && !invoice.maGiaoDich.startsWith('TM_')
+          && !invoice.maGiaoDich.startsWith('CK_')
+          && (invoice.phuongThucThanhToan === 'vnpay' || invoice.phuongThucThanhToan === 'VNPAY')
+          && (
           <div className="bg-slate-50 border border-slate-200/50 rounded-2xl p-4 mt-3">
             <p className="text-[9px] font-semibold text-slate-400 uppercase">Mã giao dịch</p>
             <p className="font-mono text-slate-700 text-sm font-bold mt-0.5">{invoice.maGiaoDich}</p>

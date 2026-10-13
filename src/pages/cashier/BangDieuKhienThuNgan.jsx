@@ -10,6 +10,7 @@ import useWebSocket from '../../hooks/useWebSocket';
 import NotificationBell from '../../components/NotificationBell';
 import { useNotification } from '../../components/NotificationContext';
 import { getAccessToken } from '../../api/tokenStore';
+import { API_ORIGIN } from '../../api/config';
 
 const BangDieuKhienThuNgan = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('payment');
@@ -26,7 +27,7 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { showSuccess, showError, bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
   const lastHandledRef = useRef({ maHoaDon: null, ts: 0 });
-  const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
+  const baseUrl = API_ORIGIN;
 
   // Lấy maTaiKhoan của nhân viên (bảng tai_khoan) từ token
   const getMaTaiKhoanNhanVien = () => {

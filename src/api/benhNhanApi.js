@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/benh-nhan';
+import { API_BASE_URL } from './config';
+const API_URL = `${API_BASE_URL}/benh-nhan`;
 
 /**
  * GET /
@@ -175,6 +176,31 @@ export const deleteApi = async id => {
     return text ? JSON.parse(text) : null;
   } catch (error) {
     console.error("Error in deleteApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * PUT /benh-nhan/{id}/reset-qua-hen
+ * Reset số lần quá hẹn về 0. Chỉ QTV.
+ */
+export const resetQuaHenApi = async id => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}/reset-qua-hen`, {
+      method: 'PUT'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in resetQuaHenApi:", error);
     throw error;
   }
 };

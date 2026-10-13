@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { apiClient } from '../../../api/apiClient';
+import * as chuyenKhoaApi from '../../../api/chuyenKhoaApi';
 import { useNotification } from '../../../components/NotificationContext';
-
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/chuyen-khoa';
 
 const QuanLyChuyenKhoa = () => {
   const [chuyenKhoas, setChuyenKhoas] = useState([]);
@@ -23,14 +21,8 @@ const QuanLyChuyenKhoa = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient(API);
-      if (res.ok) {
-        const data = await res.json();
-        setChuyenKhoas(data ?? []);
-      } else {
-        setError('Không thể tải danh sách chuyên khoa. Vui lòng thử lại.');
-        setChuyenKhoas([]);
-      }
+      const data = await chuyenKhoaApi.getAllApi();
+      setChuyenKhoas(data ?? []);
     } catch (err) {
       console.error('Error fetching chuyen khoa:', err);
       setError('Lỗi kết nối máy chủ. Vui lòng thử lại.');
@@ -69,24 +61,15 @@ const QuanLyChuyenKhoa = () => {
 
   const handleSave = async () => {
     try {
-      const url = editing
-        ? `${API}/${editing.maChuyenKhoa}`
-        : API;
-      const method = editing ? 'PUT' : 'POST';
-
-      const res = await apiClient(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      if (res.ok) {
-        handleCloseModal();
-        fetchData();
-        showSuccess(editing ? 'Cập nhật chuyên khoa thành công!' : 'Thêm chuyên khoa thành công!');
+      if (editing) {
+        await chuyenKhoaApi.updateApi(editing.maChuyenKhoa, formData);
       } else {
-        showError('Lỗi khi lưu chuyên khoa. Vui lòng thử lại.');
+        await chuyenKhoaApi.createApi(formData);
       }
+
+      handleCloseModal();
+      fetchData();
+      showSuccess(editing ? 'Cập nhật chuyên khoa thành công!' : 'Thêm chuyên khoa thành công!');
     } catch (err) {
       console.error('Error saving chuyen khoa:', err);
       showError('Lỗi kết nối máy chủ. Vui lòng thử lại.');
@@ -96,15 +79,9 @@ const QuanLyChuyenKhoa = () => {
   const handleDelete = async (item) => {
     if (!window.confirm(`Bạn có chắc muốn xóa chuyên khoa "${item.tenChuyenKhoa}"?`)) return;
     try {
-      const res = await apiClient(`${API}/${item.maChuyenKhoa}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        fetchData();
-        showSuccess('Xóa chuyên khoa thành công!');
-      } else {
-        showError('Không thể xóa chuyên khoa này.');
-      }
+      await chuyenKhoaApi.deleteApi(item.maChuyenKhoa);
+      fetchData();
+      showSuccess('Xóa chuyên khoa thành công!');
     } catch (err) {
       console.error('Error deleting chuyen khoa:', err);
       showError('Lỗi kết nối máy chủ. Vui lòng thử lại.');

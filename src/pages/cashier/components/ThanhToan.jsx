@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAllApi, getChiTietApi, getBillingItemsApi, createInvoiceFromPhieuKhamApi, thanhToanApi } from '../../../api/hoaDonApi';
-import { apiClient } from '../../../api/apiClient';
+import * as paymentApi from '../../../api/paymentApi';
+import * as phieuKhamApi from '../../../api/phieuKhamApi';
 import { useNotification } from '../../../components/NotificationContext';
 import BangBenhNhan from './BangBenhNhan';
 import ChiTietHoaDon from './ChiTietHoaDon';
@@ -9,9 +10,6 @@ import InHoaDon from './InHoaDon';
 import SockJS from 'sockjs-client/dist/sockjs.min.js';
 import Stomp from 'stompjs';
 import { getAccessToken } from '../../../api/tokenStore';
-
-const API_NHAN_VIEN = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
-const API_PHIEU_KHAM = 'https://qlpk-backend-spring-boot.onrender.com/api/phieu-kham';
 
 const formatCurrency = (amount) => {
   if (amount == null) return '—';
@@ -95,15 +93,16 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
   const fetchData = useCallback(async (keyword = '') => {
     setIsLoading(true);
     try {
-      const url = keyword ? `${API_PHIEU_KHAM}/completed-patients?keyword=${encodeURIComponent(keyword)}` : `${API_PHIEU_KHAM}/completed-patients`;
-      const [pkRes, invRes] = await Promise.all([
-        apiClient(url),
-        apiClient('https://qlpk-backend-spring-boot.onrender.com/api/hoa-don'),
+      const [pkData, invData] = await Promise.all([
+        phieuKhamApi.getCompletedPatientsApi(keyword),
+        getAllApi(),
       ]);
-      setCompletedPatients(pkRes.ok ? await pkRes.json() : []);
-      setInvoices(invRes.ok ? await invRes.json() : []);
+      setCompletedPatients(pkData || []);
+      setInvoices(invData || []);
     } catch (e) {
       console.error('Error fetching data:', e);
+      setCompletedPatients([]);
+      setInvoices([]);
     } finally {
       setIsLoading(false);
     }
@@ -179,8 +178,8 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
       );
       if (!inv) {
         inv = await createInvoiceFromPhieuKhamApi(patient.maPhieuKham, { maNhanVien: getMaNhanVien() });
-        const invRes = await apiClient('https://qlpk-backend-spring-boot.onrender.com/api/hoa-don');
-        if (invRes.ok) setInvoices(await invRes.json() || []);
+        const invData = await getAllApi();
+        setInvoices(invData || []);
       }
       setCurrentInvoice(inv);
       setInvoiceDetails(await getChiTietApi(inv.maHoaDon) || []);
@@ -218,32 +217,25 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
     if (!currentInvoice) return;
     const maNhanVien = getMaNhanVien();
     if (method === 'vnpay') {
-      handleVnpayPayment(maNhanVien);
+      handleVnpayPayment();
     } else {
       handleCashTransferPayment(maNhanVien, method);
     }
   };
 
-  const handleVnpayPayment = async (maNhanVien) => {
+  const handleVnpayPayment = async () => {
     setShowPaymentModal(false);
     const vnpayWindow = window.open('', '_blank');
-    if (!vnpayWindow) {
-      const response = await apiClient(`https://qlpk-backend-spring-boot.onrender.com/api/payment/vnpay/create/${currentInvoice.maHoaDon}`, { method: 'POST' });
-      if (response.ok) window.location.href = (await response.json()).url;
-      else throw new Error((await response.json()).error || 'Lỗi VNPay');
-      return;
-    }
     try {
-      const response = await apiClient(`https://qlpk-backend-spring-boot.onrender.com/api/payment/vnpay/create/${currentInvoice.maHoaDon}`, { method: 'POST' });
-      if (response.ok) {
-        vnpayWindow.location.href = (await response.json()).url;
+      const { url } = await paymentApi.createVnpayUrlApi(currentInvoice.maHoaDon);
+      if (vnpayWindow) {
+        vnpayWindow.location.href = url;          // popup OK → tab mới
       } else {
-        vnpayWindow.close();
-        throw new Error((await response.json()).error || 'Lỗi VNPay');
+        window.location.href = url;               // popup blocked → redirect cùng tab
       }
-    } catch (e) {
-      vnpayWindow.close();
-      showError(`Lỗi thanh toán: ${e.message}`);
+    } catch (err) {
+      if (vnpayWindow) vnpayWindow.close();       // guard: null thì không close
+      showError(`Lỗi thanh toán: ${err.message}`);
     }
   };
 
@@ -251,8 +243,9 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
     setProcessing(true);
     try {
       const autoAmount = tongTien;
-      const autoTransId = method === 'chuyen_khoan' ? `CK_${Date.now()}` : `TM_${Date.now()}`;
-      await thanhToanApi(currentInvoice.maHoaDon, { maNhanVien, maTaiKhoan: getMaTaiKhoanNhanVien(), phuongThuc: method, soTienNhan: autoAmount, maGiaoDich: autoTransId });
+      // Không sinh mã giả — tiền mặt / chuyển khoản thủ công không có mã giao dịch.
+      // Mã giao dịch chỉ có thật khi thanh toán qua VNPay (backend ghi từ vnp_TransactionNo).
+      await thanhToanApi(currentInvoice.maHoaDon, { maNhanVien, maTaiKhoan: getMaTaiKhoanNhanVien(), phuongThuc: method, soTienNhan: autoAmount, maGiaoDich: null });
       showSuccess(`Thanh toán hóa đơn #${currentInvoice.maHoaDon?.toString().padStart(4, '0')} thành công!`);
       setShowPaymentModal(false);
       setSelectedPatient(null);

@@ -1,7 +1,5 @@
-import { getAllPhongApi as _getAllPhongApi, getAllChucVuApi as _getAllChucVuApi, getAllChuyenKhoaApi as _getAllChuyenKhoaApi, deletePhongApi as _deletePhongApi } from '../../../api/danhMucApi';
-import { apiClient } from "../../../api/apiClient";
+import * as danhMucApi from '../../../api/danhMucApi';
 import React, { useState, useEffect } from 'react';
-const BASE = 'https://qlpk-backend-spring-boot.onrender.com/api/danhmuc';
 const empty = {
   tenPhong: '',
   loaiPhong: '',
@@ -53,7 +51,7 @@ export default function QuanLyPhong() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [p, cv, ck] = await Promise.all([_getAllPhongApi(), _getAllChucVuApi(), _getAllChuyenKhoaApi()]);
+      const [p, cv, ck] = await Promise.all([danhMucApi.getAllPhongApi(), danhMucApi.getAllChucVuApi(), danhMucApi.getAllChuyenKhoaApi()]);
       setPhongList(p || []);
       setChucVuList(cv || []);
       setCkList(ck || []);
@@ -100,16 +98,11 @@ export default function QuanLyPhong() {
       maChucVu: form.maChucVu !== '' ? Number(form.maChucVu) : null
     };
     try {
-      const url = modal === 'edit' ? `${BASE}/phong/${editId}` : `${BASE}/phong`;
-      const method = modal === 'edit' ? 'PUT' : 'POST';
-      const res = await apiClient(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) throw new Error('Lỗi lưu dữ liệu');
+      if (modal === 'edit') {
+        await danhMucApi.updatePhongApi(editId, body);
+      } else {
+        await danhMucApi.createPhongApi(body);
+      }
       setModal(null);
       fetchAll();
     } catch (e) {
@@ -124,7 +117,7 @@ export default function QuanLyPhong() {
     if (!window.confirm('Xóa phòng này?')) return;
     setDeleting(id);
     try {
-      await _deletePhongApi(id);
+      await danhMucApi.deletePhongApi(id);
       fetchAll();
     } catch (e) {
       alert(e.message);

@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/dich-vu';
+import { API_BASE_URL } from './config';
+const API_URL = `${API_BASE_URL}/dich-vu`;
 
 /**
  * GET /
@@ -11,11 +12,16 @@ export const getAllApi = async () => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -39,11 +45,16 @@ export const createApi = async data => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -67,11 +78,16 @@ export const updateApi = async (id, data) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -91,11 +107,16 @@ export const deleteApi = async id => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;

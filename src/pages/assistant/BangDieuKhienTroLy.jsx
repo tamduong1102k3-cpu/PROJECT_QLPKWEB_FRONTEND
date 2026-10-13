@@ -1,8 +1,6 @@
 import { getTodayApi as _getTodayDangKy, updateStatusApi as _updateDangKyStatus } from '../../api/dangKyKhamBenhApi';
 import { getCurrentRoomApi as _getCurrentRoomApi } from '../../api/shiftApi';
-import { updateToWaitingForDoctorApi } from '../../api/phieuKhamApi';
-// ĐẢM BẢO IMPORT apiClient
-import { apiClient } from "../../api/apiClient"; 
+import * as phieuKhamApi from '../../api/phieuKhamApi';
 import { useNotification } from '../../components/NotificationContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -20,9 +18,6 @@ import NhomOSoLieu from '../doctor/components/NhomOSoLieu';
 import UserMenu from '../../components/UserMenu';
 import LichLamViecTab from '../../components/LichLamViecTab';
 import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
-
-// KHAI BÁO API_BASE
-const API_BASE = 'https://qlpk-backend-spring-boot.onrender.com/api';
 
 const BangDieuKhienTroLy = ({ onLogout, user }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -99,21 +94,16 @@ const BangDieuKhienTroLy = ({ onLogout, user }) => {
         setConfirmState(prev => ({ ...prev, isOpen: false }));
         try {
           const maNV = user?.maNhanVien || '';
-          const res = await apiClient(`${API_BASE}/phieu-kham/accept-patient/${patient.id}?assistantId=${maNV}`, { 
-            method: 'POST' 
-          });
+          const data = await phieuKhamApi.acceptPatientApi(patient.id, maNV);
 
-          if (res.ok) {
-            const data = await res.json();
-            await fetchStats();
-            setSelectedPatient({ 
-              ...patient, 
-              trangThai: 'DANG_KHAM', 
-              maPhieuKham: data.phieuKhamId 
-            });
-            showSuccess(`Đã tiếp nhận bệnh nhân "${patient.hoTen}"`);
-            setActiveTab('dashboard');
-          }
+          await fetchStats();
+          setSelectedPatient({ 
+            ...patient, 
+            trangThai: 'DANG_KHAM', 
+            maPhieuKham: data.phieuKhamId 
+          });
+          showSuccess(`Đã tiếp nhận bệnh nhân "${patient.hoTen}"`);
+          setActiveTab('dashboard');
         } catch (error) { 
           showError("Lỗi tiếp nhận: " + error.message); 
         }
@@ -381,7 +371,7 @@ const VitalSignsForm = ({ phieuKhamId, registrationId, assistantId, initialGhiCh
           if (vitalsRef.current) {
             const success = await vitalsRef.current.handleSave();
             if (success) {
-              await updateToWaitingForDoctorApi(phieuKhamId);
+              await phieuKhamApi.updateToWaitingForDoctorApi(phieuKhamId);
               showSuccess("✅ Đã hoàn tất đo sinh hiệu và chuyển Bác sĩ khám.");
               onSaved();
             }

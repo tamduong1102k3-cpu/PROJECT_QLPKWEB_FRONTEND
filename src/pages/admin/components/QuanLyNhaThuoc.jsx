@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from "../../../api/apiClient";
+import * as khoThuocApi from '../../../api/khoThuocApi';
+import * as employeeApi from '../../../api/employeeApi';
 import ThuocTab from './ThuocTab';
 import KhoThuocTab from './KhoThuocTab';
 import PhieuNhapTab from './PhieuNhapTab';
-
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
-const NV_API = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
 
 // ── Hook: load lookup maps ────────────────────────────────────────────────────
 const useLookups = refreshTrigger => {
@@ -13,14 +11,14 @@ const useLookups = refreshTrigger => {
   const [thuocMap, setThuocMap] = useState({}); // maThuoc    → tenThuoc
   const [thuocList, setThuocList] = useState([]);
   useEffect(() => {
-    Promise.all([apiClient(NV_API).then(r => r.json()), apiClient(`${API}/thuoc`).then(r => r.json())]).then(([nvList, tList]) => {
+    Promise.all([employeeApi.getAllNhanVienApi(), khoThuocApi.getAllThuocApi()]).then(([nvList, tList]) => {
       const nv = {};
-      nvList.forEach(n => { nv[n.maNhanVien] = n.hoTen; });
+      (nvList || []).forEach(n => { nv[n.maNhanVien] = n.hoTen; });
       setNvMap(nv);
       const th = {};
-      tList.forEach(t => { th[t.maThuoc] = t; });
+      (tList || []).forEach(t => { th[t.maThuoc] = t; });
       setThuocMap(th);
-      setThuocList(tList);
+      setThuocList(tList || []);
     }).catch(() => {});
   }, [refreshTrigger]);
   return { nvMap, thuocMap, thuocList };

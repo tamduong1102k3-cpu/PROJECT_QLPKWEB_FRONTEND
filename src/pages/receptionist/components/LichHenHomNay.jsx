@@ -7,9 +7,9 @@ const LichHenHomNay = ({ onCheckIn }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async ()=>({ ok: true, json: async ()=>await _getAllAppointments() }))()
-      .then(r => r.ok ? r.json() : [])
-      .then(data => {
+    _getAllAppointments()
+      .then(res => {
+        const data = res || [];
         const today = new Date();
         const filtered = data.filter(a => {
           const d = new Date(a.ngayTaiKham);

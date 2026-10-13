@@ -1,6 +1,5 @@
-import { apiClient } from "../../../api/apiClient";
+import * as statisticsApi from '../../../api/statisticsApi';
 import React, { useState, useEffect } from 'react';
-const BASE = 'https://qlpk-backend-spring-boot.onrender.com/api/thong-ke';
 const MONTHS = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
 const fmt = val => {
   if (!val || val === 0) return '0';
@@ -32,7 +31,7 @@ export default function QuanLyThongKe() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('doanh-thu');
   useEffect(() => {
-    apiClient(`${BASE}/nam-co-du-lieu`).then(r => r.ok ? r.json() : []).then(y => {
+    statisticsApi.namCoDuLieuApi().then(y => {
       const list = y && y.length > 0 ? y : [new Date().getFullYear()];
       setYears(list);
       setSelYear(list[0]);
@@ -41,10 +40,10 @@ export default function QuanLyThongKe() {
   useEffect(() => {
     if (!selYear) return;
     setLoading(true);
-    apiClient(`${BASE}/theo-nam?nam=${selYear}`).then(r => r.ok ? r.json() : []).then(d => {
-      setData(d);
+    statisticsApi.theoNamApi(selYear).then(d => {
+      setData(d || []);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => { setData([]); setLoading(false); });
   }, [selYear]);
 
   // ── Calculated values ────────────────────────────────────────────────

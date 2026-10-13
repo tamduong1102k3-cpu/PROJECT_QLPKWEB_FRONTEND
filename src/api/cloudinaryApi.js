@@ -3,7 +3,10 @@
  * Backend endpoint: POST /api/images/upload
  */
 
-const CLOUDINARY_UPLOAD_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/images/upload';
+import { API_BASE_URL } from './config';
+import fetchClient from './fetchClient';
+
+const CLOUDINARY_UPLOAD_URL = `${API_BASE_URL}/images/upload`;
 
 /**
  * Upload file ảnh lên Cloudinary
@@ -15,7 +18,7 @@ export const uploadToCloudinary = async (file) => {
   formData.append('file', file);
 
   try {
-    const response = await fetch(CLOUDINARY_UPLOAD_URL, {
+    const response = await fetchClient(CLOUDINARY_UPLOAD_URL, {
       method: 'POST',
       body: formData,
     });

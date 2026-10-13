@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom';
 import InPhieuTiepDon from './InPhieuTiepDon';
 import DangKyBenhNhan from './DangKyBenhNhan';
 import { getMaNhanVienFromAccessToken } from '../../../api/tokenStore';
+import { API_BASE_URL } from '../../../api/config';
 
 const removeVietnameseTones = str => {
   if (!str) return '';
@@ -150,7 +151,7 @@ const QuyTrinhTiepDon = ({
     ghiChu: ''
   });
 
-  const API_BASE = 'https://qlpk-backend-spring-boot.onrender.com/api';
+  const API_BASE = API_BASE_URL;
 
   const loadPatients = useCallback(async () => {
     setSearching(true);

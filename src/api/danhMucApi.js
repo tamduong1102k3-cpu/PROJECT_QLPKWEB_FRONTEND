@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/danhmuc';
+import { API_BASE_URL } from './config';
+const API_URL = `${API_BASE_URL}/danhmuc`;
 
 /**
  * GET /chuc-vu
@@ -122,6 +123,35 @@ export const getPhongByChucVuApi = async maChucVu => {
 };
 
 /**
+ * GET /phong/by-chuyen-khoa/{maChuyenKhoa}
+ */
+export const getPhongByChuyenKhoaApi = async (maChuyenKhoa) => {
+  try {
+    const response = await fetchClient(`${API_URL}/phong/by-chuyen-khoa/${maChuyenKhoa}`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
+      } catch (e) { /* ignore parse error */ }
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in getPhongByChuyenKhoaApi:", error);
+    throw error;
+  }
+};
+
+/**
  * POST /phong
  */
 export const createPhongApi = async data => {
@@ -197,6 +227,36 @@ export const deletePhongApi = async id => {
     return text ? JSON.parse(text) : null;
   } catch (error) {
     console.error("Error in deletePhongApi:", error);
+    throw error;
+  }
+};
+
+/**
+ * GET /nhom-dich-vu
+ * Lấy danh sách nhóm dịch vụ.
+ */
+export const getAllNhomDichVuApi = async () => {
+  try {
+    const response = await fetchClient(`${API_BASE_URL}/nhom-dich-vu`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
+      } catch (e) {}
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in getAllNhomDichVuApi:", error);
     throw error;
   }
 };

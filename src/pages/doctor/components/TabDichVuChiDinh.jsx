@@ -15,6 +15,8 @@ const TabDichVuChiDinh = ({
   handleSaveReferral,
   selectedServices,
   setSelectedServices,
+  phongMap = {},
+  onPhongChange = () => {},
   isAssistant,
   selectedPatient,
   user,
@@ -98,6 +100,7 @@ const TabDichVuChiDinh = ({
                 <tr>
                   <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Tên dịch vụ</th>
                   <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-center">SL</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Phòng</th>
                   <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right">Đơn giá</th>
                   <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-right">Thành tiền</th>
                   <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase text-center">Trạng thái</th>
@@ -119,6 +122,27 @@ const TabDichVuChiDinh = ({
                           setSelectedServices(selectedServices.map(item => item.maDichVu === s.maDichVu ? {...item, soLuong: val} : item)); 
                         }} 
                       />
+                    </td>
+                    <td className="px-4 py-4 text-sm">
+                      {readOnly ? (
+                        <span className="font-medium text-gray-700">{s.tenPhong || (s.maPhong ? `Phòng #${s.maPhong}` : 'Chưa có phòng')}</span>
+                      ) : (
+                        <select
+                          className="border border-gray-300 rounded-lg px-2 py-1 text-sm bg-white max-w-[220px]"
+                          value={s.maPhong || ''}
+                          onChange={e => onPhongChange(s.maDichVu, e.target.value ? Number(e.target.value) : null)}
+                        >
+                          <option value="">-- Chưa có phòng --</option>
+                          {(phongMap[s.maDichVu] || []).map(p => {
+                            const full = (p.soLuongToiDa > 0) && (p.soDaDat >= p.soLuongToiDa);
+                            return (
+                              <option key={p.maPhong} value={p.maPhong} disabled={full}>
+                                {p.tenPhong} ({p.soDaDat}/{p.soLuongToiDa}){full ? ' — Đã đủ' : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
                     </td>
                     <td className="px-4 py-4 text-sm text-right font-medium text-gray-600">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.donGia)}</td>
                     <td className="px-4 py-4 text-sm text-right font-bold text-indigo-600">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.donGia * s.soLuong)}</td>

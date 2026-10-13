@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/phieu-kham';
+import { API_BASE_URL } from './config';
+const API_URL = `${API_BASE_URL}/phieu-kham`;
 
 /**
  * GET /
@@ -160,9 +161,10 @@ export const fullCheckInApi = async data => {
 /**
  * POST /accept-patient/{registrationId}
  */
-export const acceptPatientApi = async registrationId => {
+export const acceptPatientApi = async (registrationId, assistantId) => {
   try {
-    const response = await fetchClient(`${API_URL}/accept-patient/${registrationId}`, {
+    const query = assistantId != null ? `?assistantId=${assistantId}` : '';
+    const response = await fetchClient(`${API_URL}/accept-patient/${registrationId}${query}`, {
       method: 'POST'
     });
     if (!response.ok) {
@@ -494,5 +496,34 @@ export const getCurrentChoPatientApi = async (maChuyenKhoa) => {
   } catch (error) {
     console.error("Error in getCurrentChoPatientApi:", error);
     return null;
+  }
+};
+
+/**
+ * GET /completed-patients
+ * Lấy danh sách bệnh nhân đã hoàn thành khám hôm nay (cho thu ngân).
+ * - keyword optional: bỏ trống / toàn space → không lọc (backend tự bỏ qua).
+ * - Backend trả List<Map<String,Object>> → JSON ARRAY (không phải object).
+ */
+export const getCompletedPatientsApi = async (keyword = '') => {
+  try {
+    const trimmed = (keyword || '').trim();
+    const qs = trimmed ? `?keyword=${encodeURIComponent(trimmed)}` : '';
+    const response = await fetchClient(`${API_URL}/completed-patients${qs}`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error("Error in getCompletedPatientsApi:", error);
+    throw error;
   }
 };

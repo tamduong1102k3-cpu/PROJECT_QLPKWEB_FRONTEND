@@ -8,6 +8,7 @@
  */
 import { loadingManager } from './loadingManager';
 import { getAccessToken, setAccessToken, clearAccessToken } from './tokenStore';
+import { API_ORIGIN } from './config';
 
 let isRefreshing = false;
 let refreshSubscribers = [];
@@ -47,7 +48,7 @@ const refreshTokenRequest = async () => {
   const timeoutId = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
 
   try {
-    const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
+    const baseUrl = API_ORIGIN;
     const endpoint = getRefreshEndpoint();
 
     const response = await fetch(`${baseUrl}${endpoint}`, {

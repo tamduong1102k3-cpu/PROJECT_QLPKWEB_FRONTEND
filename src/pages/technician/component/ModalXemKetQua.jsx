@@ -17,6 +17,14 @@ const ModalXemKetQua = ({ viewingResult, user, isImaging, onClose }) => {
 
   const handlePrintReport = () => { window.print(); };
 
+  // Gallery N ảnh (backward-compat duongDanAnh1/2)
+  const gallery = (() => {
+    if (!cdhaResultData) return [];
+    if (Array.isArray(cdhaResultData.danhSachAnh) && cdhaResultData.danhSachAnh.length > 0)
+      return cdhaResultData.danhSachAnh.filter(Boolean);
+    return [cdhaResultData.duongDanAnh1, cdhaResultData.duongDanAnh2].filter(Boolean);
+  })();
+
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6 transition-all duration-300 overflow-y-auto">
       {/* CSS In ấn giữ nguyên */}
@@ -98,22 +106,16 @@ const ModalXemKetQua = ({ viewingResult, user, isImaging, onClose }) => {
             </div>
 
             {/* Hình ảnh (Nếu có) */}
-            {isImaging && cdhaResultData && (cdhaResultData.duongDanAnh1 || cdhaResultData.duongDanAnh2) && (
+            {isImaging && cdhaResultData && gallery.length > 0 && (
               <div className="space-y-4 mt-8 print:break-inside-avoid">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 no-print">Hình Ảnh Cận Lâm Sàng</h3>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 no-print">Hình Ảnh Cận Lâm Sàng ({gallery.length})</h3>
                 <div className="grid grid-cols-2 gap-6">
-                  {cdhaResultData.duongDanAnh1 && (
-                    <div className="group relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm print:border-none print:shadow-none">
-                       <img src={cdhaResultData.duongDanAnh1} alt="Result 1" className="w-full h-56 object-cover cursor-zoom-in transition-transform duration-500 group-hover:scale-105 print:h-auto" onClick={() => setActiveLightboxImage(cdhaResultData.duongDanAnh1)} />
+                  {gallery.map((url, i) => (
+                    <div key={i} className="group relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm print:border-none print:shadow-none">
+                       <img src={url} alt={`Result ${i + 1}`} className="w-full h-56 object-cover cursor-zoom-in transition-transform duration-500 group-hover:scale-105 print:h-auto" onClick={() => setActiveLightboxImage(url)} />
                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none no-print"><span className="material-symbols-outlined text-white text-3xl">zoom_in</span></div>
                     </div>
-                  )}
-                  {cdhaResultData.duongDanAnh2 && (
-                    <div className="group relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm print:border-none print:shadow-none">
-                       <img src={cdhaResultData.duongDanAnh2} alt="Result 2" className="w-full h-56 object-cover cursor-zoom-in transition-transform duration-500 group-hover:scale-105 print:h-auto" onClick={() => setActiveLightboxImage(cdhaResultData.duongDanAnh2)} />
-                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none no-print"><span className="material-symbols-outlined text-white text-3xl">zoom_in</span></div>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </div>
             )}

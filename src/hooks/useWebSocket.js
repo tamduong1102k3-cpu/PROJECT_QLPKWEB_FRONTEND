@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import SockJS from 'sockjs-client/dist/sockjs.min.js';
 import Stomp from 'stompjs';
+import { WS_BASE_URL } from '../api/config';
+import { getAccessToken } from '../api/tokenStore';
 
 /**
  * Hook chung để subscribe WebSocket STOMP.
@@ -8,14 +10,14 @@ import Stomp from 'stompjs';
  * @param {Object} options
  * @param {string[]} options.topics - Danh sách topic cần subscribe, ví dụ ['/topic/phieu-kham', '/topic/vitals']
  * @param {function} options.onMessage - Callback khi nhận được message, signature: (topic, data) => void
- * @param {string} options.url - URL WebSocket endpoint (mặc định: https://qlpk-backend-spring-boot.onrender.com/ws)
+ * @param {string} options.url - URL WebSocket endpoint (mặc định: ${WS_BASE_URL}/ws)
  * @param {function} options.onConnect - Callback khi kết nối thành công
  * @param {function} options.onDisconnect - Callback khi mất kết nối
  */
 const useWebSocket = ({
   topics = [],
   onMessage,
-  url = 'https://qlpk-backend-spring-boot.onrender.com/ws',
+  url = `${WS_BASE_URL}/ws`,
   onConnect,
   onDisconnect,
 } = {}) => {
@@ -33,7 +35,9 @@ const useWebSocket = ({
       stompClient.debug = () => {};
       stompClientRef.current = stompClient;
 
-      stompClient.connect({}, () => {
+      const token = getAccessToken();
+      const connectHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      stompClient.connect(connectHeaders, () => {
         if (!mounted) return;
         if (onConnect) onConnect();
 

@@ -22,7 +22,15 @@ const DuyetKetQuaCDHA = ({
   const [submitting, setSubmitting] = useState(false);
   const [tiepNhanCls, setTiepNhanCls] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [activeImageKey, setActiveImageKey] = useState('duongDanAnh1');
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  // Helper gallery N ảnh (backward-compat duongDanAnh1/2)
+  const getGallery = (item) => {
+    if (!item) return [];
+    if (Array.isArray(item.danhSachAnh) && item.danhSachAnh.length > 0)
+      return item.danhSachAnh.filter(Boolean);
+    return [item.duongDanAnh1, item.duongDanAnh2].filter(Boolean);
+  };
 
   const fetchCdhaResults = useCallback(async () => {
     try {
@@ -38,7 +46,10 @@ const DuyetKetQuaCDHA = ({
           ketLuan: item.ketLuan || '',
           deNghi: item.deNghi || '',
           duongDanAnh1: item.duongDanAnh1 || '',
-          duongDanAnh2: item.duongDanAnh2 || ''
+          duongDanAnh2: item.duongDanAnh2 || '',
+          danhSachAnh: Array.isArray(item.danhSachAnh)
+            ? item.danhSachAnh
+            : [item.duongDanAnh1, item.duongDanAnh2].filter(Boolean)
         })));
       }
       if (tiepNhanData && tiepNhanData.length > 0) {
@@ -76,8 +87,10 @@ const DuyetKetQuaCDHA = ({
         moTaHinhAnh: currentResult.moTaHinhAnh,
         ketLuan: currentResult.ketLuan,
         deNghi: currentResult.deNghi,
-        duongDanAnh1: currentResult.duongDanAnh1,
-        duongDanAnh2: currentResult.duongDanAnh2,
+        // Gallery N ảnh + backward-compat 2 field cũ
+        danhSachAnh: getGallery(currentResult),
+        duongDanAnh1: getGallery(currentResult)[0] || null,
+        duongDanAnh2: getGallery(currentResult)[1] || null,
         // Khi xem lại ca đã duyệt (readOnly) => chỉ cập nhật nội dung, giữ nguyên trạng thái
         updateOnly: readOnly
       };
@@ -143,7 +156,8 @@ const DuyetKetQuaCDHA = ({
 
   const currentResult = results[selectedResultIndex];
   const isApproved = currentResult?.trangThai === 'DA_DUYET';
-  const hasImages = currentResult?.duongDanAnh1 || currentResult?.duongDanAnh2;
+  const currentGallery = getGallery(currentResult);
+  const hasImages = currentGallery.length > 0;
 
   if (loading) {
     return (
@@ -227,7 +241,7 @@ const DuyetKetQuaCDHA = ({
                           key={res.id}
                           onClick={() => {
                             setSelectedResultIndex(index);
-                            setActiveImageKey('duongDanAnh1');
+                            setActiveImageIndex(0);
                           }}
                           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedResultIndex === index
                               ? 'bg-indigo-600 text-white shadow-md'
@@ -385,16 +399,20 @@ const DuyetKetQuaCDHA = ({
             {/* Quick Image Button */}
             {hasImages && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-                <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Hình ảnh</h4>
+                <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Hình ảnh ({currentGallery.length})</h4>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {currentGallery.slice(0, 4).map((url, i) => (
+                    <img key={i} src={url} alt={`CDHA ${i + 1}`}
+                      onClick={() => { setActiveImageIndex(i); setShowImageModal(true); }}
+                      className="w-full h-20 object-cover rounded-lg cursor-zoom-in hover:opacity-90 transition-opacity" />
+                  ))}
+                </div>
                 <button
-                  onClick={() => setShowImageModal(true)}
-                  className="w-full py-8 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-xl text-blue-700 hover:bg-blue-100 transition-all flex flex-col items-center gap-2"
+                  onClick={() => { setActiveImageIndex(0); setShowImageModal(true); }}
+                  className="w-full py-3 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-xl text-blue-700 hover:bg-blue-100 transition-all flex flex-col items-center gap-1"
                 >
-                  <span className="material-symbols-outlined text-4xl">image</span>
-                  <span className="text-sm font-bold">XEM ẢNH</span>
-                  <span className="text-[10px] text-blue-500">
-                    {currentResult?.duongDanAnh2 ? '2 ảnh' : '1 ảnh'}
-                  </span>
+                  <span className="material-symbols-outlined text-3xl">image</span>
+                  <span className="text-sm font-bold">XEM {currentGallery.length} ẢNH</span>
                 </button>
               </div>
             )}
@@ -415,29 +433,19 @@ const DuyetKetQuaCDHA = ({
           onClick={() => setShowImageModal(false)}
         >
           <div className="relative max-w-[95vw] max-h-[95vh]" onClick={e => e.stopPropagation()}>
-            <div className="absolute -top-14 right-0 flex items-center gap-3">
-              {currentResult?.duongDanAnh1 && (
+            <div className="absolute -top-14 right-0 flex items-center gap-2 flex-wrap justify-end max-w-[90vw]">
+              {currentGallery.map((url, i) => (
                 <button
-                  onClick={() => setActiveImageKey('duongDanAnh1')}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-lg ${activeImageKey === 'duongDanAnh1'
+                  key={i}
+                  onClick={() => setActiveImageIndex(i)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg ${activeImageIndex === i
                       ? 'bg-indigo-600 text-white'
                       : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                     }`}
                 >
-                  Ảnh 1
+                  Ảnh {i + 1}
                 </button>
-              )}
-              {currentResult?.duongDanAnh2 && (
-                <button
-                  onClick={() => setActiveImageKey('duongDanAnh2')}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-lg ${activeImageKey === 'duongDanAnh2'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                    }`}
-                >
-                  Ảnh 2
-                </button>
-              )}
+              ))}
               <button
                 onClick={() => setShowImageModal(false)}
                 className="text-white/70 hover:text-white flex items-center gap-1 text-sm ml-4"
@@ -447,10 +455,26 @@ const DuyetKetQuaCDHA = ({
               </button>
             </div>
             <img
-              src={currentResult?.[activeImageKey]}
-              alt="Medical scan"
+              src={currentGallery[activeImageIndex]}
+              alt={`Medical scan ${activeImageIndex + 1}/${currentGallery.length}`}
               className="max-w-full max-h-[85vh] object-contain rounded-lg"
             />
+            {currentGallery.length > 1 && (
+              <>
+                <button
+                  onClick={() => setActiveImageIndex((activeImageIndex - 1 + currentGallery.length) % currentGallery.length)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center backdrop-blur"
+                >
+                  <span className="material-symbols-outlined">chevron_left</span>
+                </button>
+                <button
+                  onClick={() => setActiveImageIndex((activeImageIndex + 1) % currentGallery.length)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center backdrop-blur"
+                >
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

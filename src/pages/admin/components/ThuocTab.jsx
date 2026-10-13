@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { deleteThuocApi as _deleteThuocApi } from '../../../api/khoThuocApi';
-import { apiClient } from "../../../api/apiClient";
+import * as khoThuocApi from '../../../api/khoThuocApi';
 import { useNotification } from '../../../components/NotificationContext';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import { card, th, td, formatCurrency } from './styles';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
+import { API_BASE_URL } from '../../../api/config';
 
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
+const API = `${API_BASE_URL}/kho-thuoc`;
 
 const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
   const { showSuccess, showError, showWarning } = useNotification();
@@ -36,7 +36,7 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
   const handleDelete = async () => {
     if (!confirmDelete) return;
     try {
-      await _deleteThuocApi(confirmDelete.maThuoc);
+      await khoThuocApi.deleteThuocApi(confirmDelete.maThuoc);
       showSuccess('Đã xóa thuốc thành công!');
       onRefresh();
     } catch (e) {
@@ -62,31 +62,23 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
     }
     setLoading(true);
     try {
-      const url = editing?.maThuoc ? `${API}/thuoc/${editing.maThuoc}` : `${API}/thuoc`;
-      const method = editing?.maThuoc ? 'PUT' : 'POST';
-      const res = await apiClient(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      // Xử lý 409 CONFLICT do Optimistic Lock (apiClient trả Response ok=false, status=409 thay vì throw)
-      const conflictStatus = res.status === 409 || res.status?.toString?.() === '409';
-      if (res.ok) {
-        setEditing(null);
-        showSuccess(editing?.maThuoc ? 'Đã cập nhật thuốc thành công!' : 'Đã thêm thuốc mới thành công!');
-        onRefresh();
+      // Module tự throw khi lỗi — không cần check .ok
+      if (editing?.maThuoc) {
+        await khoThuocApi.updateThuocApi(editing.maThuoc, data);
+      } else {
+        await khoThuocApi.createThuocApi(data);
       }
-      else if (conflictStatus) {
-        showWarning('⚠️ Dữ liệu đã được cập nhật bởi người dùng khác. Vui lòng tải lại dữ liệu mới nhất!');
-        setEditing(null);
-        onRefresh();
-      }
-      else showError('Lỗi khi lưu thuốc');
-    } catch (e) {
-      // Fallback: nếu apiClient throw trực tiếp lỗi 409
-      const status = e.status || e.response?.status || (e.message && e.message.includes('409') ? 409 : null);
-      if (status === 409) {
+      setEditing(null);
+      showSuccess(editing?.maThuoc ? 'Đã cập nhật thuốc thành công!' : 'Đã thêm thuốc mới thành công!');
+      onRefresh();
+    } catch (err) {
+      // Wave D.1: khoThuocApi giờ gắn err.status + err.errorCode
+      if (err.status === 409 && err.errorCode === 'VERSION_CONFLICT') {
         showWarning('⚠️ Dữ liệu đã được cập nhật bởi người dùng khác. Vui lòng tải lại dữ liệu mới nhất!');
         setEditing(null);
         onRefresh();
       } else {
-        showError(e.message || 'Lỗi khi lưu thuốc');
+        showError(err.message || 'Lỗi khi lưu thuốc');
       }
     }
     finally { setLoading(false); }

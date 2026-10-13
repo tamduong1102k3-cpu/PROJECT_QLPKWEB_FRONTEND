@@ -1,7 +1,8 @@
 import fetchClient from './fetchClient';
 import { setAccessToken, getAccessToken, clearAccessToken } from './tokenStore';
+import { API_ORIGIN, API_BASE_URL } from './config';
 
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/taikhoan';
+const API_URL = `${API_BASE_URL}/taikhoan`;
 
 /**
  * Helper: parse response text hoặc JSON
@@ -171,7 +172,7 @@ export const ensureAuthenticated = async () => {
   try {
     if (getAccessToken()) return getAccessToken();
 
-    const baseUrl = localStorage.getItem('apiBaseUrl') || 'https://qlpk-backend-spring-boot.onrender.com';
+    const baseUrl = API_ORIGIN;
     const response = await fetch(`${baseUrl}/api/taikhoan/refresh-token`, {
       method: 'POST',
       credentials: 'include',

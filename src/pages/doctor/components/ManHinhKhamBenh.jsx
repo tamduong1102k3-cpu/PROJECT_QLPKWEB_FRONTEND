@@ -30,6 +30,7 @@ import {
 } from '../../../api/phieuKhamApi';
 import { saveAndUpdateApi as _saveChiSoKhamTongHopApi } from '../../../api/chiSoKhamTongHopApi';
 import { getByIdApi as _getBenhNhanByIdApi } from '../../../api/benhNhanApi';
+import { getPhongByChuyenKhoaApi } from '../../../api/danhMucApi';
 
 import HienThiSinhHieu from './HienThiSinhHieu';
 import TabKhamLamSang from './TabKhamLamSang';
@@ -112,6 +113,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   });
   const [allServices, setAllServices] = useState([]);
   const [selectedServices, setSelectedServices] = useState([]);
+  const [phongMap, setPhongMap] = useState({}); // { maDichVu: [{maPhong, tenPhong, soDaDat, soLuongToiDa}] }
   const [serviceSearch, setServiceSearch] = useState('');
   const [showServiceList, setShowServiceList] = useState(false);
   const [prescribedHistory, setPrescribedHistory] = useState([]);
@@ -222,6 +224,12 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     }
   }, [allMeds, enrichMedsWithCatalog]);
 
+  // Ref cho phongMap để dùng trong loader async mà không stale closure
+  const phongMapRef = useRef({});
+  useEffect(() => { phongMapRef.current = phongMap; }, [phongMap]);
+
+  const detailMaDv = (d) => d?.maDichVu;
+
   // Fetch initial info for selected patient
   useEffect(() => {
     if (selectedPatient) {
@@ -249,11 +257,21 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
                       loadedServices.push({
                         maDichVu: d.maDichVu,
                         tenDichVu: catalogService?.tenDichVu || d.tenDichVu || `Dịch vụ #${d.maDichVu}`,
+                        maChuyenKhoa: catalogService?.maChuyenKhoa,
                         donGia: d.donGia,
                         soLuong: d.soLuong,
                         trangThaiDv: d.trangThaiDv || 'CHUA_THUC_HIEN',
+                        maPhong: d.maPhong ?? null,
+                        tenPhong: d.tenPhong || null,
                         id: d.id
                       });
+                      // Nạp sẵn danh sách phòng theo chuyên khoa để dropdown có dữ liệu
+                      const ck = catalogService?.maChuyenKhoa;
+                      if (ck && !phongMapRef.current[detailMaDv(d)]) {
+                        getPhongByChuyenKhoaApi(ck)
+                          .then(list => setPhongMap(prev => ({ ...prev, [detailMaDv(d)]: list || [] })))
+                          .catch(e => console.error("Lỗi tải danh sách phòng:", e));
+                      }
                     }
                   }
                 }
@@ -399,7 +417,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     }
   }, [selectedPatient]);
 
-  const handleAddService = service => {
+  const handleAddService = async service => {
     if (selectedServices.find(s => s.maDichVu === service.maDichVu)) {
       showWarning("Dịch vụ này đã có trong danh sách!");
       return;
@@ -411,6 +429,21 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     }]);
     setShowServiceList(false);
     setServiceSearch('');
+    // Fetch phòng theo chuyên khoa của dịch vụ để chọn phòng CLS
+    const maDichVu = service.maDichVu;
+    const maChuyenKhoa = service.maChuyenKhoa;
+    if (maChuyenKhoa && !phongMap[maDichVu]) {
+      try {
+        const list = await getPhongByChuyenKhoaApi(maChuyenKhoa);
+        setPhongMap(prev => ({ ...prev, [maDichVu]: list || [] }));
+      } catch (e) { console.error("Lỗi tải danh sách phòng:", e); }
+    }
+  };
+
+  const handlePhongChange = (maDichVu, maPhong) => {
+    setSelectedServices(prev => prev.map(s =>
+      s.maDichVu === maDichVu ? { ...s, maPhong } : s
+    ));
   };
 
   const handleRemoveService = id => {
@@ -420,6 +453,11 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const handleSaveReferral = async (silent = false) => {
     if (!selectedPatient?.maPhieuKham) return;
     try {
+      const missing = selectedServices.filter(s => !s.maPhong);
+      if (missing.length > 0) {
+        showWarning('Vui lòng chọn phòng cho tất cả dịch vụ');
+        return;
+      }
       const total = selectedServices.reduce((acc, s) => acc + s.donGia * s.soLuong, 0);
       const payload = {
         phieuChiDinh: {
@@ -432,7 +470,8 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           donGia: s.donGia,
           soLuong: s.soLuong,
           thanhTien: s.donGia * s.soLuong,
-          trangThaiDv: 'CHUA_THUC_HIEN'
+          trangThaiDv: 'CHUA_THUC_HIEN',
+          maPhong: s.maPhong
         }))
       };
       const res = await _createPhieuChiDinhApi(payload);
@@ -963,6 +1002,8 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
               handleSaveReferral={handleSaveReferral}
               selectedServices={selectedServices}
               setSelectedServices={setSelectedServices}
+              phongMap={phongMap}
+              onPhongChange={handlePhongChange}
               selectedPatient={selectedPatient}
               user={user}
             />

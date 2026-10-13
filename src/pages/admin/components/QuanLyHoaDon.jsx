@@ -1,8 +1,6 @@
-import { apiClient } from "../../../api/apiClient";
-import { getAllApi, getChiTietApi } from '../../../api/hoaDonApi';
+import * as hoaDonApi from '../../../api/hoaDonApi';
+import * as employeeApi from '../../../api/employeeApi';
 import React, { useState, useEffect } from 'react';
-const API = 'https://qlpk-backend-spring-boot.onrender.com/api/hoa-don';
-const NV_API = 'https://qlpk-backend-spring-boot.onrender.com/api/nhan_vien';
 const formatCurrency = amount => {
   if (amount == null) return '—';
   return new Intl.NumberFormat('vi-VN', {
@@ -81,12 +79,10 @@ const QuanLyHoaDon = () => {
     (async () => {
       setIsLoading(true);
       try {
-        const [invRes, nvRes] = await Promise.all([apiClient(API), apiClient(NV_API)]);
-        if (!invRes.ok) throw new Error('Lỗi tải danh sách hóa đơn');
-        const [invData, nvData] = await Promise.all([invRes.json(), nvRes.json()]);
-        setInvoices(invData);
+        const [invData, nvData] = await Promise.all([hoaDonApi.getAllApi(), employeeApi.getAllNhanVienApi()]);
+        setInvoices(invData || []);
         const map = {};
-        nvData.forEach(n => {
+        (nvData || []).forEach(n => {
           map[n.maNhanVien] = n.hoTen;
         });
         setNvMap(map);
@@ -104,7 +100,7 @@ const QuanLyHoaDon = () => {
     setDetails([]);
     setLoadingDetail(true);
     try {
-      const detailsData = await getChiTietApi(inv.maHoaDon);
+      const detailsData = await hoaDonApi.getChiTietApi(inv.maHoaDon);
       setDetails(detailsData);
     } catch (e) {
       alert(e.message);

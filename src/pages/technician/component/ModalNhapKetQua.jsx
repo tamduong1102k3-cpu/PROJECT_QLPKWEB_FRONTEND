@@ -8,10 +8,17 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
   const [testResultText, setTestResultText] = useState('');
   const [useTemplate, setUseTemplate] = useState(true);
   const [templateValues, setTemplateValues] = useState({});
-  const [duongDanAnh1, setDuongDanAnh1] = useState('');
-  const [duongDanAnh2, setDuongDanAnh2] = useState('');
-  const [isUploading, setIsUploading] = useState(null);
+  const [danhSachAnh, setDanhSachAnh] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Helper backward-compat: BE mới trả danhSachAnh, BE/FE cũ trả duongDanAnh1/2
+  const extractGallery = (data) => {
+    if (!data) return [];
+    if (Array.isArray(data.danhSachAnh) && data.danhSachAnh.length > 0)
+      return data.danhSachAnh.filter(Boolean);
+    return [data.duongDanAnh1, data.duongDanAnh2].filter(Boolean);
+  };
 
   // State quản lý ảnh phóng to
   const [lightboxUrl, setLightboxUrl] = useState(null);
@@ -29,8 +36,7 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
     if (isImaging) {
       getCdhaResultApi(test.id).then(data => {
         if (data) {
-          if (data.duongDanAnh1) setDuongDanAnh1(data.duongDanAnh1);
-          if (data.duongDanAnh2) setDuongDanAnh2(data.duongDanAnh2);
+          setDanhSachAnh(extractGallery(data));
           
           if (selectedTemplate && selectedTemplate.key === 'CDHA_GENERIC') {
             const vals = {
@@ -50,14 +56,25 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
     setTestResultText(generateTextFromTemplate(selectedTemplate, updated, test.tenDichVu));
   };
 
-  const handleImageUpload = async (e, idx) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setIsUploading(idx);
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    if (danhSachAnh.length + files.length > 10) {
+      alert('Tối đa 10 ảnh'); return;
+    }
+    setIsUploading(true);
     try {
-      const url = await uploadToCloudinary(file);
-      if (idx === 1) setDuongDanAnh1(url); else setDuongDanAnh2(url);
-    } finally { setIsUploading(null); }
+      const urls = [];
+      for (const file of files) urls.push(await uploadToCloudinary(file));
+      setDanhSachAnh([...danhSachAnh, ...urls]);
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveImage = (idx) => {
+    setDanhSachAnh(danhSachAnh.filter((_, i) => i !== idx));
   };
 
   const handleSave = async () => {
@@ -69,8 +86,10 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
         tenDichVu: test.tenDichVu,
         ketQua: testResultText, 
         maNhanVienThucHien: user?.maNhanVien,
-        duongDanAnh1, 
-        duongDanAnh2, 
+        // Gallery N ảnh + backward-compat 2 field cũ
+        danhSachAnh,
+        duongDanAnh1: danhSachAnh[0] || null,
+        duongDanAnh2: danhSachAnh[1] || null,
         useTemplate, 
         templateKey: selectedTemplate ? selectedTemplate.key : null,
         templateValues: useTemplate ? templateValues : null
@@ -154,40 +173,33 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
 
           {isImaging && (
             <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/30">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Hình ảnh đính kèm</h4>
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Hình ảnh đính kèm ({danhSachAnh.length}/10)</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[1, 2].map(idx => {
-                  const imgUrl = idx === 1 ? duongDanAnh1 : duongDanAnh2;
-                  return (
-                    <div key={idx} className="relative group rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/50 transition-all flex flex-col items-center justify-center h-24 sm:h-28 overflow-hidden">
-                      {imgUrl ? (
-                        <>
-                          <img src={imgUrl} alt={`Uploaded ${idx}`} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button type="button" onClick={(e) => { e.stopPropagation(); setLightboxUrl(imgUrl); }} className="w-8 h-8 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-all">
-                              <span className="material-symbols-outlined text-lg">zoom_in</span>
-                            </button>
-                            <div className="relative w-8 h-8 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-all">
-                              <span className="material-symbols-outlined text-lg">swap_horiz</span>
-                              <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleImageUpload(e, idx)} disabled={isUploading !== null} />
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span className="material-symbols-outlined text-slate-400 group-hover:text-indigo-500 transition-colors text-2xl mb-1">add_photo_alternate</span>
-                          <span className="text-[10px] font-bold text-slate-500 group-hover:text-indigo-600 uppercase tracking-wider">Tải ảnh</span>
-                          <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={e => handleImageUpload(e, idx)} disabled={isUploading !== null} />
-                        </>
-                      )}
-                      {isUploading === idx && (
-                        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
-                          <span className="material-symbols-outlined animate-spin text-indigo-500 text-2xl">refresh</span>
-                        </div>
-                      )}
+                <label className="relative group rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/50 transition-all flex flex-col items-center justify-center h-24 sm:h-28 overflow-hidden cursor-pointer">
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} disabled={isUploading} />
+                  {isUploading ? (
+                    <span className="material-symbols-outlined animate-spin text-indigo-500 text-2xl">refresh</span>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-slate-400 group-hover:text-indigo-500 transition-colors text-2xl mb-1">add_photo_alternate</span>
+                      <span className="text-[10px] font-bold text-slate-500 group-hover:text-indigo-600 uppercase tracking-wider">Thêm ảnh</span>
+                    </>
+                  )}
+                </label>
+                {danhSachAnh.map((imgUrl, i) => (
+                  <div key={i} className="relative group rounded-xl border border-slate-200 bg-slate-50 flex flex-col items-center justify-center h-24 sm:h-28 overflow-hidden">
+                    <img src={imgUrl} alt={`CDHA ${i + 1}`} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button type="button" onClick={() => setLightboxUrl(imgUrl)} className="w-8 h-8 bg-white/20 hover:bg-white/40 text-white rounded-full flex items-center justify-center transition-all">
+                        <span className="material-symbols-outlined text-lg">zoom_in</span>
+                      </button>
+                      <button type="button" onClick={() => handleRemoveImage(i)} className="w-8 h-8 bg-rose-500/80 hover:bg-rose-500 text-white rounded-full flex items-center justify-center transition-all" title="Xóa ảnh">
+                        <span className="material-symbols-outlined text-lg">close</span>
+                      </button>
                     </div>
-                  )
-                })}
+                    <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-slate-900/60 text-white text-[10px] font-bold rounded">#{i + 1}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

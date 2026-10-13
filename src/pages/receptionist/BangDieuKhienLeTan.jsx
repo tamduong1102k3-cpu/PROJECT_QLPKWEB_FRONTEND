@@ -37,8 +37,7 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
   const fetchStats = useCallback(async () => {
     try {
       // Today's appointments
-      const appRes = await (async () => ({ ok: true, json: async () => await _getAllAppointments() }))();
-      const appointments = appRes.ok ? await appRes.json() : [];
+      const appointments = await _getAllAppointments() || [];
       const todayApp = appointments.filter(a => {
         const d = new Date(a.ngayTaiKham);
         const today = new Date();
@@ -46,13 +45,11 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
       }).length;
 
       // Lấy danh sách đăng ký hôm nay (Bảng Đăng ký khám bệnh)
-      const dkRes = await (async () => ({ ok: true, json: async () => await _getTodayDangKy() }))();
-      const registrations = dkRes.ok ? await dkRes.json() : [];
+      const registrations = await _getTodayDangKy() || [];
       const waitingRegs = registrations.filter(r => r.trangThai === 'CHO_KHAM');
 
       // Waiting patients (PhieuKham with status 'CHO')
-      const pkRes = await (async () => ({ ok: true, json: async () => await _getTodayPhieuKham() }))();
-      const pks = pkRes.ok ? await pkRes.json() : [];
+      const pks = await _getTodayPhieuKham() || [];
       const completed = pks.filter(p => p.trangThai === 'HOAN_THANH').length;
 
       setStats({

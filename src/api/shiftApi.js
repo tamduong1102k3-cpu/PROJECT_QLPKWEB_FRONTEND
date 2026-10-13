@@ -1,6 +1,7 @@
 import fetchClient from "./fetchClient";
-const API_URL = "https://qlpk-backend-spring-boot.onrender.com/api/phan-cong";
-const CA_LAM_URL = "https://qlpk-backend-spring-boot.onrender.com/api/ca-lam";
+import { API_BASE_URL } from './config';
+const API_URL = `${API_BASE_URL}/phan-cong`;
+const CA_LAM_URL = `${API_BASE_URL}/ca-lam`;
 
 /**
  * Lấy tất cả danh sách phân công ca làm

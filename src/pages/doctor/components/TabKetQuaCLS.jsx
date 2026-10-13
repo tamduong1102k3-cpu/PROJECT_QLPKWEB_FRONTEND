@@ -9,6 +9,17 @@ const TabKetQuaCLS = ({ maPhieuKham }) => {
   const [loading, setLoading] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
+
+  // Gallery N ảnh CĐHA (backward-compat duongDanAnh1/2) — copy pattern ModalXemKetQua.jsx
+  const extractGallery = (result) => {
+    if (!result) return [];
+    if (Array.isArray(result.danhSachAnh) && result.danhSachAnh.length > 0)
+      return result.danhSachAnh
+        .map(a => typeof a === 'string' ? a : (a?.duongDanAnh || a?.url))
+        .filter(Boolean);
+    return [result.duongDanAnh1, result.duongDanAnh2].filter(Boolean);
+  };
   
   // Referenced IDs from clinical exam to display checkmarks
   const [referencedIds, setReferencedIds] = useState([]);
@@ -208,6 +219,29 @@ const TabKetQuaCLS = ({ maPhieuKham }) => {
                   {selectedResult.ketLuan || 'Chưa có kết luận.'}
                 </p>
               </div>
+
+              {(() => {
+                const gallery = extractGallery(selectedResult);
+                if (gallery.length === 0) return null;
+                return (
+                  <div>
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Hình ảnh kết quả ({gallery.length})</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {gallery.map((url, idx) => (
+                        <div key={idx} className="group relative rounded-2xl overflow-hidden border border-gray-200/50">
+                          <img
+                            src={url}
+                            alt={`Hình ảnh ${idx + 1}`}
+                            className="w-full h-32 object-cover cursor-zoom-in transition-transform duration-500 group-hover:scale-105"
+                            onClick={() => setLightboxUrl(url)}
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none"><span className="material-symbols-outlined text-white text-3xl">zoom_in</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Modal Footer */}
@@ -229,6 +263,16 @@ const TabKetQuaCLS = ({ maPhieuKham }) => {
             <div className="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
             <span className="text-xs font-bold text-gray-600">Đang tải kết quả chi tiết...</span>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox ảnh phóng to — copy pattern ModalXemKetQua.jsx */}
+      {lightboxUrl && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setLightboxUrl(null)}>
+          <img src={lightboxUrl} alt="Xem ảnh" className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
+          <button className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors" onClick={() => setLightboxUrl(null)}>
+            <span className="material-symbols-outlined">close</span>
+          </button>
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/kho-thuoc';
+import { API_BASE_URL } from './config';
+const API_URL = `${API_BASE_URL}/kho-thuoc`;
 
 /**
  * GET /thuoc
@@ -11,11 +12,16 @@ export const getAllThuocApi = async () => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -39,11 +45,16 @@ export const createThuocApi = async data => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -67,11 +78,16 @@ export const updateThuocApi = async (id, data) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -91,11 +107,16 @@ export const deleteThuocApi = async id => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -115,11 +136,16 @@ export const getAllKhoApi = async () => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -139,11 +165,16 @@ export const getKhoCanhBaoApi = async () => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -163,11 +194,16 @@ export const getThuocCanhBaoApi = async () => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -187,11 +223,16 @@ export const getThuocSapHetApi = async (threshold = 20) => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -211,11 +252,16 @@ export const getAllPhieuNhapApi = async () => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -235,11 +281,16 @@ export const getPhieuNhapByIdApi = async id => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -259,11 +310,16 @@ export const getChiTietPhieuNhapApi = async id => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
@@ -287,11 +343,16 @@ export const createPhieuNhapApi = async data => {
     });
     if (!response.ok) {
       let errorMsg = `Lỗi: ${response.status}`;
+      let errorCode = null;
       try {
         const errorData = await response.json();
         errorMsg = errorData.message || errorMsg;
+        errorCode = errorData.errorCode;
       } catch (e) {}
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      error.errorCode = errorCode;
+      throw error;
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;

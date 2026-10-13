@@ -10,10 +10,8 @@ const DanhSachCho = ({ type = 'waiting', refreshTrigger = 0, compact = false }) 
     const shouldShowLoading = isInitialLoad.current;
     if (shouldShowLoading) setLoading(true);
     isInitialLoad.current = false;
-    (async () => ({
-      ok: true,
-      json: async () => await _getTodayDangKy()
-    }))().then(r => r.ok ? r.json() : []).then(data => {
+    _getTodayDangKy().then(res => {
+      const data = res || [];
       // Hiển thị tất cả bệnh nhân đăng ký khám trong ngày hôm nay
       const todayList = data.filter(r => r.trangThai !== 'HUY');
       const cancelled = data.filter(r => r.trangThai === 'HUY');

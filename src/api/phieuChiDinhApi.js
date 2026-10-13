@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
-const API_URL = 'https://qlpk-backend-spring-boot.onrender.com/api/phieu-chi-dinh';
+import { API_BASE_URL } from './config';
+const API_URL = `${API_BASE_URL}/phieu-chi-dinh`;
 
 /**
  * 1. Lấy danh sách chờ thực hiện CLS (Dành cho KTV)
@@ -38,13 +39,23 @@ export const getCompletedTestsTodayApi = async (params = {}) => {
 /**
  * 3. Kỹ thuật viên nộp kết quả (Lab/X-Quang/Siêu âm)
  * POST /submit-result
+ * Hỗ trợ gallery N ảnh: payload.danhSachAnh (mảng URL). BE tự fallback
+ * duongDanAnh1/2 cho client cũ.
  */
 export const submitTestResultApi = async (data) => {
   try {
+    const payload = { ...data };
+    const list = Array.isArray(payload.danhSachAnh)
+      ? payload.danhSachAnh.filter(Boolean)
+      : [];
+    // Backward-compat: luôn gửi kèm 2 field cũ từ gallery
+    if (payload.duongDanAnh1 == null) payload.duongDanAnh1 = list[0] || null;
+    if (payload.duongDanAnh2 == null) payload.duongDanAnh2 = list[1] || null;
+    if (list.length > 0) payload.danhSachAnh = list;
     const response = await fetchClient(`${API_URL}/submit-result`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(payload)
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

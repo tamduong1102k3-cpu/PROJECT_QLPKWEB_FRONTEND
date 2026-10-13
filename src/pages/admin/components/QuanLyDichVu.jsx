@@ -1,13 +1,12 @@
-import { apiClient } from "../../../api/apiClient";
-import { createApi, updateApi, deleteApi } from '../../../api/dichVuApi';
+import * as dichVuApi from '../../../api/dichVuApi';
+import * as danhMucApi from '../../../api/danhMucApi';
 import React, { useState, useEffect } from 'react';
-const BASE_DV = 'https://qlpk-backend-spring-boot.onrender.com/api/dich-vu';
-const BASE_DM = 'https://qlpk-backend-spring-boot.onrender.com/api/danhmuc';
 const empty = {
   tenDichVu: '',
   donGia: '',
   loaiDichVu: '',
   maChuyenKhoa: '',
+  maNhomDichVu: '',
   version: undefined
 };
 const fmtGia = val => {
@@ -26,6 +25,7 @@ const fmtLoai = val => {
 export default function QuanLyDichVu() {
   const [list, setList] = useState([]);
   const [ckList, setCkList] = useState([]);
+  const [nhomList, setNhomList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterLoai, setFilterLoai] = useState('');
@@ -40,9 +40,10 @@ export default function QuanLyDichVu() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [dv, ck] = await Promise.all([apiClient(BASE_DV).then(r => r.json()), apiClient(`${BASE_DM}/chuyen-khoa`).then(r => r.json())]);
+      const [dv, ck, nhom] = await Promise.all([dichVuApi.getAllApi(), danhMucApi.getAllChuyenKhoaApi(), danhMucApi.getAllNhomDichVuApi()]);
       setList(dv || []);
       setCkList(ck || []);
+      setNhomList(nhom || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -52,6 +53,11 @@ export default function QuanLyDichVu() {
 
   // Helpers
   const tenCK = id => ckList.find(c => c.maChuyenKhoa === id)?.tenChuyenKhoa || '—';
+  const tenNhom = id => {
+    if (!id && id !== 0) return '—';
+    const n = nhomList.find(x => x.maNhom === id || x.maNhom === Number(id));
+    return n ? n.tenNhom : '—';
+  };
 
   // Unique loai for filter
   const loaiOptions = [...new Set(list.map(d => d.loaiDichVu).filter(Boolean))];
@@ -71,6 +77,7 @@ export default function QuanLyDichVu() {
       donGia: d.donGia ?? '',
       loaiDichVu: d.loaiDichVu || '',
       maChuyenKhoa: d.maChuyenKhoa ?? '',
+      maNhomDichVu: d.maNhomDichVu ?? '',
       version: d.version ?? undefined
     });
     setEditId(d.maDichVu);
@@ -91,13 +98,14 @@ export default function QuanLyDichVu() {
       donGia: Number(form.donGia),
       loaiDichVu: form.loaiDichVu || null,
       maChuyenKhoa: form.maChuyenKhoa !== '' ? Number(form.maChuyenKhoa) : null,
+      maNhomDichVu: form.maNhomDichVu !== '' ? Number(form.maNhomDichVu) : null,
       version: form.version
     };
     try {
       if (modal === 'edit') {
-        await updateApi(editId, body);
+        await dichVuApi.updateApi(editId, body);
       } else {
-        await createApi(body);
+        await dichVuApi.createApi(body);
       }
       setModal(null);
       fetchAll();
@@ -123,7 +131,7 @@ export default function QuanLyDichVu() {
     if (!window.confirm('Xóa dịch vụ này?')) return;
     setDeleting(id);
     try {
-      await deleteApi(id);
+      await dichVuApi.deleteApi(id);
       fetchAll();
     } catch (e) {
       alert(e.message);
@@ -286,7 +294,7 @@ export default function QuanLyDichVu() {
               <tr style={{
             background: '#faf5ff'
           }}>
-                {['#', 'Tên Dịch Vụ', 'Loại', 'Đơn Giá', 'Chuyên Khoa', 'Thao Tác'].map(h => <th key={h} style={{
+                {['#', 'Tên Dịch Vụ', 'Loại', 'Đơn Giá', 'Chuyên Khoa', 'Nhóm', 'Thao Tác'].map(h => <th key={h} style={{
               padding: '12px 14px',
               textAlign: h === 'Thao Tác' || h === 'Đơn Giá' ? 'center' : 'left',
               color: '#6b7280',
@@ -297,7 +305,7 @@ export default function QuanLyDichVu() {
               </tr>
             </thead>
             <tbody>
-              {displayed.length === 0 ? <tr><td colSpan={6} style={{
+              {displayed.length === 0 ? <tr><td colSpan={7} style={{
               padding: '50px',
               textAlign: 'center',
               color: '#9ca3af'
@@ -347,6 +355,13 @@ export default function QuanLyDichVu() {
               fontSize: '12px'
             }}>
                     {d.maChuyenKhoa ? tenCK(d.maChuyenKhoa) : '—'}
+                  </td>
+                  <td style={{
+              padding: '10px 14px',
+              color: '#374151',
+              fontSize: '12px'
+            }}>
+                    {tenNhom(d.maNhomDichVu)}
                   </td>
                   <td style={{
               padding: '10px 14px',
@@ -539,6 +554,30 @@ export default function QuanLyDichVu() {
             }}>
                   <option value="">-- Không có --</option>
                   {ckList.map(c => <option key={c.maChuyenKhoa} value={c.maChuyenKhoa}>{c.tenChuyenKhoa}</option>)}
+                </select>
+              </label>
+
+              <label style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '5px',
+            fontSize: '13px'
+          }}>
+                <span style={{
+              fontWeight: 600,
+              color: '#374151'
+            }}>Nhóm Dịch Vụ</span>
+                <select value={form.maNhomDichVu ?? ''} onChange={e => setForm({
+              ...form,
+              maNhomDichVu: e.target.value
+            })} style={{
+              padding: '10px 12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              fontSize: '13px'
+            }}>
+                  <option value="">-- Chọn nhóm --</option>
+                  {nhomList.map(n => <option key={n.maNhom} value={n.maNhom}>{n.tenNhom}</option>)}
                 </select>
               </label>
             </div>
