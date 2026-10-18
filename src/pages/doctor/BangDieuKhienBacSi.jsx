@@ -30,34 +30,75 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
     setMaNhanVienBS(typeof maNv === 'number' ? maNv : Number(maNv) || null);
   }, [user?.maNhanVien]);
 
-  // Fetch thông báo LICH_KHAM dành cho BS từ bảng thong_bao.
-  // Ưu tiên fetch theo maNhanVien (ma_bac_si) để BS luôn thấy TB đặt lịch
-  // dù maTaiKhoan map chưa khớp; fallback maTaiKhoan khi thiếu maNV.
+  // Fetch thông báo LICH_KHAM dành cho BS từ 2 nguồn:
+  // (1) bảng thong_bao (TB đã tạo cho NV) — ưu tiên fetch theo maNhanVien (ma_bac_si);
+  // (2) bảng lich_kham theo ma_bac_si — fallback khi app chỉ tạo TB cho BN
+  //     mà chưa tạo TB cho BS (VD lịch cũ). Trùng lịch (cùng maLichKham đã có
+  //     TB ở nguồn 1) thì bỏ qua để khỏi double chuông.
   const fetchThongBaoBS = useCallback(async () => {
+    const daCoMaLich = new Set();
     const query = maNhanVienBS
       ? `maNhanVien=${maNhanVienBS}`
       : (maTaiKhoanBS ? `maTaiKhoan=${maTaiKhoanBS}` : '');
-    if (!query) return;
-    try {
-      const res = await fetchClient(
-        `${API_BASE_URL}/thong-bao/reference-type/LICH_KHAM?loaiNguoiNhan=NHAN_VIEN&${query}`,
-        { skipLoading: true }
-      );
-      if (!res.ok) return;
-      const result = await res.json();
-      const list = result?.data ?? result ?? [];
-      (Array.isArray(list) ? list : []).forEach(tb => {
-        if (tb.id == null) return;
-        addBellNotification({
-          id: tb.id,
-          title: tb.tieuDe || 'Thông báo lịch khám',
-          message: tb.noiDung || '',
-          type: 'info',
-          createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
-          read: tb.daDoc || false,
-        });
-      });
-    } catch (e) { console.error('fetchThongBaoBS:', e); }
+    // Nguồn 1: bảng thong_bao
+    if (query) {
+      try {
+        const res = await fetchClient(
+          `${API_BASE_URL}/thong-bao/reference-type/LICH_KHAM?loaiNguoiNhan=NHAN_VIEN&${query}`,
+          { skipLoading: true }
+        );
+        if (res.ok) {
+          const result = await res.json();
+          const list = result?.data ?? result ?? [];
+          (Array.isArray(list) ? list : []).forEach(tb => {
+            if (tb.id == null) return;
+            if (tb.referenceId != null) daCoMaLich.add(String(tb.referenceId));
+            addBellNotification({
+              id: tb.id,
+              title: tb.tieuDe || 'Thông báo lịch khám',
+              message: tb.noiDung || '',
+              type: 'info',
+              createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
+              read: tb.daDoc || false,
+            });
+          });
+        }
+      } catch (e) { console.error('fetchThongBaoBS:', e); }
+    }
+    // Nguồn 2: bảng lich_kham theo ma_bac_si (chỉ lịch còn hiệu lực)
+    if (maNhanVienBS) {
+      try {
+        const res = await fetchClient(
+          `${API_BASE_URL}/lich-kham/bac-si/${maNhanVienBS}`,
+          { skipLoading: true }
+        );
+        if (!res.ok) return;
+        const list = await res.json();
+        const fmtDate = (d) => {
+          if (!d) return '';
+          const p = String(d).split('-');
+          return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(d);
+        };
+        (Array.isArray(list) ? list : [])
+          .filter(lk => lk && lk.trangThai !== 'HUY' && lk.trangThai !== 'QUA_HEN' && lk.trangThai !== 'HOAN')
+          .filter(lk => !daCoMaLich.has(String(lk.id)))
+          .forEach(lk => {
+            const ngay = fmtDate(lk.ngayKham);
+            const ca = lk.tenCa || (lk.maCa != null ? `Ca ${lk.maCa}` : 'ca khám');
+            const gio = (lk.gioBatDau && lk.gioKetThuc)
+              ? ` (${String(lk.gioBatDau).substring(0, 5)} - ${String(lk.gioKetThuc).substring(0, 5)})`
+              : '';
+            addBellNotification({
+              id: `lk-${lk.id}`,
+              title: 'Lịch khám mới từ App',
+              message: `Bạn có ca khám ${ca}${gio} vào ngày ${ngay}. Mã lịch: ${lk.id}.`,
+              type: 'info',
+              createdAt: lk.ngayTao ? new Date(lk.ngayTao) : new Date(),
+              read: false,
+            });
+          });
+      } catch (e) { console.error('fetchLichKhamBS:', e); }
+    }
   }, [maNhanVienBS, maTaiKhoanBS, addBellNotification]);
 
   useEffect(() => {
