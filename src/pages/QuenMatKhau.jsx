@@ -36,7 +36,7 @@ const QuenMatKhau = ({ onBackToLogin }) => {
         }
     };
 
-    // Step 2: Handle Verify OTP (gọi API backend xác thực)
+
     const handleVerifyOtp = async (e) => {
         e.preventDefault();
         setMessage({ type: '', text: '' });
@@ -58,7 +58,7 @@ const QuenMatKhau = ({ onBackToLogin }) => {
         }
     };
 
-    // Step 3: Handle Reset Password
+    //  Handle Reset Password
     const handleChangePassword = async (e) => {
         e.preventDefault();
         setMessage({ type: '', text: '' });
@@ -114,7 +114,7 @@ const QuenMatKhau = ({ onBackToLogin }) => {
                         </div>
                     )}
 
-                    {/* Step 1: Email Input */}
+                    {/*  Email Input */}
                     {step === 1 && (
                         <div className="animate-fade-in">
                             <h2 className="text-[26px] font-bold text-[#1e3a8a] mb-2">Quên Mật Khẩu?</h2>
@@ -154,7 +154,7 @@ const QuenMatKhau = ({ onBackToLogin }) => {
                         </div>
                     )}
 
-                    {/* Step 2: OTP Input */}
+                    {/* OTP Input */}
                     {step === 2 && (
                         <div className="animate-fade-in">
                             <h2 className="text-[26px] font-bold text-[#1e3a8a] mb-2">Xác Thực OTP</h2>
@@ -195,7 +195,7 @@ const QuenMatKhau = ({ onBackToLogin }) => {
                         </div>
                     )}
 
-                    {/* Step 3: New Password Input */}
+                    {/* New Password Input */}
                     {step === 3 && (
                         <div className="animate-fade-in">
                             <h2 className="text-[26px] font-bold text-[#1e3a8a] mb-8">Đặt Lại Mật Khẩu</h2>

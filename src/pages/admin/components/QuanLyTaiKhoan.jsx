@@ -79,7 +79,7 @@ const QuanLyTaiKhoan = () => {
  const fetchAccounts = async () => {
     setIsLoading(true);
     try {
-      // 2. GỌI TRỰC TIẾP HÀM getAllApi()
+      // GỌI TRỰC TIẾP HÀM getAllApi()
       const data = await getAllApi(); 
       setAccounts(data || []); // Đảm bảo luôn là mảng để không lỗi .filter
     } catch (err) {
@@ -164,7 +164,7 @@ const QuanLyTaiKhoan = () => {
       };
       if (formPassword.trim()) body.matKhau = formPassword.trim();
 
-      // 3. SỬ DỤNG HÀM updateApi
+      // SỬ DỤNG HÀM updateApi
       await updateApi(editTarget.maTaiKhoan, body);
       
       alert('Cập nhật tài khoản thành công!');
@@ -181,7 +181,7 @@ const QuanLyTaiKhoan = () => {
   const handleDelete = async (id, username) => {
     if (!window.confirm(`Bạn có chắc muốn xóa tài khoản "${username}" không?`)) return;
     try {
-      // 4. SỬ DỤNG HÀM deleteApi
+      //  SỬ DỤNG HÀM deleteApi
       await deleteApi(id);
       alert('Xóa tài khoản thành công!');
       fetchAccounts();

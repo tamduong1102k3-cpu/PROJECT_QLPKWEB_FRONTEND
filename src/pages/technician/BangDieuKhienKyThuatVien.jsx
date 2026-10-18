@@ -36,18 +36,18 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
   const [viewingResult, setViewingResult] = useState(null);
-  // Vitals states
+
   const [vitalsPatient, setVitalsPatient] = useState(null);
-  // Modal tiếp nhận CLS
+
   const [tiepNhanClsPatient, setTiepNhanClsPatient] = useState(null);
-  // Map lưu trạng thái sinh hiệu {maPhieuKham: true/false}
+
   const [vitalsMap, setVitalsMap] = useState({});
-  // Map lưu dữ liệu sinh hiệu {maPhieuKham: data}
+
   const [vitalsDataMap, setVitalsDataMap] = useState({});
-  // Danh sách toàn bộ dịch vụ để tra cứu loại dịch vụ
+
   const [servicesList, setServicesList] = useState([]);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, type: 'primary', icon: '' });
-  // Sidebar width state và ref để kéo dãn
+
   const [sidebarWidth, setSidebarWidth] = useState(288); // 288px = w-72
   const isResizing = useRef(false);
 
@@ -204,19 +204,16 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
     setVitalsPatient(null);
   };
 
-  // Helper: lấy đúng id đăng ký khám bệnh
-  // Ưu tiên registrationId (gán từ fetchWorklist), fallback item.id,
-  // nhưng với items từ pendingTests (chi_tiet_chi_dinh), item.id là sai -> cần lookup lại
+
   const getRegistrationId = (item) => {
     if (item.registrationId) return item.registrationId;
-    // Nếu không có registrationId, tra cứu từ lại từ registrations (đã được lưu)
-    // Dùng item.maBenhNhan để lookup
+
     if (item.maBenhNhan) {
       const reg = pendingRegistrations.find(r =>
         Number(r.maBenhNhan) === Number(item.maBenhNhan)
       );
       if (reg) return reg.id;
-      // Cũng kiểm tra trong vangMatPatients (đã gộp vào pendingTests)
+
       const vangMat = pendingTests.find(p =>
         Number(p.maBenhNhan) === Number(item.maBenhNhan) && p.registrationId
       );

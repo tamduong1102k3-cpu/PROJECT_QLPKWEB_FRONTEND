@@ -75,7 +75,7 @@ const InfoBlock = ({ icon, label, value, href, alert = false }) => {
 const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQueue, readOnly = false }) => {
   const { showSuccess, showError, showWarning } = useNotification();
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, type: 'primary', icon: '' });
-  // Mã chuyên khoa: 1: Nội tổng quát, 3: Nhi khoa, 4: TMH, 5: RHM, 11: Tim mạch
+
   const isTmhDoc = Number(user?.maChuyenKhoa) === 4;
   const isRhmDoc = Number(user?.maChuyenKhoa) === 5;
   const isCardiologyDoc = Number(user?.maChuyenKhoa) === 11;
@@ -89,9 +89,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       _getBenhNhanByIdApi(selectedPatient.maBenhNhan)
         .then(data => {
           if (data) {
-            // Merge toàn bộ thông tin chi tiết bệnh nhân (ngaySinh, diaChi, soDienThoai,
-            // ngheNghiep, nhomMau, nguoiGiamHo, soDienThoaiNguoiGiamHo...),
-            // bỏ qua các trường null/rỗng để không ghi đè dữ liệu đã có từ hàng đợi
+       
             setPatientDetails(prev => {
               const merged = { ...prev };
               Object.entries(data).forEach(([key, value]) => {
@@ -113,7 +111,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   });
   const [allServices, setAllServices] = useState([]);
   const [selectedServices, setSelectedServices] = useState([]);
-  const [phongMap, setPhongMap] = useState({}); // { maDichVu: [{maPhong, tenPhong, soDaDat, soLuongToiDa}] }
+  const [phongMap, setPhongMap] = useState({}); 
   const [serviceSearch, setServiceSearch] = useState('');
   const [showServiceList, setShowServiceList] = useState(false);
   const [prescribedHistory, setPrescribedHistory] = useState([]);
@@ -125,7 +123,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const [examHistory, setExamHistory] = useState([]);
   const [prescriptionSavedAt, setPrescriptionSavedAt] = useState(null);
 
-  // TMH/RHM exam data (loaded from chiSoKhamTongHopApi) - shared with TabKhamTMH / TabKhamRHM
+
   const [examData, setExamData] = useState({
     tinhTrangMui: '',
     tinhTrangHong: '',
@@ -176,21 +174,19 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     coQuanKhacNhi: ''
   });
 
-  // Reference to TabKhamLamSang to trigger auto-save before changing tabs
+ 
   const tabKhamLamSangRef = useRef(null);
 
-  // Keep a reference to selectedMeds to avoid state closure race conditions
+
   const selectedMedsRef = useRef([]);
   useEffect(() => {
     selectedMedsRef.current = selectedMeds;
-    // Khi xóa danh sách thuốc, reset trạng thái đã lưu để ẩn banner
+
     if (selectedMeds.length === 0) {
       setPrescriptionSavedAt(null);
     }
   }, [selectedMeds]);
 
-  // Gộp thông tin & version mới nhất từ danh mục thuốc vào danh sách thuốc đang kê
-  // Khắc phục: tên thuốc hiển thị "Thuốc #N", thiếu version (gây lỗi 409 khi lưu lại)
   const enrichMedsWithCatalog = useCallback((meds, catalog) => {
     if (!meds) return meds;
     return meds.map(m => {
@@ -203,13 +199,13 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
         donViTinh: cat.donViTinh || m.donViTinh,
         tonKho: cat.tonKho ?? m.tonKho,
         trangThaiKho: cat.trangThaiKho || m.trangThaiKho,
-        // Luôn giữ version mới nhất từ catalog để không bị lỗi 409 khi lưu lặp lại
+ 
         version: cat.version ?? m.version
       };
     });
   }, []);
 
-  // Khi danh mục thuốc vừa tải xong, cập nhật tên thuốc & version cho các thuốc đã chọn
+
   useEffect(() => {
     if (allMeds && allMeds.length > 0) {
       setSelectedMeds(prev => {
@@ -224,16 +220,16 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     }
   }, [allMeds, enrichMedsWithCatalog]);
 
-  // Ref cho phongMap để dùng trong loader async mà không stale closure
+ 
   const phongMapRef = useRef({});
   useEffect(() => { phongMapRef.current = phongMap; }, [phongMap]);
 
   const detailMaDv = (d) => d?.maDichVu;
 
-  // Fetch initial info for selected patient
+
   useEffect(() => {
     if (selectedPatient) {
-      // Reset lists when patient changes
+
       setSelectedServices([]);
       setSelectedMeds([]);
       setPrescriptionSavedAt(null);
@@ -265,7 +261,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
                         tenPhong: d.tenPhong || null,
                         id: d.id
                       });
-                      // Nạp sẵn danh sách phòng theo chuyên khoa để dropdown có dữ liệu
+                  
                       const ck = catalogService?.maChuyenKhoa;
                       if (ck && !phongMapRef.current[detailMaDv(d)]) {
                         getPhongByChuyenKhoaApi(ck)
@@ -281,7 +277,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           })
           .catch(e => console.error("Lỗi tải dịch vụ:", e));
 
-        // Tải đơn thuốc đã kê (chỉ khi bác sĩ chưa đang chỉnh sửa để tránh ghi đè trạng thái "chưa lưu")
+
         _getToaThuocByPhieuKhamApi(selectedPatient.maPhieuKham)
           .then(async toasList => {
             if (toasList && toasList.length > 0) {
@@ -307,14 +303,14 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
                         thoiDiemDung: d.thoiDiemDung || '',
                         lieuDung: d.lieuDung || '',
                         tonKho: catalogMed?.tonKho,
-                        // Giữ nguyên trạng thái đã lưu/chưa lưu hiện tại nếu có, mặc định là đã lưu (toa từ server)
+                  
                         isSaved: existing ? existing.isSaved : true
                       });
                     }
                   }
                 }
               }
-              // Chỉ ghi đè danh sách nếu bác sĩ chưa thêm/sửa gì trong phiên này
+  
               if (selectedMedsRef.current.length === 0) {
                 setSelectedMeds(loadedMeds);
               }
@@ -501,11 +497,11 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
         getKhoCanhBaoApi()
       ]);
       if (thuocData) {
-        // Merge stock info and expiry into medicine list
+
         const khoMap = {};
         if (khoData) {
           khoData.forEach(k => {
-            // tonKho = số lượng tồn khả dụng = soLuongTon - soLuongDaGiu
+ 
             const soLuongDaGiu = k.soLuongDaGiu || 0;
             khoMap[k.maThuoc] = {
               tonKho: (k.soLuongTon || 0) - soLuongDaGiu,
@@ -583,12 +579,12 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     fetchMeds();
   }, [fetchMeds]);
 
-  // Handle immediate auto-save for adding and deleting medicines
+
   const handleSavePrescription = async (silent = false, customMeds = null) => {
     if (!selectedPatient?.maPhieuKham) return true;
     try {
       const targetMeds = customMeds || selectedMedsRef.current;
-      // Nếu không có thuốc nào thì không cần lưu, coi như thành công
+
       if (!targetMeds || targetMeds.length === 0) return true;
       const payload = {
         toaThuoc: {
@@ -741,14 +737,13 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
     setExamSubTab(newTabId);
   };
 
-  // Save specialty exam data (TMH, RHM, TimMach, Nhi) before finishing
   const saveSpecialtyExamData = async () => {
     if (!selectedPatient?.maPhieuKham) return true;
 
     const isSpecialtyDoc = isTmhDoc || isRhmDoc || isCardiologyDoc || isNhiDoc;
     if (!isSpecialtyDoc) return true; // Not a specialist, skip
 
-    // Check if specialty fields have any data entered
+
     const hasAnySpecialtyData = Object.entries(examData).some(([key, val]) => {
       if (key === 'nhietDo' || key === 'nhipTim' || key === 'nhipTho' ||
         key === 'huyetApTamThu' || key === 'huyetApTamTruong' ||
@@ -757,7 +752,7 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       return val && val.toString().trim() !== '';
     });
 
-    if (!hasAnySpecialtyData) return true; // No data entered, nothing to save
+    if (!hasAnySpecialtyData) return true; 
 
     try {
       const userData = user;
@@ -786,31 +781,31 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, isOpen: false }));
         try {
-          // Step 1: Validate and save clinical exam with strict validation
+  
           let examSuccess = true;
           if (tabKhamLamSangRef.current) {
             examSuccess = await tabKhamLamSangRef.current.triggerFinishAutoSave();
           }
           if (!examSuccess) {
-            // Error is already shown by triggerFinishAutoSave
+          
             return;
           }
 
-          // Step 2: Save prescription data
+      
           const prescriptionSuccess = await handleSavePrescription(true);
           if (!prescriptionSuccess) {
             showError("Không thể kết thúc khám vì thông tin đơn thuốc chưa được lưu.");
             return;
           }
 
-          // Step 3: Save specialty exam data (if any)
+   
           const specialtySuccess = await saveSpecialtyExamData();
           if (!specialtySuccess) {
             showError("Không thể lưu dữ liệu khám chuyên khoa. Vui lòng thử lại.");
             return;
           }
 
-          // Step 4: Finish consultation
+       
           const res = await _finishKhamApi(selectedPatient.maPhieuKham);
           if (res) {
             showSuccess("Đã kết thúc lượt khám thành công!");

@@ -18,6 +18,7 @@ import BangDieuKhienThuNgan from './pages/cashier/BangDieuKhienThuNgan';
 import BangDieuKhienDuocSi from './pages/pharmacist/BangDieuKhienDuocSi';
 import BangDieuKhienKho from './pages/warehouse/BangDieuKhienKho';
 import PaymentResult from './pages/cashier/components/PaymentResult';
+import PaymentSuccess from './pages/checkout/PaymentSuccess';
 import { logoutApi } from './api/accountApi';
 import { clearAccessToken, getAccessToken, getRoleFromAccessToken, decodeTokenPayload } from './api/tokenStore';
 import './App.css';
@@ -140,6 +141,9 @@ function App() {
   };
 
   const renderMainContent = () => {
+    if (window.location.pathname === '/payment-success') {
+      return <PaymentSuccess />;
+    }
     if (window.location.pathname === '/payment/result') {
       return <PaymentResult />;
     }

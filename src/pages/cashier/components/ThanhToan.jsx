@@ -243,8 +243,7 @@ const ThanhToan = ({ user, onPaymentSuccess, refreshTrigger }) => {
     setProcessing(true);
     try {
       const autoAmount = tongTien;
-      // Không sinh mã giả — tiền mặt / chuyển khoản thủ công không có mã giao dịch.
-      // Mã giao dịch chỉ có thật khi thanh toán qua VNPay (backend ghi từ vnp_TransactionNo).
+
       await thanhToanApi(currentInvoice.maHoaDon, { maNhanVien, maTaiKhoan: getMaTaiKhoanNhanVien(), phuongThuc: method, soTienNhan: autoAmount, maGiaoDich: null });
       showSuccess(`Thanh toán hóa đơn #${currentInvoice.maHoaDon?.toString().padStart(4, '0')} thành công!`);
       setShowPaymentModal(false);

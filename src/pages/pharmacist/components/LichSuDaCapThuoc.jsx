@@ -23,7 +23,7 @@ const LichSuDaCapThuoc = ({ onReview, formatCurrency, formatDateTime }) => {
     pageSize: 8,
     searchKeys: ['hoTen', 'maBenhNhan', 'maPhieuKham'],
     searchTerm,
-    // Hook tự reset về trang 1 khi search đổi, không cần useEffect riêng
+   
   });
 
   const fetchHistory = useCallback(async () => {

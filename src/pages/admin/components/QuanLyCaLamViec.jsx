@@ -411,7 +411,8 @@ export default function QuanLyCaLamViec() {
     });
   };
 
-  // Đếm số lịch khám CHUA_DEN của bác sĩ trong ngày — lỗi API bỏ qua (coi như 0)
+  // Đếm số lịch khám CHUA_DEN của bác sĩ trong ngày 
+
   const calCountLichKhamChuaDen = async (maBacSi, ngay) => {
     try {
       const lichList = await getAppointmentsByDoctorAndDateApi(maBacSi, ngay);
@@ -424,16 +425,16 @@ export default function QuanLyCaLamViec() {
     }
   };
 
-  // Xác nhận nghỉ phép — đếm lịch khám trùng ngày, confirm, UPDATE từng id (tuần tự, an toàn)
+  // Xác nhận nghỉ phép — đếm lịch khám trùng ngày, confirm, UPDATE từng id 
   const calConfirmNghiPhep = async () => {
     if (!calNghiPhepModal?.open || calSelectedShiftIds.length === 0) return;
     try {
-      // 1. Lấy danh sách selected shifts theo id
+      // Lấy danh sách selected shifts theo id
       const selectedShifts = (calSelectedDay?.macDinh || []).filter((m) =>
         calSelectedShiftIds.includes(m.id),
       );
 
-      // 2. Group theo (maNhanVien, ngay) — mỗi cặp gọi API đếm MỘT LẦN
+      // Group theo (maNhanVien, ngay) — mỗi cặp gọi API đếm MỘT LẦN
       const pairMap = new Map();
       for (const s of selectedShifts) {
         const maNhanVien = s.maNhanVien ?? calSelectedMaNV;
@@ -442,18 +443,18 @@ export default function QuanLyCaLamViec() {
         if (!pairMap.has(key)) pairMap.set(key, { maNhanVien, ngay });
       }
 
-      // 3. Đếm tổng lịch CHUA_DEN — lỗi API bỏ qua (coi như 0)
+
       let M = 0;
       for (const { maNhanVien, ngay } of pairMap.values()) {
         M += await calCountLichKhamChuaDen(maNhanVien, ngay);
       }
       const N = pairMap.size;
 
-      // 4. Hàm thực hiện nghỉ phép sau khi xác nhận
+
       const doNghiPhep = async () => {
         setCalSaving(true);
         try {
-          // Loop từng ca — xuLyNghiDotXuat chỉ hủy lịch lần đầu, các lần sau idempotent không lỗi
+        
           for (const id of calSelectedShiftIds) {
             await updateShiftNghiPhepApi(id, calNghiPhepModal.lyDo || null);
           }
@@ -475,7 +476,7 @@ export default function QuanLyCaLamViec() {
         }
       };
 
-      // 5. Confirm trước nghỉ phép bằng toast — không silent hủy lịch
+   
       if (M > 0) {
         showConfirm(
           `Bác sĩ ${calSelectedMaNV} có ${M} lịch khám chưa đến trong ${N} ngày. Xác nhận nghỉ phép sẽ hủy các lịch này và gửi thông báo cho bệnh nhân. Tiếp tục?`,
@@ -517,10 +518,7 @@ export default function QuanLyCaLamViec() {
     );
     if (!calForm.id && existingMacDinh && calForm.loai !== "MAC_DINH") {
       if (window.confirm("Ngày này đã có ca mặc định theo ca này. Bạn có muốn thay thế ca mặc định không?")) {
-        // Delete the MAC_DINH record and proceed to create exception
-        // Actually we need to delete it first, but we don't have delete default by ID directly.
-        // Instead, we can let the create happen and handle conflict, or just allow.
-        // For now, just allow creating - the backend may handle conflict.
+
       } else {
         return;
       }
@@ -535,7 +533,7 @@ export default function QuanLyCaLamViec() {
       lyDo: calForm.lyDo.trim() || null,
       maCaMacDinh: calForm.maCaMacDinh,
     };
-    // Xác định thao tác lưu và kiểm tra lịch khám trước khi nghỉ phép
+
     let saveOp;
     let confirmMessage = null;
 
@@ -548,17 +546,17 @@ export default function QuanLyCaLamViec() {
         (m) => m.ca?.id === calForm.maCaMacDinh,
       );
       if (!existingShift?.id) {
-        // Nghỉ phép là UPDATE bản ghi ca hiện có — không CREATE record mới
+    
         showError("Không tìm thấy ca mặc định để đánh dấu nghỉ phép");
         return;
       }
-      // Đếm lịch khám trùng ngày (nhất quán với calConfirmNghiPhep)
+   
       const M = await calCountLichKhamChuaDen(
         existingShift.maNhanVien ?? calSelectedMaNV,
         existingShift.ngay ?? calSelectedDay.ngay,
       );
       saveOp = async () => {
-        // xuLyNghiDotXuat chỉ hủy lịch lần đầu, các lần sau idempotent không lỗi
+   
         await updateShiftNghiPhepApi(existingShift.id, payload.lyDo);
       };
       if (M > 0) {
@@ -570,7 +568,7 @@ export default function QuanLyCaLamViec() {
       };
     }
 
-    // Thực hiện lưu sau khi xác nhận
+
     const doSave = async () => {
       setCalSaving(true);
       try {
@@ -595,7 +593,7 @@ export default function QuanLyCaLamViec() {
       }
     };
 
-    // Confirm bằng toast nếu có lịch khám, ngược lại lưu trực tiếp
+
     if (confirmMessage) {
       showConfirm(confirmMessage, doSave);
     } else {
@@ -798,7 +796,7 @@ const calDeleteDefault = async (m) => {
       phong: m.phong ?? null,
       caIds: [m.ca?.id || m.maCa || ""],
     });
-    // Close bulk-edit form to avoid conflicts
+
     setCalShowEditAllThu(false);
     setCalEditAllThuForm({ phong: "", caIds: [""] });
   };
@@ -852,13 +850,13 @@ const calDeleteDefault = async (m) => {
     setCalEditDefaultForm(emptyDefaultForm());
   };
 
-  /* ===== Bulk edit: Sửa tất cả ca mặc định cùng Thứ trong tháng ===== */
+
   const calOpenEditAllThu = () => {
     if (!calSelectedDay || !calSelectedMaNV) return;
     const macDinh = calSelectedDay.macDinh || [];
     if (macDinh.length === 0) return;
 
-    // Pre-fill from existing default shifts (same phong + same ca IDs)
+
     const firstDefault = macDinh[0];
     const caIds = macDinh
       .map((m) => String(m.ca?.id || m.maCa || ""))
@@ -869,7 +867,7 @@ const calDeleteDefault = async (m) => {
       caIds: caIds.length > 0 ? caIds : [""],
     });
     setCalShowEditAllThu(true);
-    // Close other inline forms to avoid conflicts
+
     setCalEditingDefaultId(null);
     setCalShowAddDefault(false);
   };
@@ -961,7 +959,7 @@ const calDeleteDefault = async (m) => {
     const macDinh = day.macDinh || [];
     const ngoaiLe = day.ngoaiLe || [];
 
-    // NGHI_PHEP exception cũ (THEO_NGAY) — vẫn tôn trọng: ngày không có lịch
+    
     const nghiList = ngoaiLe.filter((e) => e.loai === "NGHI_PHEP");
     const nghiCa = nghiList.find((e) => e.caThayThe);
     const nghiAll = nghiList.find((e) => !e.caThayThe);

@@ -55,14 +55,14 @@ const BangDieuKhienDuocSi = ({ onLogout, user }) => {
     return () => clearInterval(interval);
   }, [fetchPatients]);
 
-  // WebSocket for real-time updates
+
   useWebSocket({
     topics: ['/topic/toa-thuoc', '/topic/hoa-don', '/topic/phieu-kham', '/topic/kho-alert'],
     onMessage: (topic, data) => {
       if (['/topic/toa-thuoc', '/topic/hoa-don', '/topic/phieu-kham'].includes(topic)) {
         fetchPatients();
       } else if (topic === '/topic/kho-alert' && data?.action === 'HET_HANG_KHI_CAP') {
-        // Show notification when medicine is out of stock during dispensing
+  
         addBellNotification({
           id: Date.now() + Math.random(),
           title: '🚫 Thuốc hết hàng!',

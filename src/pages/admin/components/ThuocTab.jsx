@@ -72,7 +72,7 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
       showSuccess(editing?.maThuoc ? 'Đã cập nhật thuốc thành công!' : 'Đã thêm thuốc mới thành công!');
       onRefresh();
     } catch (err) {
-      // Wave D.1: khoThuocApi giờ gắn err.status + err.errorCode
+      // : khoThuocApi giờ gắn err.status + err.errorCode
       if (err.status === 409 && err.errorCode === 'VERSION_CONFLICT') {
         showWarning('⚠️ Dữ liệu đã được cập nhật bởi người dùng khác. Vui lòng tải lại dữ liệu mới nhất!');
         setEditing(null);

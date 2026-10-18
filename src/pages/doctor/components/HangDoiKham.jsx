@@ -19,7 +19,7 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
   const [activeTab, setActiveTab] = useState('waiting'); // 'waiting' | 'waitingCls' | 'completed'
   const debounceTimerRef = useRef(null);
 
-  // Mã chuyên khoa: 1: Nội, 3: Nhi, 4: TMH, 5: RHM, 7: XN, 11: Tim mạch, 12: CĐHA
+
   const isXetNghiemDoc = Number(user?.maChuyenKhoa) === 7;
   const isCdhaDoc = Number(user?.maChuyenKhoa) === 12;
   const isRhmDoc = Number(user?.maChuyenKhoa) === 5;
@@ -38,8 +38,8 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
         const pending = pendingRes.status === 'fulfilled' ? (pendingRes.value || []) : [];
         const completed = completedRes.status === 'fulfilled' ? (completedRes.value || []) : [];
         setPatients({
-          waiting: completed, // completed = DA_THUC_HIEN -> cần bác sĩ duyệt
-          completed: pending,  // pending = CHUA_THUC_HIEN -> chưa có kết quả
+          waiting: completed, // DA_THUC_HIEN -> cần bác sĩ duyệt
+          completed: pending,  // CHUA_THUC_HIEN -> chưa có kết quả
           waitingCls: []
         });
         return;
@@ -85,7 +85,7 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
     return () => clearInterval(interval);
   }, [fetchQueue, appliedSearch, refreshTrigger]);
 
-  // Debounce search: chờ 400ms sau khi user ngừng gõ mới gọi API
+
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);

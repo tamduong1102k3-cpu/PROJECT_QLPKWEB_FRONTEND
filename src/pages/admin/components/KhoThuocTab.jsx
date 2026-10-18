@@ -16,8 +16,7 @@ const KhoThuocTab = ({ thuocMap }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Bọc filter trong useCallback để reference ổn định giữa các render,
-  // tránh bị reset trang về 1 mỗi lần re-render (lỗi không chuyển trang được)
+
   const khoFilters = useCallback((item) => {
     if (!searchTerm) return true;
     const t = searchTerm.toLowerCase();

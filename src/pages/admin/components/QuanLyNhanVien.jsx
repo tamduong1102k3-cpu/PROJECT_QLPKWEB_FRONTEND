@@ -134,9 +134,9 @@ const QuanLyNhanVien = () => {
     dia_chi: '',
     so_dien_thoai: '',
     email: '',
-    chuyen_khoa: '', // Lưu maChuyenKhoa (ID) dạng string để match với select option
+    chuyen_khoa: '', 
     bang_cap: '',
-    chuc_vu: '', // Sẽ lưu ID hoặc Tên tùy backend cần
+    chuc_vu: '', 
     ngay_vao_lam: '',
     username: '', 
     role: 'BAC_SI_TONG_QUAT' // Default role
@@ -161,7 +161,7 @@ const QuanLyNhanVien = () => {
     setFormData({
       ho_ten: emp.hoTen || '',
       gioi_tinh: emp.gioiTinh !== null ? emp.gioiTinh.toString() : '1',
-      ngay_sinh: emp.ngaySinh ? emp.ngaySinh.split('T')[0] : '', // format YYYY-MM-DD
+      ngay_sinh: emp.ngaySinh ? emp.ngaySinh.split('T')[0] : '',
       cccd: emp.cccd || '',
       dia_chi: emp.diaChi || '',
       so_dien_thoai: emp.soDienThoai || '',
@@ -170,7 +170,7 @@ const QuanLyNhanVien = () => {
       bang_cap: emp.bangCap || '',
       chuc_vu: emp.chucVu || '',
       ngay_vao_lam: emp.ngayVaoLam ? emp.ngayVaoLam.split('T')[0] : '',
-      // Username and role won't be editable in this basic edit, but keep them in state
+    
       username: '',
       role: ''
     });
@@ -216,7 +216,7 @@ const QuanLyNhanVien = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Kiểm tra thủ công các trường bắt buộc
+    // Kiểm tra các trường bắt buộc
     if (!formData.ho_ten.trim() || !formData.cccd.trim() || !formData.chuc_vu || !formData.email.trim()) {
       alert("Vui lòng nhập đầy đủ các thông tin bắt buộc (có đánh dấu sao *) !");
       return;
@@ -227,7 +227,7 @@ const QuanLyNhanVien = () => {
       return;
     }
 
-    // Format dữ liệu gửi lên (giới tính kiểu int: 1=Nam, 0=Nữ)
+
     const payload = {
       ...formData,
       gioiTinh: parseInt(formData.gioi_tinh),

@@ -18,7 +18,7 @@ const removeVietnameseTones = str => {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
 };
 
-// Kiểm tra nhân viên có phải là Bác sĩ (chức vụ chứa "bác sĩ" nhưng KHÔNG phải "trợ lý bác sĩ")
+
 const isDoctor = doc => {
   const roleText = removeVietnameseTones(String(
     doc?.tenChucVu ??
@@ -50,7 +50,7 @@ const normalizeRoomName = (value) => {
 
 const getAssignedRoomOptions = ({ shiftsToday, selectedDepartment, phongList }) => {
   const catalog = Array.isArray(phongList) ? phongList : [];
-  // phong giờ là Integer (mã phòng) — so sánh theo maPhong
+ 
   const assignedRoomIds = new Set(
     (Array.isArray(shiftsToday) ? shiftsToday : [])
       .map(shift => shift?.phong ?? shift?.maPhong)
@@ -78,7 +78,7 @@ const QuyTrinhTiepDon = ({
   presetDoctor,
   presetPatient,
   appointmentId,
-  /** true = Bệnh nhân đặt lịch qua App & chưa được xác minh danh tính (da_xac_minh_danh_tinh = 0) */
+  
   needsIdentityVerification
 }) => {
   const [step, setStep] = useState(1);
@@ -184,7 +184,7 @@ const QuyTrinhTiepDon = ({
 
     loadPatients();
 
-    // Nếu có presetPatient thì tự động set và chuyển sang bước 3
+
     if (presetPatient) {
       setSelectedPatient(presetPatient);
       setCccdVerified(false);
@@ -238,7 +238,8 @@ const QuyTrinhTiepDon = ({
     setRoomLockError('');
 
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      // Lấy ngày theo giờ VN (tránh lỗi UTC lùi 1 ngày vào rạng sáng)
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
       const result = await _getPhongTheoBacSi(maNhanVien, todayStr);
       setCheckInData(prev => ({ ...prev, maPhong: String(result.maPhong) }));
       setRoomLocked(true);
@@ -363,6 +364,11 @@ const QuyTrinhTiepDon = ({
       return;
     }
 
+    if (!checkInData.maNhanVien) {
+        showError('Vui lòng chọn bác sĩ chỉ định');
+        return;
+    }
+
     if (roomCapacity > 0 && roomRemaining <= 0) {
       showWarning(`Phòng ${selectedRoom?.tenPhong || 'đã chọn'} đã đầy trong ngày hôm nay. Vui lòng chọn phòng khác hoặc tăng hạn mức phòng.`);
       return;
@@ -384,7 +390,7 @@ const QuyTrinhTiepDon = ({
     }
 
     try {
-      // Bước 1: Tạo đăng ký khám bệnh (DangKyKhamBenh)
+      //  Tạo đăng ký khám bệnh (DangKyKhamBenh)
       const dangKyData = {
         maBenhNhan: selectedPatient.maBenhNhan,
         maNhanVien: maLeTan,
@@ -400,7 +406,7 @@ const QuyTrinhTiepDon = ({
       const soThuTu = dangKyResult.soThuTu;
       const dangKyId = dangKyResult.id;
 
-      // Bước 2: Cập nhật trạng thái lịch khám nếu có appointmentId
+      // Cập nhật trạng thái lịch khám nếu có appointmentId
       if (appointmentId) {
         try {
           await updateTrangThaiApi(appointmentId, 'DA_CHECK_IN');
@@ -804,7 +810,7 @@ const QuyTrinhTiepDon = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Bác sĩ chỉ định (Tùy chọn)</label>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Bác sĩ chỉ định (*)</label>
                 <select className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold" value={checkInData.maNhanVien} onChange={e => handleDoctorChange(e.target.value)}>
                   <option value="">-- Không chọn bác sĩ --</option>
                   {availableDoctors.map(d => <option key={d.maNhanVien} value={d.maNhanVien}>{d.hoTen}</option>)}
@@ -904,12 +910,10 @@ const QuyTrinhTiepDon = ({
               <span className="text-sm text-gray-500">Đơn giá</span>
               <span className="text-sm font-bold text-indigo-600">{printData.dichVu ? `${new Intl.NumberFormat('vi-VN').format(printData.dichVu.donGia)}đ` : 'N/A'}</span>
             </div>
-            {printData.bacSi && (
-              <div className="flex justify-between items-center pb-3 border-b border-gray-50">
-                <span className="text-sm text-gray-500">Bác sĩ</span>
-                <span className="text-sm font-bold text-gray-800">{printData.bacSi.hoTen}</span>
-              </div>
-            )}
+            <div className="flex justify-between items-center pb-3 border-b border-gray-50">
+              <span className="text-sm text-gray-500">Bác sĩ</span>
+              <span className="text-sm font-bold text-gray-800">{printData.bacSi?.hoTen || 'Chưa chỉ định'}</span>
+            </div>
             <div className="flex justify-between items-center pb-3 border-b border-gray-50">
               <span className="text-sm text-gray-500">Thời gian</span>
               <span className="text-sm font-bold text-gray-800">{printData.ngayDangKy}</span>

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { formatDateOfBirth, calculateAge, formatDateTime } from './TienIchKyThuatVien';
 import formatGender from '../../../utils/formatGender';
 
-// Sort patients: normal order by soThuTu ASC, but xepCuoi=true patients go to the end
+
 function sortPatientList(patients) {
   const sorted = [...patients].sort((a, b) => (a.soThuTu || 0) - (b.soThuTu || 0));
   const normal = sorted.filter(p => !p.xepCuoi);

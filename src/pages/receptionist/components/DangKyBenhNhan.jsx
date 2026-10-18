@@ -35,7 +35,7 @@ const DangKyBenhNhan = ({
           const d = new Date(editPatient.ngaySinh);
           return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
         })() : '',
-        gioiTinh: editPatient.gioiTinh !== false, // Default to true if not strictly false
+        gioiTinh: editPatient.gioiTinh !== false, 
         soDienThoai: editPatient.soDienThoai || '',
         cccd: editPatient.cccd || '',
         email: editPatient.email || '',
@@ -51,7 +51,7 @@ const DangKyBenhNhan = ({
     }
   }, [editPatient]);
 
-  // Format DD/MM/YYYY khi gõ
+
   const formatDateDisplay = (val) => {
     const digits = val.replace(/\D/g, '').slice(0, 8);
     let result = '';
@@ -62,14 +62,14 @@ const DangKyBenhNhan = ({
     return result;
   };
 
-  // Parse DD/MM/YYYY -> YYYY-MM-DD
+
   const parseDisplayToDate = (display) => {
     const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (!match) return '';
     return `${match[3]}-${match[2]}-${match[1]}`;
   };
 
-  // Kiểm tra ngày hợp lệ
+
   const isValidDate = (display) => {
     const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (!match) return false;
@@ -91,7 +91,7 @@ const DangKyBenhNhan = ({
     } else if (!isValidDate(ngaySinhDisplay)) {
       newErrors.ngaySinh = 'Ngày sinh không hợp lệ';
     } else {
-      // Kiểm tra không được là ngày tương lai
+
       const match = ngaySinhDisplay.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       const d = parseInt(match[1], 10);
       const m = parseInt(match[2], 10) - 1;
@@ -104,7 +104,7 @@ const DangKyBenhNhan = ({
       }
     }
     
-    // Validate SĐT: bỏ spaces trước khi test
+  
     const phoneDigits = formData.soDienThoai.replace(/\s/g, '');
     const phoneRegex = /^[0-9]{10}$/;
     if (!formData.soDienThoai) {
@@ -137,24 +137,24 @@ const DangKyBenhNhan = ({
     } = e.target;
     let newValue = type === 'checkbox' ? checked : value;
     
-    // Tự động viết hoa chữ cái đầu mỗi từ cho Họ tên
+
     if (name === 'hoTen') {
       newValue = newValue
         .toLowerCase()
         .replace(/\b\w/g, char => char.toUpperCase());
     }
     
-    // Định dạng số điện thoại
+
     if (name === 'soDienThoai' || name === 'soDienThoaiNguoiGiamHo') {
       newValue = formatPhone(newValue);
     }
     
-    // Giới hạn CCCD 12 số
+
     if (name === 'cccd') {
       newValue = newValue.replace(/\D/g, '').slice(0, 12);
     }
     
-    // Xử lý input ngày sinh
+ 
     if (name === 'ngaySinhDisplay') {
       const formatted = formatDateDisplay(value);
       setFormData(prev => ({
@@ -172,7 +172,7 @@ const DangKyBenhNhan = ({
       ...prev,
       [name]: newValue
     }));
-    // Xóa lỗi của trường đang nhập
+
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -181,9 +181,8 @@ const DangKyBenhNhan = ({
     }
   };
 
-  // Xử lý khi chọn từ native datepicker
   const handleDatePickerChange = (e) => {
-    const val = e.target.value; // YYYY-MM-DD
+    const val = e.target.value; 
     if (!val) return;
     const [y, m, d] = val.split('-');
     const display = `${d}/${m}/${y}`;
@@ -197,7 +196,7 @@ const DangKyBenhNhan = ({
     }
   };
 
-  // Lấy max date hôm nay cho native datepicker
+
   const todayStr = new Date().toISOString().split('T')[0];
   const handleSubmit = async e => {
     e.preventDefault();

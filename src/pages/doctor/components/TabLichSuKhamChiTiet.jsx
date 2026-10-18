@@ -19,18 +19,18 @@ const TabLichSuKhamChiTiet = ({ examHistory, allMeds = [], user, onCopyPrescript
 
   const maChuyenKhoa = Number(user?.maChuyenKhoa);
 
-  // Filter history: specialty filter + search + date range
+
   const filteredHistory = useMemo(() => {
     if (!examHistory || examHistory.length === 0) return [];
     
     let result = [...examHistory];
     
-    // 1. Filter by specialty (default only show same specialty, toggle to show all)
+   
     if (!showAllSpecialty) {
       result = result.filter(item => Number(item.maChuyenKhoa) === maChuyenKhoa);
     }
     
-    // 2. Filter by search term (maPhieuKham, tenChuyenKhoa, tenDichVu, tenNhanVien, chanDoan, lyDoKham, khamLamSang)
+
     if (searchTerm && searchTerm.trim() !== '') {
       const kw = searchTerm.trim().toLowerCase();
       result = result.filter(item => {
@@ -49,7 +49,7 @@ const TabLichSuKhamChiTiet = ({ examHistory, allMeds = [], user, onCopyPrescript
       });
     }
     
-    // 3. Filter by date range (fromDate -> toDate)
+
     if (fromDate || toDate) {
       result = result.filter(item => {
         if (!item.ngayKham) return true;
@@ -107,7 +107,7 @@ const TabLichSuKhamChiTiet = ({ examHistory, allMeds = [], user, onCopyPrescript
     setDetailLoading(true);
     setDetailData(null);
     try {
-      // 1. Fetch CLS results
+  
       let clsResults = [];
       try {
         clsResults = await getAvailableClsResultsApi(historyItem.maPhieuKham);
@@ -115,7 +115,7 @@ const TabLichSuKhamChiTiet = ({ examHistory, allMeds = [], user, onCopyPrescript
         console.error("Lỗi lấy CLS lịch sử:", err);
       }
 
-      // 2. Fetch Prescription details
+
       let meds = [];
       try {
         const toasList = await _getToaThuocByPhieuKhamApi(historyItem.maPhieuKham);

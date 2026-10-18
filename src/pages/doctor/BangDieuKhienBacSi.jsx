@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
 import BangDieuKhienChanDoan from './components/BangDieuKhienChanDoan';
@@ -8,16 +8,93 @@ import TabHenTaiKham from './components/TabHenTaiKham';
 import UserMenu from '../../components/UserMenu';
 import LichLamViecTab from '../../components/LichLamViecTab';
 import WebSocketAutoRefresh from '../../hooks/WebSocketAutoRefresh';
+import NotificationBell from '../../components/NotificationBell';
+import { useNotification } from '../../components/NotificationContext';
+import useWebSocket from '../../hooks/useWebSocket';
+import fetchClient from '../../api/fetchClient';
+import { getAccessToken, decodeTokenPayload } from '../../api/tokenStore';
+import { API_BASE_URL } from '../../api/config';
 
 const BangDieuKhienBacSi = ({ onLogout, user }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  // Dựa vào mã chuyên khoa và tên chuyên khoa:
-  // 1: Nội tổng quát, 3: Nhi khoa, 4: TMH, 5: RHM, 7: Xét nghiệm, 11: Tim mạch, 12: CĐHA
+  const { bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
+  const [maTaiKhoanBS, setMaTaiKhoanBS] = useState(null);
+  const thongBaoLoadedRef = useRef(false);
+
+  // Decode JWT lấy maTaiKhoan BS (claim maTaiKhoan cho NHAN_VIEN)
+  useEffect(() => {
+    const payload = decodeTokenPayload(getAccessToken());
+    setMaTaiKhoanBS(payload?.maTaiKhoan || null);
+  }, []);
+
+  // Fetch thông báo LICH_KHAM cũ dành cho BS từ bảng thong_bao
+  const fetchThongBaoBS = useCallback(async () => {
+    if (!maTaiKhoanBS) return;
+    try {
+      const res = await fetchClient(
+        `${API_BASE_URL}/thong-bao/${maTaiKhoanBS}/NHAN_VIEN`,
+        { skipLoading: true }
+      );
+      if (!res.ok) return;
+      const result = await res.json();
+      const list = result?.data ?? result ?? [];
+      (Array.isArray(list) ? list : []).forEach(tb => {
+        if (tb.id == null) return;
+        addBellNotification({
+          id: tb.id,
+          title: tb.tieuDe || 'Thông báo lịch khám',
+          message: tb.noiDung || '',
+          type: 'info',
+          createdAt: tb.createdAt ? new Date(tb.createdAt) : new Date(),
+          read: tb.daDoc || false,
+        });
+      });
+    } catch (e) { console.error('fetchThongBaoBS:', e); }
+  }, [maTaiKhoanBS, addBellNotification]);
+
+  useEffect(() => {
+    if (!thongBaoLoadedRef.current && maTaiKhoanBS) {
+      thongBaoLoadedRef.current = true;
+      fetchThongBaoBS();
+    }
+  }, [maTaiKhoanBS, fetchThongBaoBS]);
+
+  // Đánh dấu TẤT CẢ đã đọc: gọi BE mark-all-read rồi mới update local
+  const handleMarkAllBellAsRead = useCallback(async () => {
+    if (maTaiKhoanBS) {
+      try {
+        await fetchClient(
+          `${API_BASE_URL}/thong-bao/${maTaiKhoanBS}/NHAN_VIEN/mark-all-read`,
+          { method: 'PUT', skipLoading: true }
+        );
+      } catch (e) { console.error('handleMarkAllBellAsRead BS:', e); }
+    }
+    markAllBellAsRead();
+  }, [maTaiKhoanBS, markAllBellAsRead]);
+
+  // WebSocket realtime: topic thong-bao riêng của BS
+  useWebSocket({
+    topics: maTaiKhoanBS ? [`/topic/thong-bao/${maTaiKhoanBS}`] : [],
+    onMessage: (topic, data) => {
+      if (topic.startsWith('/topic/thong-bao/') && data) {
+        if (data.id == null) return;
+        addBellNotification({
+          id: data.id,
+          title: data.tieuDe || 'Thông báo lịch khám',
+          message: data.noiDung || '',
+          type: 'info',
+          createdAt: new Date(),
+          read: false,
+        });
+      }
+    },
+  });
+
   const maCK = Number(user?.maChuyenKhoa);
   const tenCK = (user?.tenChuyenKhoa || '').toLowerCase();
   const vaiTro = (user?.vaiTro || '').toUpperCase();
 
-  // Kiểm tra nhiều nguồn để đảm bảo phát hiện chính xác
+
   const isXetNghiemDoc = maCK === 7 || vaiTro.includes('XET_NGHIEM') || tenCK.includes('xét nghiệm');
   const isCdhaDoc = maCK === 12 || vaiTro.includes('CDHA') || vaiTro.includes('CHAN_DOAN_HINH_ANH') || tenCK.includes('chẩn đoán') || tenCK.includes('hình ảnh');
   const isLabDoctor = isXetNghiemDoc || isCdhaDoc;
@@ -93,7 +170,7 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
         }
       ];
 
-  // Luôn mount HangDoiKham (dùng display:none khi không active) để giữ state khi chuyển tab
+
   const renderContent = () => {
     return (
       <>
@@ -222,13 +299,19 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-                <UserMenu
-                user={user}
-                onLogout={onLogout}
-                displayName={`Xin chào ${user?.username || ''}`}
-                displayRole={user?.tenChuyenKhoa || 'Khoa Nội'}
-                accentColor="indigo"
-              />
+            <NotificationBell
+              notifications={bellNotifications}
+              onMarkAsRead={markBellAsRead}
+              onMarkAllAsRead={handleMarkAllBellAsRead}
+              onClearAll={clearAllBell}
+            />
+            <UserMenu
+              user={user}
+              onLogout={onLogout}
+              displayName={`Xin chào ${user?.username || ''}`}
+              displayRole={user?.tenChuyenKhoa || 'Khoa Nội'}
+              accentColor="indigo"
+            />
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6 bg-[#f8f9fa] flex flex-col h-full">{renderContent()}</main>

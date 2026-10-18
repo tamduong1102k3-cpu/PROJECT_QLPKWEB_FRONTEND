@@ -47,9 +47,7 @@ const LichSuThanhToan = ({ formatCurrency }) => {
     }
   };
 
-  // Lọc theo ngày - dùng useCallback để reference ổn định giữa các render,
-  // tránh bị reset trang về 1 mỗi lần re-render (vì filters trong usePagination
-  // là dependency của useEffect reset page)
+
   const invoiceFilters = useCallback((item) => {
     if (filterNgay === 'today') {
       const today = new Date();

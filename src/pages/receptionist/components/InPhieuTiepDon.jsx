@@ -250,11 +250,10 @@ const InPhieuTiepDon = ({ printData, className = '' }) => {
         <span class="info-label">Đơn giá</span>
         <span class="info-value price">${printData.dichVu ? `${new Intl.NumberFormat('vi-VN').format(printData.dichVu.donGia)}đ` : 'N/A'}</span>
       </div>
-      ${printData.bacSi ? `
       <div class="info-item">
         <span class="info-label">Bác sĩ khám</span>
-        <span class="info-value">${printData.bacSi.hoTen}</span>
-      </div>` : ''}
+        <span class="info-value">${printData.bacSi?.hoTen || 'Chưa chỉ định'}</span>
+      </div>
       <div class="info-item">
         <span class="info-label">Thời gian</span>
         <span class="info-value">${printData.ngayDangKy}</span>

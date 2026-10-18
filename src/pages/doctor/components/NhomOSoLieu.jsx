@@ -21,7 +21,7 @@ const NhomOSoLieu = ({ user }) => {
   const isTroLy = vaiTro.startsWith('TRO_LY_') || vaiTro === 'TRO_LY_BAC_SI';
   const isBacSi = vaiTro.startsWith('BAC_SI_') || vaiTro === 'BAC_SI';
 
-  // Mã chuyên khoa: 1: Nội, 3: Nhi, 4: TMH, 5: RHM, 7: XN, 11: Tim mạch, 12: CĐHA
+
   const isXetNghiemDoc = Number(user?.maChuyenKhoa) === 7;
   const isCdhaDoc = Number(user?.maChuyenKhoa) === 12;
   const isRhmDoc = Number(user?.maChuyenKhoa) === 5;

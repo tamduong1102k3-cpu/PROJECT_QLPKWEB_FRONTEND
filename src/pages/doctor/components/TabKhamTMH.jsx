@@ -7,12 +7,11 @@ const TabKhamTMH = ({ examData, setExamData, maPhieuKham, isAssistant, user }) =
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // NOTE: Data is loaded by the parent component (TroLyTMHForm / ManHinhKhamBenh).
-  // This component is a "controlled" form bound to parent's `examData` and `setExamData`.
+  
 
   const validate = () => {
     const newErrors = {};
-    // At least one field should be filled for TMH exam
+
     const fields = ['tinhTrangMui', 'tinhTrangHong', 'soiTaiMuiHong', 'ongTai', 'mangNhiPhai', 'mangNhiTrai', 'vachNgan', 'cuonMui', 'kheMui', 'amidan', 'thanhQuan', 'thinhLucTaiTrai', 'thinhLucTaiPhai'];
     const hasAny = fields.some(f => examData[f] && examData[f].trim());
     if (!hasAny) {

@@ -126,9 +126,6 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
     fetchAllHoaDonNotifications();
   }, [fetchStats, fetchAllHoaDonNotifications]);
 
-  // Đánh dấu TẤT CẢ thông báo của nhân viên (NHAN_VIEN) là đã đọc (da_doc = 1) trên backend
-  // Duyệt từng thông báo chưa đọc theo id (id lấy trực tiếp từ DB) để cập nhật đúng bản ghi.
-  // KHÔNG phụ thuộc maTaiKhoan từ JWT (hệ thống chưa đưa ma_tai_khoan vào token).
   const handleMarkAllBellAsRead = useCallback(async () => {
     // Cập nhật local state NGAY LẬP TỨC để badge biến mất (UX không bị kẹt)
     markAllBellAsRead();
@@ -200,7 +197,7 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
     onMessage: (topic, data) => {
       if (topic === '/topic/payment') {
         const now = Date.now();
-        // Dedup: bỏ qua nếu cùng maHoaDon trong vòng 2 giây
+
         if (
           lastHandledRef.current.maHoaDon === data.maHoaDon &&
           now - lastHandledRef.current.ts < 2000
@@ -209,7 +206,7 @@ const BangDieuKhienThuNgan = ({ onLogout, user }) => {
         }
         lastHandledRef.current = { maHoaDon: data.maHoaDon, ts: now };
 
-        // Fetch thông báo thanh toán từ API thay vì hardcode
+     
         fetchPaymentNotifications();
         fetchStats();
         setRefreshTrigger(prev => prev + 1);

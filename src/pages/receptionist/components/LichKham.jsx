@@ -136,10 +136,7 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
   // Helper normalize ngày — cắt bỏ phần giờ nếu có (ISO datetime → yyyy-MM-dd)
   const normalizeDate = (v) => v ? String(v).split('T')[0] : '';
 
-  // Lưu thông tin đã sửa — CHỈ gọi updateApi()
-  // - KHÔNG tick "Hoãn" → update() bình thường, giữ nguyên trạng thái
-  // - TICK "Hoãn" → update() với trangThai='HOAN' + lyDoHoan field riêng
-  //   → Backend tự tạo lịch mới + đánh dấu lịch cũ HOAN
+
   const handleSaveEdit = async () => {
     const appointment = editModal.appointment;
     if (!appointment) return;
@@ -182,7 +179,7 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
       };
 
       if (hoanLich) {
-        // Tick "Hoãn" → trạng thái HOAN + lý do hoãn field RIÊNG (không nhét vào ghiChu)
+     
         payload.trangThai = 'HOAN';
         payload.lyDoHoan = lyDoHoan?.trim();
       }
@@ -251,13 +248,12 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
     });
   }
 
-  // Bọc filter trong useCallback để reference ổn định giữa các render,
-  // tránh bị reset trang về 1 mỗi lần re-render (lỗi không chuyển trang được)
+  
   const appointmentFilters = useCallback((a) => (
     filterStatus === 'ALL' || a.trangThai === filterStatus
   ), [filterStatus]);
 
-  // Full mode: table - dùng usePagination để filter + search + phân trang
+
   const {
     paginatedData: paginated,
     filteredData: filtered,

@@ -57,7 +57,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
       setSelectedLabId('');
       setSelectedCdhaId('');
 
-      // 1. Fetch clinical exam data
+      // Fetch clinical exam data
       getClinicalExamByPhieuKhamApi(selectedPatient.maPhieuKham)
         .then(data => {
           if (data) {
@@ -84,7 +84,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
         })
         .catch(e => console.error("Lỗi tải khám lâm sàng:", e));
 
-      // 2. Fetch vitals data
+      //  Fetch vitals data
       getVitalsByPhieuKhamApi(selectedPatient.maPhieuKham)
         .then(data => {
           if (data) {
@@ -143,7 +143,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
         })
         .catch(e => console.error("Lỗi tải sinh hiệu:", e));
 
-      // 3. Fetch available CLS results
+      //  Fetch available CLS results
       getAvailableClsResultsApi(selectedPatient.maPhieuKham)
         .then(data => {
           if (data) setAvailableCls(data);
@@ -239,7 +239,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
     setExamData(newExamData);
     setHasChanges(true);
     setSaveStatus("editing");
-    // Clear error for this field if valid
+
     if (errors[field] && value.trim()) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
@@ -250,14 +250,14 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
     setVitals(newVitals);
     setHasChanges(true);
     setSaveStatus("editing");
-    // Clear error for this field on change
+  
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
   };
 
   const autoSave = async (latestExamData = examData, latestVitals = vitals, force = false) => {
-    // Validate before save
+
     if (!validateForm(latestExamData, latestVitals) && !force) {
       showError('Vui lòng kiểm tra lại thông tin trước khi lưu!');
       return false;
@@ -268,7 +268,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
       setSaveStatus("saving");
       setErrors({});
 
-      // Check if vitals have been filled (by assistant) - if not, don't save vitals portion
+    
       const vitalsHaveData = latestVitals.nhietDo && latestVitals.nhipTim && latestVitals.huyetApThu && 
                               latestVitals.huyetApTruong && latestVitals.nhipTho && latestVitals.spo2 && 
                               latestVitals.canNang && latestVitals.chieuCao;
@@ -338,19 +338,19 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
     }
   };
 
-  // Expose autoSave capability to parent container
+
   useImperativeHandle(ref, () => ({
     triggerAutoSave: async () => {
       return await autoSave(examData, vitals, true);
     },
-    // Strict save for finishing exam - validates ALL fields before saving
+   
     triggerFinishAutoSave: async () => {
-      // First validate all fields strictly
+
       if (!validateAllFieldsForFinish(examData)) {
         showError('Không thể kết thúc khám vì thông tin khám lâm sàng chưa đầy đủ! Vui lòng nhập đầy đủ: Lý do khám, Tiền sử bản thân, Bệnh sử, Khám lâm sàng, Chẩn đoán sơ bộ, Lời dặn bác sĩ.');
         return false;
       }
-      // Then auto-save with force=true
+
       return await autoSave(examData, vitals, true);
     }
   }));
@@ -367,7 +367,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
     try {
       const detail = await getDetailClsResultApi(chiDinhId);
       if (detail) {
-        // Check for duplicates
+  
         const servicePattern = `[${detail.loaiDichVu === 'XET_NGHIEM' ? 'XÉT NGHIỆM' : 'CĐHA'}] ${detail.tenDichVu}`;
         if (examData.ketQuaKhamCanLamSang.includes(servicePattern)) {
           showWarning(`Kết quả dịch vụ "${detail.tenDichVu}" đã được chọn trước đó!`);
@@ -376,10 +376,10 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
           return;
         }
 
-        // Format and append output
+   
         const formatted = `[${detail.loaiDichVu === 'XET_NGHIEM' ? 'XÉT NGHIỆM' : 'CĐHA'}] ${detail.tenDichVu}\n\n${detail.noiDungKetQua}\n\nKết luận:\n${detail.ketLuan || 'Chưa có kết luận'}\n\n--------------------\n`;
 
-        // Store referenced ID in localStorage for TabKetQuaCLS highlights
+       
         const refKey = `ref-cls-${selectedPatient.maPhieuKham}`;
         const refIds = JSON.parse(localStorage.getItem(refKey) || "[]");
         if (!refIds.includes(chiDinhId)) {
@@ -397,7 +397,7 @@ const TabKhamLamSang = forwardRef(({ selectedPatient, user }, ref) => {
         setHasChanges(true);
         setSaveStatus("editing");
 
-        // Save immediately to DB
+
         await autoSave(newExamData, vitals, true);
       }
     } catch (error) {

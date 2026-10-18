@@ -8,8 +8,6 @@ const TabKhamRHM = ({ examData, setExamData, isAssistant, maPhieuKham, user }) =
   const [selectedTooth, setSelectedTooth] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // NOTE: Data is loaded by the parent component (TroLyRHMForm / ManHinhKhamBenh).
-  // This component is a "controlled" form bound to parent's `examData` and `setExamData`.
 
   // --- VALIDATE ---
   const [errors, setErrors] = useState({});
