@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import Notification from './Notification';
 import fetchClient from '../api/fetchClient';
 import { getAccessToken, decodeTokenPayload } from '../api/tokenStore';
@@ -17,6 +17,11 @@ export const useNotification = () => {
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [bellNotifications, setBellNotifications] = useState([]);
+  // Ref mirror để clearAllBell rollback khi BE lỗi
+  const bellNotificationsRef = useRef([]);
+  useEffect(() => {
+    bellNotificationsRef.current = bellNotifications;
+  }, [bellNotifications]);
 
   const addNotification = useCallback((message, type = 'success', duration = 3000) => {
     const id = Date.now() + Math.random();
@@ -64,20 +69,30 @@ export const NotificationProvider = ({ children }) => {
   }, []);
 
   const markBellAsRead = useCallback((id) => {
+    // Gọi BE đánh dấu đã đọc theo id (không chặn UI)
+    fetchClient(`${API_BASE_URL}/thong-bao/${id}/mark-read`, {
+      method: 'PUT',
+      skipLoading: true,
+    }).catch((e) => console.error('markBellAsRead:', e));
     setBellNotifications(prev =>
       prev.map(n => (n.id === id ? { ...n, read: true } : n))
     );
   }, []);
 
-  const markAllBellAsRead = useCallback(async () => {
+  const markAllBellAsRead = useCallback(async (maTaiKhoanOverride, loaiOverride) => {
     // Gọi BE mark-all-read theo role của token hiện tại (QUAN_TRI_VIEN hoặc NHAN_VIEN)
+    // Cho phép dashboard truyền maTaiKhoan/loai tường minh để khỏi đoán role.
     try {
-      const payload = decodeTokenPayload(getAccessToken());
-      const ma = payload?.maTaiKhoan || payload?.maTaiKhoanBn || null;
-      const role = payload?.role || '';
-      const loai = role === 'QUAN_TRI_VIEN' ? 'QUAN_TRI_VIEN'
-        : (role === 'BENH_NHAN' ? 'BENH_NHAN' : 'NHAN_VIEN');
-      if (ma) {
+      let ma = maTaiKhoanOverride ?? null;
+      let loai = loaiOverride ?? null;
+      if (ma == null || loai == null) {
+        const payload = decodeTokenPayload(getAccessToken());
+        ma = ma ?? payload?.maTaiKhoan ?? payload?.maTaiKhoanBn ?? null;
+        const role = payload?.role || '';
+        loai = loai ?? (role === 'QUAN_TRI_VIEN' ? 'QUAN_TRI_VIEN'
+          : (role === 'BENH_NHAN' ? 'BENH_NHAN' : 'NHAN_VIEN'));
+      }
+      if (ma && loai) {
         await fetchClient(
           `${API_BASE_URL}/thong-bao/${ma}/${loai}/mark-all-read`,
           { method: 'PUT', skipLoading: true }
@@ -87,14 +102,47 @@ export const NotificationProvider = ({ children }) => {
     setBellNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }, []);
 
-  const clearAllBell = useCallback(() => {
+  const deleteBellNotification = useCallback((id) => {
+    // Xóa 1 thông báo trên BE rồi mới xóa local (rollback nếu lỗi)
+    setBellNotifications(prev => prev.filter(n => n.id !== id));
+    fetchClient(`${API_BASE_URL}/thong-bao/${id}`, {
+      method: 'DELETE',
+      skipLoading: true,
+    }).catch((e) => console.error('deleteBellNotification:', e));
+  }, []);
+
+  const clearAllBell = useCallback(async (maTaiKhoanOverride, loaiOverride) => {
+    // Xóa TẤT CẢ trên BE theo (maTaiKhoan, loai) rồi mới xóa local
+    const prev = bellNotificationsRef.current;
     setBellNotifications([]);
+    try {
+      let ma = maTaiKhoanOverride ?? null;
+      let loai = loaiOverride ?? null;
+      if (ma == null || loai == null) {
+        const payload = decodeTokenPayload(getAccessToken());
+        ma = ma ?? payload?.maTaiKhoan ?? payload?.maTaiKhoanBn ?? null;
+        const role = payload?.role || '';
+        loai = loai ?? (role === 'QUAN_TRI_VIEN' ? 'QUAN_TRI_VIEN'
+          : (role === 'BENH_NHAN' ? 'BENH_NHAN' : 'NHAN_VIEN'));
+      }
+      if (ma && loai) {
+        await fetchClient(
+          `${API_BASE_URL}/thong-bao/${ma}/${loai}/all`,
+          { method: 'DELETE', skipLoading: true }
+        );
+      }
+    } catch (e) {
+      console.error('clearAllBell:', e);
+      // Rollback: khôi phục list cũ để user không mất dữ liệu oan
+      setBellNotifications(prev);
+    }
   }, []);
 
   return (
     <NotificationContext.Provider value={{
       showSuccess, showError, showInfo, showWarning, showConfirm,
-      bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell,
+      bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead,
+      deleteBellNotification, clearAllBell,
     }}>
       {children}
       <div className="notification-container">

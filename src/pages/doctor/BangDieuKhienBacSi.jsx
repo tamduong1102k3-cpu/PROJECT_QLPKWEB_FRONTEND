@@ -17,22 +17,30 @@ import { API_BASE_URL } from '../../api/config';
 
 const BangDieuKhienBacSi = ({ onLogout, user }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const { bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
+  const { bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, deleteBellNotification, clearAllBell } = useNotification();
   const [maTaiKhoanBS, setMaTaiKhoanBS] = useState(null);
+  const [maNhanVienBS, setMaNhanVienBS] = useState(null);
   const thongBaoLoadedRef = useRef(false);
 
-  // Decode JWT lấy maTaiKhoan BS (claim maTaiKhoan cho NHAN_VIEN)
+  // Decode JWT lấy maTaiKhoan + maNhanVien BS (maNhanVien = ma_bac_si)
   useEffect(() => {
     const payload = decodeTokenPayload(getAccessToken());
     setMaTaiKhoanBS(payload?.maTaiKhoan || null);
-  }, []);
+    const maNv = payload?.maNhanVien ?? user?.maNhanVien ?? null;
+    setMaNhanVienBS(typeof maNv === 'number' ? maNv : Number(maNv) || null);
+  }, [user?.maNhanVien]);
 
-  // Fetch thông báo LICH_KHAM cũ dành cho BS từ bảng thong_bao
+  // Fetch thông báo LICH_KHAM dành cho BS từ bảng thong_bao.
+  // Ưu tiên fetch theo maNhanVien (ma_bac_si) để BS luôn thấy TB đặt lịch
+  // dù maTaiKhoan map chưa khớp; fallback maTaiKhoan khi thiếu maNV.
   const fetchThongBaoBS = useCallback(async () => {
-    if (!maTaiKhoanBS) return;
+    const query = maNhanVienBS
+      ? `maNhanVien=${maNhanVienBS}`
+      : (maTaiKhoanBS ? `maTaiKhoan=${maTaiKhoanBS}` : '');
+    if (!query) return;
     try {
       const res = await fetchClient(
-        `${API_BASE_URL}/thong-bao/${maTaiKhoanBS}/NHAN_VIEN`,
+        `${API_BASE_URL}/thong-bao/reference-type/LICH_KHAM?loaiNguoiNhan=NHAN_VIEN&${query}`,
         { skipLoading: true }
       );
       if (!res.ok) return;
@@ -50,14 +58,14 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
         });
       });
     } catch (e) { console.error('fetchThongBaoBS:', e); }
-  }, [maTaiKhoanBS, addBellNotification]);
+  }, [maNhanVienBS, maTaiKhoanBS, addBellNotification]);
 
   useEffect(() => {
-    if (!thongBaoLoadedRef.current && maTaiKhoanBS) {
+    if (!thongBaoLoadedRef.current && (maNhanVienBS || maTaiKhoanBS)) {
       thongBaoLoadedRef.current = true;
       fetchThongBaoBS();
     }
-  }, [maTaiKhoanBS, fetchThongBaoBS]);
+  }, [maNhanVienBS, maTaiKhoanBS, fetchThongBaoBS]);
 
   // Đánh dấu TẤT CẢ đã đọc: gọi BE mark-all-read rồi mới update local
   const handleMarkAllBellAsRead = useCallback(async () => {
@@ -302,8 +310,9 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
             <NotificationBell
               notifications={bellNotifications}
               onMarkAsRead={markBellAsRead}
-              onMarkAllAsRead={handleMarkAllBellAsRead}
-              onClearAll={clearAllBell}
+              onMarkAllAsRead={() => handleMarkAllBellAsRead()}
+              onClearAll={() => clearAllBell(maTaiKhoanBS, 'NHAN_VIEN')}
+              onDelete={deleteBellNotification}
             />
             <UserMenu
               user={user}

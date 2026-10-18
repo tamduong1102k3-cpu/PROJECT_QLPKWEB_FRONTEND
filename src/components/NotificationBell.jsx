@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const NotificationBell = ({ notifications = [], onMarkAsRead, onMarkAllAsRead, onClearAll }) => {
+const NotificationBell = ({ notifications = [], onMarkAsRead, onMarkAllAsRead, onClearAll, onDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -148,9 +148,23 @@ const NotificationBell = ({ notifications = [], onMarkAsRead, onMarkAllAsRead, o
                       <p className={`text-sm leading-snug truncate ${!notif.read ? 'font-bold text-slate-800' : 'text-slate-600'}`}>
                         {notif.title}
                       </p>
-                      <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0 mt-0.5">
-                        {formatTime(notif.createdAt)}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                        <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                          {formatTime(notif.createdAt)}
+                        </span>
+                        {onDelete && (
+                          <button
+                            title="Xóa thông báo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDelete?.(notif.id);
+                            }}
+                            className="p-1 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">close</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className={`text-xs mt-1 leading-relaxed ${!notif.read ? 'text-slate-600 font-medium' : 'text-slate-500'}`}>
                       {notif.message}
