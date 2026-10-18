@@ -30,8 +30,8 @@ const PaymentSuccess = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center relative overflow-hidden">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center relative overflow-hidden flex-shrink-0">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-2 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-b-full" />
         <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
           <span className="material-symbols-outlined text-[48px] text-green-500 font-black">check_circle</span>

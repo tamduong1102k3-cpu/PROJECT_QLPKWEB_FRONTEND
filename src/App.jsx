@@ -142,10 +142,18 @@ function App() {
 
   const renderMainContent = () => {
     if (window.location.pathname === '/payment-success') {
-      return <PaymentSuccess />;
+      return (
+        <div className="w-full min-h-screen">
+          <PaymentSuccess />
+        </div>
+      );
     }
     if (window.location.pathname === '/payment/result') {
-      return <PaymentResult />;
+      return (
+        <div className="w-full min-h-screen">
+          <PaymentResult />
+        </div>
+      );
     }
     if (currentView === 'admin') return <BangDieuKhienAdmin onLogout={handleLogout} />;
     if (currentView === 'receptionist') return <BangDieuKhienLeTan user={currentUser} onLogout={handleLogout} />;
