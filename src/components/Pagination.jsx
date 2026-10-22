@@ -1,29 +1,5 @@
 import React from 'react';
 
-/**
- * Component phân trang dùng chung.
- *
- * Props:
- *   currentPage   - trang hiện tại
- *   totalPages    - tổng số trang
- *   totalItems    - tổng số item (hiển thị ở label)
- *   label         - nhãn item, VD: "lịch khám", "phiếu", "bệnh nhân"
- *   visiblePages  - mảng trang hiển thị (VD: [1, 2, '...', 8, 9]) từ usePagination
- *   onPageChange  - hàm đổi trang: (page) => void
- *   jumpPage      - giá trị ô nhập trang nhanh
- *   setJumpPage   - setter ô nhập trang nhanh
- *   onJumpPage    - hàm xử lý khi nhập (từ usePagination.handleJumpPage)
- *   onJumpBlur    - hàm khi blur ô nhập (từ usePagination.handleJumpPageBlur)
- *
- * Tùy biến màu (Tailwind mode):
- *   activeClass   - class nút trang đang active (mặc định indigo)
- *   hoverClass    - class hover nút trang / prev / next
- *   ringClass     - class focus ring ô nhập trang
- *   disabledClass - class nút bị disable
- *
- * Mode inline style (dùng cho component có style inline, VD QuanLyBenhNhan):
- *   mode="inline" - dùng màu xanh #2563eb
- */
 const Pagination = ({
   currentPage,
   totalPages,

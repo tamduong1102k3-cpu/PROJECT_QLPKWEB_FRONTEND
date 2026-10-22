@@ -1,16 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 
-/**
- * Reusable Modal component with:
- * - React Portal rendering to document.body
- * - position: fixed overlay covering full viewport
- * - Flexbox centering (align-items: center, justify-content: center)
- * - Scroll lock on body when open
- * - Backdrop click to close
- * - Proper z-index (9999)
- * - Overflow handling for content
- */
+
 const Modal = ({
   isOpen,
   onClose,
@@ -24,7 +15,7 @@ const Modal = ({
   borderRadius = '12px',
   unstyled = false,
 }) => {
-  // Scroll lock: prevent body scrolling when modal is open
+
   useEffect(() => {
     if (isOpen) {
       const originalOverflow = document.body.style.overflow;

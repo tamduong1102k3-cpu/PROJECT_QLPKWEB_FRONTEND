@@ -31,10 +31,9 @@ const BangDieuKhienBacSi = ({ onLogout, user }) => {
   }, [user?.maNhanVien]);
 
   // Fetch thông báo LICH_KHAM dành cho BS từ 2 nguồn:
-  // (1) bảng thong_bao (TB đã tạo cho NV) — ưu tiên fetch theo maNhanVien (ma_bac_si);
-  // (2) bảng lich_kham theo ma_bac_si — fallback khi app chỉ tạo TB cho BN
-  //     mà chưa tạo TB cho BS (VD lịch cũ). Trùng lịch (cùng maLichKham đã có
-  //     TB ở nguồn 1) thì bỏ qua để khỏi double chuông.
+  //  bảng thong_bao (TB đã tạo cho NV) — ưu tiên fetch theo maNhanVien (ma_bac_si);
+  // bảng lich_kham theo ma_bac_si — fallback khi app chỉ tạo TB cho BN
+
   const fetchThongBaoBS = useCallback(async () => {
     const daCoMaLich = new Set();
     const query = maNhanVienBS

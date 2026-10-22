@@ -392,18 +392,21 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-400 max-w-[200px] truncate">{a.ghiChu || '--'}</td>
                     <td className="px-4 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditModal(a)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all" title="Cập nhật lịch khám">
-                          <span className="material-symbols-outlined text-sm">edit</span>Cập nhật
-                        </button>
-                        {isPending && (
-                          <button onClick={() => {
-                            onCheckIn && onCheckIn({ id: a.id, maBenhNhan: a.maBenhNhan, tenBenhNhan: a.tenBenhNhan, maChuyenKhoa: a.maChuyenKhoa, maBacSi: a.maBacSi, nguonTao: a.nguonTao || a.nguon_tao, daXacMinhDanhTinh: a.daXacMinhDanhTinh });
-                          }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-sm shadow-emerald-200 hover:shadow-md font-semibold text-xs">
-                            <span className="material-symbols-outlined text-sm">assignment_turned_in</span>Tiếp đón
+                      {/* Nếu lịch đã hủy (HUY) hoặc quá hẹn (QUA_HEN) thì không cho thao tác nào nữa, để trống cột Thao Tác */}
+                      {a.trangThai === 'HUY' || a.trangThai === 'QUA_HEN' ? null : (
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => openEditModal(a)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all" title="Cập nhật lịch khám">
+                            <span className="material-symbols-outlined text-sm">edit</span>Cập nhật
                           </button>
-                        )}
-                      </div>
+                          {isPending && (
+                            <button onClick={() => {
+                              onCheckIn && onCheckIn({ id: a.id, maBenhNhan: a.maBenhNhan, tenBenhNhan: a.tenBenhNhan, maChuyenKhoa: a.maChuyenKhoa, maBacSi: a.maBacSi, nguonTao: a.nguonTao || a.nguon_tao, daXacMinhDanhTinh: a.daXacMinhDanhTinh });
+                            }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-sm shadow-emerald-200 hover:shadow-md font-semibold text-xs">
+                              <span className="material-symbols-outlined text-sm">assignment_turned_in</span>Tiếp đón
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

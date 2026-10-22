@@ -2,16 +2,7 @@ import React, { useState, useRef } from 'react';
 import ModalXemThongTin from '../pages/receptionist/components/ModalXemThongTin';
 import ModalDoiMatKhau from '../pages/receptionist/components/ModalDoiMatKhau';
 
-/**
- * Component menu dropdown người dùng — hover để hiện.
- * Props:
- *   user          – object tài khoản hiện tại
- *   onLogout      – callback đăng xuất
- *   displayName   – tên hiển thị trên header (ví dụ: "Lễ Tân", "BS. Nguyễn Văn A")
- *   displayRole   – vai trò / phòng ban hiển thị
- *   accentColor   – prefix màu: "primary" | "indigo" | "blue" | "emerald" v.v. (default = "primary")
- *   avatarIcon    – icon material hoặc chữ cái avatar (default: ký tự đầu username)
- */
+
 const UserMenu = ({
   user,
   onLogout,

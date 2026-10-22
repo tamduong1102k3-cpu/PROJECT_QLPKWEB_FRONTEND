@@ -146,6 +146,8 @@ const STATUS_CONFIG = {
   CHUA_DEN: { label: 'Chưa đến', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
   DA_DEN: { label: 'Đã đến', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400' },
   HOAN: { label: 'Hoãn', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-400' },
+  HUY: { label: 'Hủy', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-400' },
+  QUA_HEN: { label: 'Quá hẹn', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-400' },
 };
 
 const NGUON_TAO_CONFIG = {
@@ -1596,10 +1598,12 @@ const TabHenTaiKham = ({ user, patient, appointments: externalAppointments }) =>
                         {a.ngayTaiKham && <div className="mt-0.5">{getDaysUntil(a.ngayTaiKham)}</div>}
                       </td>
 
-                      {/* Status — clickable dropdown */}
-                      <td className="px-5 py-3.5 text-center">
-                        <StatusDropdown appointment={a} onUpdate={handleUpdate} />
-                      </td>
+{/* Status — hiển thị plain text, không dropdown */}
+<td className="px-5 py-3.5 text-center whitespace-nowrap">
+                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-full border ${STATUS_CONFIG[a.trangThai]?.cls || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                             {STATUS_CONFIG[a.trangThai]?.label || a.trangThai}
+                           </span>
+                       </td>
 
                       {/* Source */}
                       <td className="px-5 py-3.5">
@@ -1727,3 +1731,4 @@ const TabHenTaiKham = ({ user, patient, appointments: externalAppointments }) =>
 export { AppointmentModal, formatDateInput, formatDateDisplay, getVietnameseDayFromDate, getUniqueWorkingDays, getAssignedRoomOptions, getAvailableShiftIds, getShiftId };
 
 export default TabHenTaiKham;
+
