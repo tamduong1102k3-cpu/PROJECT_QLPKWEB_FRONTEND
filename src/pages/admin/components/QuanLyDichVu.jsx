@@ -1,6 +1,7 @@
 import * as dichVuApi from '../../../api/dichVuApi';
 import * as danhMucApi from '../../../api/danhMucApi';
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '../../../components/NotificationContext';
 const empty = {
   tenDichVu: '',
   donGia: '',
@@ -23,6 +24,7 @@ const fmtLoai = val => {
   return map[val] || val.replace(/_/g, ' ');
 };
 export default function QuanLyDichVu() {
+  const { showSuccess, showError, showWarning, showConfirm } = useNotification();
   const [list, setList] = useState([]);
   const [ckList, setCkList] = useState([]);
   const [nhomList, setNhomList] = useState([]);
@@ -85,11 +87,11 @@ export default function QuanLyDichVu() {
   };
   const handleSave = async () => {
     if (!form.tenDichVu.trim()) {
-      alert('Vui lòng nhập tên dịch vụ!');
+      showWarning('Vui lòng nhập tên dịch vụ!');
       return;
     }
     if (!form.donGia || isNaN(Number(form.donGia))) {
-      alert('Vui lòng nhập đơn giá hợp lệ!');
+      showWarning('Vui lòng nhập đơn giá hợp lệ!');
       return;
     }
     setSaving(true);
@@ -109,6 +111,7 @@ export default function QuanLyDichVu() {
       }
       setModal(null);
       fetchAll();
+      showSuccess(modal === 'edit' ? 'Cập nhật dịch vụ thành công!' : 'Thêm dịch vụ thành công!');
     } catch (e) {
       const status = e.status || e.response?.status;
       const msg = e.message || '';
@@ -117,27 +120,29 @@ export default function QuanLyDichVu() {
         || msg.includes('người dùng khác cập nhật')
         || msg.includes('Vui lòng tải lại');
       if (isConflict) {
-        alert('⚠️ Dữ liệu đã được người dùng khác cập nhật. Vui lòng tải lại dữ liệu mới nhất!');
+        showWarning('Dữ liệu đã được người dùng khác cập nhật. Vui lòng tải lại dữ liệu mới nhất!');
         setModal(null);
         fetchAll();
       } else {
-        alert(msg);
+        showError(msg || 'Không thể lưu dịch vụ.');
       }
     } finally {
       setSaving(false);
     }
   };
   const handleDelete = async id => {
-    if (!window.confirm('Xóa dịch vụ này?')) return;
-    setDeleting(id);
-    try {
-      await dichVuApi.deleteApi(id);
-      fetchAll();
-    } catch (e) {
-      alert(e.message);
-    } finally {
-      setDeleting(null);
-    }
+    showConfirm('Xóa dịch vụ này?', async () => {
+      setDeleting(id);
+      try {
+        await dichVuApi.deleteApi(id);
+        fetchAll();
+        showSuccess('Xóa dịch vụ thành công!');
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        setDeleting(null);
+      }
+    });
   };
 
   // Stats

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '../../../components/NotificationContext';
 import { uploadToCloudinary } from '../../../api/cloudinaryApi';
 import { submitTestResultApi, getCdhaResultApi } from '../../../api/phieuChiDinhApi';
 import { getTemplateForService, generateTextFromTemplate, getValueStatus, formatDateOfBirth } from './TienIchKyThuatVien';
-import { toast } from 'react-toastify';
 
 const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
+  const { showWarning, showSuccess, showError } = useNotification();
   const [testResultText, setTestResultText] = useState('');
   const [useTemplate, setUseTemplate] = useState(true);
   const [templateValues, setTemplateValues] = useState({});
@@ -60,7 +61,8 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
     if (danhSachAnh.length + files.length > 10) {
-      alert('Tối đa 10 ảnh'); return;
+      showWarning('Tối đa 10 ảnh');
+      return;
     }
     setIsUploading(true);
     try {
@@ -98,14 +100,14 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
       const res = await submitTestResultApi(payload);
       
       if (res) {
-        toast.success("Đã lưu kết quả cận lâm sàng thành công!");
+        showSuccess("Đã lưu kết quả cận lâm sàng thành công!");
         onSuccess(); 
       } else {
-        toast.error("Lỗi khi lưu kết quả vào hệ thống.");
+        showError("Lỗi khi lưu kết quả vào hệ thống.");
       }
     } catch (error) {
       console.error("Lỗi khi lưu kết quả:", error);
-      toast.error("Không thể kết nối đến máy chủ.");
+      showError("Không thể kết nối đến máy chủ.");
     } finally { 
       setIsSubmitting(false); 
     }

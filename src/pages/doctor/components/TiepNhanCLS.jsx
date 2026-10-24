@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createTiepNhanClsApi } from '../../../api/tiepNhanClsApi';
 import { confirmClsServiceApi } from '../../../api/phieuKhamApi';
-import { toast } from 'react-toastify';
+import { useNotification } from '../../../components/NotificationContext';
 
 const initials = (name) =>
   String(name || '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
 const TiepNhanCLS = ({ pendingConfirmationList = [], user, onConfirmSuccess }) => {
+  const { showWarning, showSuccess, showError } = useNotification();
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [selectedConfirmItem, setSelectedConfirmItem] = useState(null);
   const [confirmingId, setConfirmingId] = useState(null);
@@ -28,11 +29,11 @@ const TiepNhanCLS = ({ pendingConfirmationList = [], user, onConfirmSuccess }) =
   const handleSaveConfirmService = async () => {
     if (!selectedConfirmItem?.maPhieuKham) return;
     if (!tiepNhanData.lyDoDen || tiepNhanData.lyDoDen.trim() === '') {
-      toast.warning('Vui lòng nhập lý do đến!');
+      showWarning('Vui lòng nhập lý do đến!');
       return;
     }
     if (!tiepNhanData.thongTinSangLoc || tiepNhanData.thongTinSangLoc.trim() === '') {
-      toast.warning('Vui lòng nhập thông tin sàng lọc!');
+      showWarning('Vui lòng nhập thông tin sàng lọc!');
       return;
     }
     setConfirmingId(selectedConfirmItem.maPhieuKham);
@@ -46,11 +47,11 @@ const TiepNhanCLS = ({ pendingConfirmationList = [], user, onConfirmSuccess }) =
         ghiChu: tiepNhanData.ghiChu ? tiepNhanData.ghiChu.trim() : ''
       });
       await confirmClsServiceApi(selectedConfirmItem.maPhieuKham, user?.maNhanVien);
-      toast.success('Tiếp nhận bệnh nhân và tạo phiếu chỉ định thành công!');
+      showSuccess('Tiếp nhận bệnh nhân và tạo phiếu chỉ định thành công!');
       if (onConfirmSuccess) onConfirmSuccess();
     } catch (e) {
       console.error('Lỗi khi tiếp nhận dịch vụ:', e);
-      toast.error(e.message || 'Lỗi khi tiếp nhận dịch vụ.');
+      showError(e.message || 'Lỗi khi tiếp nhận dịch vụ.');
     } finally {
       setConfirmingId(null);
       setSelectedConfirmItem(null);

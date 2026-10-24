@@ -5,8 +5,8 @@ import {
 } from '../../../api/phieuChiDinhApi';
 import DuyetKetQuaXetNghiem from './DuyetKetQuaXetNghiem';
 import DuyetKetQuaCDHA from './DuyetKetQuaCDHA';
-import { toast } from 'react-toastify';
 import formatGender from '../../../utils/formatGender';
+import { useNotification } from '../../../components/NotificationContext';
 
 const TABS = [
   { key: 'pending',     label: 'Chờ duyệt',   icon: 'pending_actions' },
@@ -14,6 +14,7 @@ const TABS = [
 ];
 
 const BangDieuKhienChanDoan = ({ user, onBack }) => {
+  const { showError } = useNotification();
   const [activeTab, setActiveTab] = useState('pending');
   const [pendingList, setPendingList] = useState([]);
   const [approvedList, setApprovedList] = useState([]);
@@ -56,9 +57,9 @@ const BangDieuKhienChanDoan = ({ user, onBack }) => {
       ]);
       if (p.status === 'fulfilled') setPendingList(p.value || []);
       if (a.status === 'fulfilled') setApprovedList(a.value || []);
-    } catch (e) { console.error(e); toast.error('Không tải được dữ liệu.'); }
+    } catch (e) { console.error(e); showError('Không tải được dữ liệu.'); }
     finally { setLoading(false); }
-  }, [maCK]);
+  }, [maCK, showError]);
 
   useEffect(() => { fetchData(); const t = setInterval(fetchData, 30000); return () => clearInterval(t); }, [fetchData]);
 

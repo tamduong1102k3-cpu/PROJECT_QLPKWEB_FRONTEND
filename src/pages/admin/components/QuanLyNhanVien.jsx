@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   searchNhanVienApi,
   addNhanVienApi as createEmployeeApi, 
   updateNhanVienApi as updateEmployeeApi, 
-  deleteNhanVienApi as deleteEmployeeApi 
+  deleteNhanVienApi as deleteEmployeeApi,
+  activateNhanVienAccountApi
 } from '../../../api/employeeApi';
 import { 
   getAllChucVuApi as getChucVuApi, 
@@ -12,6 +14,7 @@ import {
 } from '../../../api/danhMucApi';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
+import { useNotification } from '../../../components/NotificationContext';
 
 const isPatientRole = role => {
   const normalized = String(role || '').trim().toLowerCase();
@@ -19,6 +22,7 @@ const isPatientRole = role => {
 };
 
 const QuanLyNhanVien = () => {
+  const { showSuccess, showError, showWarning, showConfirm } = useNotification();
   const [showAddModal, setShowAddModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -180,15 +184,27 @@ const QuanLyNhanVien = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa nhân viên này? Hành động này sẽ xóa luôn tài khoản hệ thống của họ!")) {
+    showConfirm("Bạn có chắc muốn KHÓA tài khoản nhân viên này? Nhân viên sẽ không thể đăng nhập được nữa.", async () => {
       try {
         await deleteEmployeeApi(id);
-        alert("Xóa nhân viên thành công!");
+        showSuccess("Khóa tài khoản nhân viên thành công!");
         fetchEmployees();
       } catch (error) {
-        alert("Lỗi khi xóa: " + error.message);
+        showError("Lỗi khi khóa tài khoản: " + error.message);
       }
-    }
+    });
+  };
+
+  const handleActivate = async (id) => {
+    showConfirm("Bạn có chắc muốn MỞ KHÓA tài khoản nhân viên này? Nhân viên sẽ có thể đăng nhập trở lại.", async () => {
+      try {
+        await activateNhanVienAccountApi(id);
+        showSuccess("Mở khóa tài khoản nhân viên thành công!");
+        fetchEmployees();
+      } catch (error) {
+        showError("Lỗi khi mở khóa tài khoản: " + error.message);
+      }
+    });
   };
 
   const filteredEmployees = employees;
@@ -218,12 +234,12 @@ const QuanLyNhanVien = () => {
     
     // Kiểm tra các trường bắt buộc
     if (!formData.ho_ten.trim() || !formData.cccd.trim() || !formData.chuc_vu || !formData.email.trim()) {
-      alert("Vui lòng nhập đầy đủ các thông tin bắt buộc (có đánh dấu sao *) !");
+      showWarning("Vui lòng nhập đầy đủ các thông tin bắt buộc (có đánh dấu sao *) !");
       return;
     }
     
     if (!isEditMode && (!formData.username.trim() || !formData.role || !formData.email.trim())) {
-      alert("Vui lòng nhập Email, Username và Quyền để tạo tài khoản!");
+      showWarning("Vui lòng nhập Email, Username và Quyền để tạo tài khoản!");
       return;
     }
 
@@ -244,17 +260,17 @@ const QuanLyNhanVien = () => {
     try {
       if (isEditMode) {
         await updateEmployeeApi(editId, payload);
-        alert('Cập nhật nhân viên thành công!');
+        showSuccess('Cập nhật nhân viên thành công!');
       } else {
         await createEmployeeApi(payload);
-        alert('Thêm nhân viên và tạo tài khoản thành công! (Mật khẩu mặc định: 12345)');
+        showSuccess('Thêm nhân viên và tạo tài khoản thành công! (Mật khẩu mặc định: 12345)');
       }
       
       setShowAddModal(false);
       fetchEmployees();
       resetForm();
     } catch (error) {
-      alert('Lỗi: ' + error.message);
+      showError('Lỗi: ' + error.message);
     }
   };
 
@@ -318,13 +334,14 @@ const QuanLyNhanVien = () => {
                 <th className="px-6 py-4 font-medium">Chức vụ / Chuyên khoa</th>
                 <th className="px-6 py-4 font-medium">Liên hệ</th>
                 <th className="px-6 py-4 font-medium">Ngày vào làm</th>
+                <th className="px-6 py-4 font-medium">Trạng thái</th>
                 <th className="px-6 py-4 font-medium text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan="6" className="p-10 text-center text-gray-500">Đang tải dữ liệu...</td>
+                  <td colSpan="7" className="p-10 text-center text-gray-500">Đang tải dữ liệu...</td>
                 </tr>
               ) : pagedEmployees.map((emp) => (
                 <tr key={emp.maNhanVien} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
@@ -351,13 +368,36 @@ const QuanLyNhanVien = () => {
                   <td className="px-6 py-4 text-sm text-gray-700">
                     {emp.ngayVaoLam ? new Date(emp.ngayVaoLam).toLocaleDateString('vi-VN') : ''}
                   </td>
+                  <td className="px-6 py-4">
+                    {emp.hoatDong === true || emp.hoatDong === 1 ? (
+                      <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">Đang hoạt động</span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">Đã khóa</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={() => handleEdit(emp)} className="text-blue-500 hover:text-blue-700 p-1 rounded-md hover:bg-blue-50 transition-colors mr-2">
                       <span className="material-symbols-outlined text-[20px]">edit</span>
                     </button>
-                    <button onClick={() => handleDelete(emp.maNhanVien)} className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition-colors">
-                      <span className="material-symbols-outlined text-[20px]">delete</span>
-                    </button>
+                    {emp.hoatDong === true || emp.hoatDong === 1 ? (
+                      <button
+                        onClick={() => handleDelete(emp.maNhanVien)}
+                        title="Khóa tài khoản"
+                        aria-label="Khóa tài khoản"
+                        className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">lock</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleActivate(emp.maNhanVien)}
+                        title="Mở khóa tài khoản"
+                        aria-label="Mở khóa tài khoản"
+                        className="text-green-600 hover:text-green-700 p-1 rounded-md hover:bg-green-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">lock_open</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -385,8 +425,8 @@ const QuanLyNhanVien = () => {
       </div>
 
       {/* Add Employee Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {showAddModal && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl animate-fade-in max-h-[90vh] overflow-y-auto relative border border-gray-100">
             
             {/* Modal Header */}
@@ -529,7 +569,8 @@ const QuanLyNhanVien = () => {
             </div>
             
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>
@@ -537,4 +578,3 @@ const QuanLyNhanVien = () => {
 };
 
 export default QuanLyNhanVien;
-

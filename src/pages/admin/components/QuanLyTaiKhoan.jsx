@@ -1,9 +1,10 @@
-import { getAllApi, updateApi, deleteApi } from '../../../api/accountApi'; 
+import { getAllApi, updateApi, setAccountActiveApi } from '../../../api/accountApi';
 import { getAllNhanVienApi } from '../../../api/employeeApi';
 import { getAllChuyenKhoaApi, getAllVaiTroApi } from '../../../api/danhMucApi';
 import React, { useState, useEffect } from 'react';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
+import { useNotification } from '../../../components/NotificationContext';
 
 const VAI_TRO_OPTIONS = [
   'QUAN_TRI_VIEN',
@@ -58,6 +59,7 @@ const roleBadgeClass = role => {
   return map[role] || 'bg-gray-100 text-gray-600';
 };
 const QuanLyTaiKhoan = () => {
+  const { showSuccess, showError, showConfirm } = useNotification();
   const [accounts, setAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -84,7 +86,7 @@ const QuanLyTaiKhoan = () => {
       setAccounts(data || []); // Đảm bảo luôn là mảng để không lỗi .filter
     } catch (err) {
       console.error(err);
-      alert("Không thể tải danh sách tài khoản: " + err.message);
+      showError("Không thể tải danh sách tài khoản: " + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -167,7 +169,7 @@ const QuanLyTaiKhoan = () => {
       // SỬ DỤNG HÀM updateApi
       await updateApi(editTarget.maTaiKhoan, body);
       
-      alert('Cập nhật tài khoản thành công!');
+      showSuccess('Cập nhật tài khoản thành công!');
       setShowModal(false);
       fetchAccounts();
     } catch (err) {
@@ -178,16 +180,21 @@ const QuanLyTaiKhoan = () => {
   };
 
   // ── Delete ────────────────────────────────────────────────────
-  const handleDelete = async (id, username) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa tài khoản "${username}" không?`)) return;
-    try {
-      //  SỬ DỤNG HÀM deleteApi
-      await deleteApi(id);
-      alert('Xóa tài khoản thành công!');
-      fetchAccounts();
-    } catch (err) {
-      alert("Lỗi khi xóa: " + err.message);
-    }
+  const handleToggleActive = async (account) => {
+    const isActive = account.hoatDong === true || account.hoatDong === 1;
+    const nextActive = !isActive;
+    showConfirm(
+      `Bạn có chắc muốn ${nextActive ? 'MỞ KHÓA' : 'KHÓA'} tài khoản "${account.username}" không?`,
+      async () => {
+      try {
+        await setAccountActiveApi(account.maTaiKhoan, nextActive);
+        showSuccess(nextActive ? 'Mở khóa tài khoản thành công!' : 'Khóa tài khoản thành công!');
+        fetchAccounts();
+      } catch (err) {
+        showError("Lỗi khi cập nhật trạng thái tài khoản: " + err.message);
+      }
+      }
+    );
   };
 
   // ── Render ────────────────────────────────────────────────────
@@ -328,9 +335,9 @@ const QuanLyTaiKhoan = () => {
               background: '#f9fafb',
               borderBottom: '1px solid #e5e7eb'
             }}>
-                {['Mã TK', 'Username', 'Email', 'Vai Trò', 'Trạng Thái MK', 'Thao Tác'].map(h => <th key={h} style={{
+                {['Mã TK', 'Username', 'Email', 'Vai Trò', 'Trạng Thái MK', 'Hoạt Động', 'Thao Tác'].map(h => <th key={h} style={{
                 padding: '12px 20px',
-                textAlign: 'left',
+                textAlign: h === 'Thao Tác' ? 'right' : 'left',
                 fontSize: '12px',
                 fontWeight: 600,
                 color: '#6b7280',
@@ -341,11 +348,11 @@ const QuanLyTaiKhoan = () => {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? <tr><td colSpan="6" style={{
+              {isLoading ? <tr><td colSpan="7" style={{
                 padding: '48px',
                 textAlign: 'center',
                 color: '#9ca3af'
-              }}>Đang tải dữ liệu...</td></tr> : pagedAccounts.length === 0 ? <tr><td colSpan="6" style={{
+              }}>Đang tải dữ liệu...</td></tr> : pagedAccounts.length === 0 ? <tr><td colSpan="7" style={{
                 padding: '48px',
                 textAlign: 'center',
                 color: '#9ca3af'
@@ -421,6 +428,29 @@ const QuanLyTaiKhoan = () => {
                 }}>Đã đổi MK</span>}
                   </td>
                   <td style={{
+                padding: '14px 20px'
+              }}>
+                    {acc.hoatDong === true || acc.hoatDong === 1 ? (
+                      <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    background: '#dcfce7',
+                    color: '#166534'
+                  }}>Đang hoạt động</span>
+                    ) : (
+                      <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    background: '#fee2e2',
+                    color: '#991b1b'
+                  }}>Đã khóa</span>
+                    )}
+                  </td>
+                  <td style={{
                 padding: '14px 20px',
                 textAlign: 'right'
               }}>
@@ -441,17 +471,17 @@ const QuanLyTaiKhoan = () => {
                       fontSize: '20px'
                     }}>edit</span>
                       </button>
-                      <button onClick={() => handleDelete(acc.maTaiKhoan, acc.username)} style={{
+                      <button onClick={() => handleToggleActive(acc)} style={{
                     padding: '6px',
                     border: 'none',
                     background: 'none',
                     cursor: 'pointer',
-                    color: '#ef4444',
+                    color: acc.hoatDong === true || acc.hoatDong === 1 ? '#ef4444' : '#16a34a',
                     borderRadius: '6px'
-                  }} title="Xóa tài khoản">
+                  }} title={acc.hoatDong === true || acc.hoatDong === 1 ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}>
                         <span className="material-symbols-outlined" style={{
                       fontSize: '20px'
-                    }}>delete</span>
+                    }}>{acc.hoatDong === true || acc.hoatDong === 1 ? 'lock' : 'lock_open'}</span>
                       </button>
                     </div>
                   </td>

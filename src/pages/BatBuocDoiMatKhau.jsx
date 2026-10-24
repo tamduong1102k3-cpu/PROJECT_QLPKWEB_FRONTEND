@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { firstTimeChangePasswordApi, ensureAuthenticated } from '../api/accountApi';
+import { useNotification } from '../components/NotificationContext';
 
 const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
+  const { showSuccess } = useNotification();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,7 +28,7 @@ const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
       await firstTimeChangePasswordApi({ email: user.email, newPassword });
 
       await ensureAuthenticated();
-      alert('Đổi mật khẩu thành công!');
+      showSuccess('Đổi mật khẩu thành công!');
       onBackToLogin();
     } catch (err) {
       setError(err.message);
@@ -101,4 +103,3 @@ const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
 };
 
 export default BatBuocDoiMatKhau;
-

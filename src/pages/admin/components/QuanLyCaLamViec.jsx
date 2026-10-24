@@ -490,7 +490,7 @@ export default function QuanLyCaLamViec() {
     }
   };
 
-  const calSaveException = async () => {
+  const calSaveException = async (confirmedReplacement = false) => {
     if (!calForm.loai || !calSelectedDay || !calSelectedMaNV) return;
     if (calForm.loai === "THEM_CA" && calForm.phong == null) {
       showError("Vui lòng chọn phòng!");
@@ -516,12 +516,12 @@ export default function QuanLyCaLamViec() {
     const existingMacDinh = (calSelectedDay.macDinh || []).find(
       (m) => m.ca?.id === calForm.maCaMacDinh,
     );
-    if (!calForm.id && existingMacDinh && calForm.loai !== "MAC_DINH") {
-      if (window.confirm("Ngày này đã có ca mặc định theo ca này. Bạn có muốn thay thế ca mặc định không?")) {
-
-      } else {
-        return;
-      }
+    if (!calForm.id && existingMacDinh && calForm.loai !== "MAC_DINH" && !confirmedReplacement) {
+      showConfirm(
+        "Ngày này đã có ca mặc định theo ca này. Bạn có muốn thay thế ca mặc định không?",
+        () => calSaveException(true),
+      );
+      return;
     }
     const payload = {
       maNhanVien: Number(calSelectedMaNV),
@@ -1254,20 +1254,19 @@ const calDeleteDefault = async (m) => {
     }
   };
 
-  const deleteCaLam = async (id) => {
-    if (
-      !window.confirm(
-        "Xác nhận xóa ca này? Nếu ca đang được dùng trong lịch phân công, thao tác sẽ bị từ chối.",
-      )
-    )
-      return;
-    try {
-      await deleteCaLamDanhMucApi(id);
-      await fetchData();
-      showSuccess("Đã xóa ca");
-    } catch (e) {
-      showError("Lỗi xóa ca: " + e.message);
-    }
+  const deleteCaLam = (id) => {
+    showConfirm(
+      "Xác nhận xóa ca này? Nếu ca đang được dùng trong lịch phân công, thao tác sẽ bị từ chối.",
+      async () => {
+        try {
+          await deleteCaLamDanhMucApi(id);
+          await fetchData();
+          showSuccess("Đã xóa ca");
+        } catch (e) {
+          showError("Lỗi xóa ca: " + e.message);
+        }
+      },
+    );
   };
 
   if (loading)

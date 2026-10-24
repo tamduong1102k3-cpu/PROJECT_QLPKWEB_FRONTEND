@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { techConfirmClsApi } from '../../../api/phieuKhamApi';
-import { toast } from 'react-toastify';
+import { useNotification } from '../../../components/NotificationContext';
 
 const ModalNhapTiepNhanCls = ({ patient, user, onClose, onSuccess }) => {
+  const { showWarning, showSuccess, showError } = useNotification();
   const [formData, setFormData] = useState({
     lyDoDen: '',
     thongTinSangLoc: '',
@@ -16,11 +17,11 @@ const ModalNhapTiepNhanCls = ({ patient, user, onClose, onSuccess }) => {
 
   const handleSubmit = async () => {
     if (!formData.lyDoDen || formData.lyDoDen.trim() === '') {
-      toast.warning('Vui lòng nhập lý do đến!');
+      showWarning('Vui lòng nhập lý do đến!');
       return;
     }
     if (!formData.thongTinSangLoc || formData.thongTinSangLoc.trim() === '') {
-      toast.warning('Vui lòng nhập thông tin sàng lọc!');
+      showWarning('Vui lòng nhập thông tin sàng lọc!');
       return;
     }
     setSubmitting(true);
@@ -34,11 +35,11 @@ const ModalNhapTiepNhanCls = ({ patient, user, onClose, onSuccess }) => {
           ghiChu: formData.ghiChu ? formData.ghiChu.trim() : ''
         }
       );
-      toast.success('Tiếp nhận CLS và tạo phiếu chỉ định thành công!');
+      showSuccess('Tiếp nhận CLS và tạo phiếu chỉ định thành công!');
       if (onSuccess) onSuccess(patient);
     } catch (e) {
       console.error('Lỗi khi tiếp nhận CLS:', e);
-      toast.error(e.message || 'Lỗi khi tiếp nhận CLS.');
+      showError(e.message || 'Lỗi khi tiếp nhận CLS.');
     } finally {
       setSubmitting(false);
     }

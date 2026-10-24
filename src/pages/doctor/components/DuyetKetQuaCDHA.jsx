@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   getCdhaResultsByPhieuKhamApi,
   approveCdhaResultApi,
@@ -23,6 +24,8 @@ const DuyetKetQuaCDHA = ({
   const [tiepNhanCls, setTiepNhanCls] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   // Helper gallery N ảnh (backward-compat duongDanAnh1/2)
   const getGallery = (item) => {
@@ -107,12 +110,16 @@ const DuyetKetQuaCDHA = ({
     }
   };
 
-  const handleReject = async () => {
+  const handleReject = () => {
+    setRejectReason('');
+    setShowRejectModal(true);
+  };
+
+  const submitReject = async (e) => {
+    e.preventDefault();
     const currentResult = results[selectedResultIndex];
     if (!currentResult) return;
-    const reason = prompt("Nhập lý do không duyệt / yêu cầu kỹ thuật viên chụp lại:");
-    if (reason === null) return;
-    if (!reason.trim()) {
+    if (!rejectReason.trim()) {
       showWarning("Lý do từ chối không được để trống!");
       return;
     }
@@ -120,8 +127,9 @@ const DuyetKetQuaCDHA = ({
     try {
       const detailId = currentResult.maChiTietChiDinh || currentResult.idChiTietChiDinh;
       await rejectCdhaResultApi(detailId, {
-        reason: reason.trim()
+        reason: rejectReason.trim()
       });
+      setShowRejectModal(false);
       showSuccess("Đã từ chối kết quả và gửi yêu cầu thực hiện lại cho kỹ thuật viên!");
       onBack();
     } catch (e) {
@@ -424,6 +432,52 @@ const DuyetKetQuaCDHA = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showRejectModal && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/50 p-4">
+          <form
+            onSubmit={submitReject}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reject-cdha-title"
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <h3 id="reject-cdha-title" className="mb-2 text-lg font-bold text-slate-800">
+              Từ chối kết quả CĐHA
+            </h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Nhập lý do không duyệt hoặc yêu cầu kỹ thuật viên chụp lại.
+            </p>
+            <textarea
+              autoFocus
+              required
+              rows={4}
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              placeholder="Nhập lý do..."
+              className="w-full resize-y rounded-xl border border-slate-300 p-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            />
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setShowRejectModal(false)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                {submitting ? 'Đang gửi...' : 'Xác nhận từ chối'}
+              </button>
+            </div>
+          </form>
+        </div>,
+        document.body
       )}
 
       {/* Image Modal */}

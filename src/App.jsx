@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 import { NotificationProvider } from './components/NotificationContext';
 import { LoadingProvider } from './components/LoadingContext';
@@ -215,18 +213,6 @@ function App() {
   return (
     <LoadingProvider>
       <NotificationProvider>
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
         {/* Gọi hàm render logic content */}
         {renderMainContent()}
       </NotificationProvider>

@@ -3,6 +3,7 @@ import * as khoThuocApi from '../../../api/khoThuocApi';
 import { card, th, td, formatCurrency, formatDate } from './styles';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
+import { useNotification } from '../../../components/NotificationContext';
 
 export const suppliers = [
   { id: 1, name: 'Công ty Cổ phần Dược Hậu Giang (DHG)' },
@@ -21,6 +22,7 @@ const statusStyle = s => {
 };
 
 const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, currentUser }) => {
+  const { showSuccess, showError, showWarning } = useNotification();
   const [phieuList, setPhieuList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -48,7 +50,7 @@ const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, current
       const data = await khoThuocApi.getAllPhieuNhapApi();
       setPhieuList(data || []);
     } catch (e) {
-      alert(e.message);
+      showError(e.message);
     } finally {
       setLoading(false);
     }
@@ -66,7 +68,7 @@ const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, current
       const data = await khoThuocApi.getChiTietPhieuNhapApi(phieu.maPhieuNhapThuoc);
       setDetails(data || []);
     } catch (e) {
-      alert(e.message);
+      showError(e.message);
     } finally {
       setLoadingDetail(false);
     }
@@ -91,7 +93,7 @@ const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, current
 
   const handleSubmitImport = async () => {
     if (newSlip.chiTiet.length === 0) {
-      alert('Vui lòng thêm ít nhất một loại thuốc');
+      showWarning('Vui lòng thêm ít nhất một loại thuốc');
       return;
     }
     const tongTien = newSlip.chiTiet.reduce((sum, item) => sum + item.soLuongNhap * item.donGiaNhap, 0);
@@ -102,8 +104,9 @@ const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, current
       setNewSlip({ maNhanVienNhap: currentUser?.maNhanVien ? Number(currentUser.maNhanVien) : 1, maNhaCungCap: 1, ghiChu: '', chiTiet: [] });
       loadPhieu();
       onRefresh();
+      showSuccess('Tạo phiếu nhập thuốc thành công!');
     } catch (e) {
-      alert(e.message);
+      showError(e.message);
     }
   };
 

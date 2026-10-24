@@ -2,6 +2,7 @@ import React from 'react';
 import PrintButton from '../../../components/PrintButton';
 import { sqlLikeMatch } from '../../../utils/searchUtils';
 import formatGender from '../../../utils/formatGender';
+import { useNotification } from '../../../components/NotificationContext';
 
 const isExpired = (hanSuDung) => {
   if (!hanSuDung) return false;
@@ -55,6 +56,7 @@ const TabKeDonThuoc = ({
   readOnly,
   prescriptionSavedAt
 }) => {
+  const { showWarning } = useNotification();
   return (
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 animate-fade-in min-h-[500px] flex flex-col w-full">
       {prescriptionSavedAt && selectedMeds.length > 0 && (
@@ -137,12 +139,12 @@ const TabKeDonThuoc = ({
           {!readOnly && (
             <button onClick={() => {
               if (selectedMeds.length === 0) {
-                alert('Vui lòng thêm ít nhất một loại thuốc trước khi lưu đơn!');
+                showWarning('Vui lòng thêm ít nhất một loại thuốc trước khi lưu đơn!');
                 return;
               }
               const invalidMeds = selectedMeds.filter(m => !m.tenThuoc || !m.tenThuoc.trim());
               if (invalidMeds.length > 0) {
-                alert('Có thông tin thuốc không hợp lệ trong đơn!');
+                showWarning('Có thông tin thuốc không hợp lệ trong đơn!');
                 return;
               }
               handleSavePrescription(false);

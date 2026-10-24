@@ -96,6 +96,24 @@ export const updateApi = async (id, data) => {
 };
 
 /**
+ * PUT /{id}/hoat-dong
+ */
+export const setAccountActiveApi = async (id, hoatDong) => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}/hoat-dong`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hoatDong })
+    });
+    if (!response.ok) await handleError(response);
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error in setAccountActiveApi:", error);
+    throw error;
+  }
+};
+
+/**
  * DELETE /{id}
  */
 export const deleteApi = async id => {

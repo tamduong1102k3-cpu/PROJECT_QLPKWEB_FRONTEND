@@ -1,6 +1,7 @@
 import * as hoaDonApi from '../../../api/hoaDonApi';
 import * as employeeApi from '../../../api/employeeApi';
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '../../../components/NotificationContext';
 const formatCurrency = amount => {
   if (amount == null) return '—';
   return new Intl.NumberFormat('vi-VN', {
@@ -64,6 +65,7 @@ const loaiMucBadge = loai => {
   };
 };
 const QuanLyHoaDon = () => {
+  const { showError } = useNotification();
   const [invoices, setInvoices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -87,12 +89,12 @@ const QuanLyHoaDon = () => {
         });
         setNvMap(map);
       } catch (e) {
-        alert(e.message);
+        showError(e.message);
       } finally {
         setIsLoading(false);
       }
     })();
-  }, []);
+  }, [showError]);
 
   // ── Fetch detail ──────────────────────────────────────────────────
   const openDetail = async inv => {
@@ -103,7 +105,7 @@ const QuanLyHoaDon = () => {
       const detailsData = await hoaDonApi.getChiTietApi(inv.maHoaDon);
       setDetails(detailsData);
     } catch (e) {
-      alert(e.message);
+      showError(e.message);
     } finally {
       setLoadingDetail(false);
     }

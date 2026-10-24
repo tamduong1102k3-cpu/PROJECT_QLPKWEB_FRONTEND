@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { submitTestResultApi, getXetNhiemResultApi } from '../../../api/phieuChiDinhApi';
 import { getLabForm } from './labForms/labServiceForms';
 import { getTemplateForService, generateTextFromTemplate, buildTemplateFromIndicators } from './TienIchKyThuatVien';
-import { toast } from 'react-toastify';
+import { useNotification } from '../../../components/NotificationContext';
 
 // Form nhập kết quả XÉT NGHIỆM
 // - Thiết kế form riêng cho từng dịch vụ: lấy cấu hình form theo mã dịch vụ từ labForms/*
 // - Khám mã dịch vụ nào → nạp form dịch vụ đó (select/number/radio theo từng loại xét nghiệm)
 const ModalNhapKetQuaXetNghiem = ({ test, user, servicesList = [], onClose, onSuccess }) => {
+  const { showError, showSuccess } = useNotification();
   // Lấy cấu hình form riêng theo mã dịch vụ
   const labForm = useMemo(() => getLabForm(test?.maDichVu), [test?.maDichVu]);
 
@@ -74,7 +75,7 @@ const ModalNhapKetQuaXetNghiem = ({ test, user, servicesList = [], onClose, onSu
 
   const handleSave = async () => {
     if (!testResultText.trim()) {
-      toast.error('Vui lòng nhập nội dung kết quả xét nghiệm.');
+      showError('Vui lòng nhập nội dung kết quả xét nghiệm.');
       return;
     }
     setIsSubmitting(true);
@@ -99,14 +100,14 @@ const ModalNhapKetQuaXetNghiem = ({ test, user, servicesList = [], onClose, onSu
       };
       const res = await submitTestResultApi(payload);
       if (res) {
-        toast.success('Đã lưu kết quả xét nghiệm thành công!');
+        showSuccess('Đã lưu kết quả xét nghiệm thành công!');
         onSuccess();
       } else {
-        toast.error('Lỗi khi lưu kết quả vào hệ thống.');
+        showError('Lỗi khi lưu kết quả vào hệ thống.');
       }
     } catch (error) {
       console.error('Lỗi khi lưu kết quả xét nghiệm:', error);
-      toast.error('Không thể kết nối đến máy chủ.');
+      showError('Không thể kết nối đến máy chủ.');
     } finally {
       setIsSubmitting(false);
     }

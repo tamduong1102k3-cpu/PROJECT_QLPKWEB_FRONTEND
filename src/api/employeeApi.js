@@ -119,3 +119,17 @@ export const deleteNhanVienApi = async id => {
     throw error;
   }
 };
+
+/**
+ * PUT /{id}/activate
+ */
+export const activateNhanVienAccountApi = async id => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}/activate`, { method: 'PUT' });
+    if (!response.ok) await handleError(response);
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error in activateNhanVienAccountApi:", error);
+    throw error;
+  }
+};

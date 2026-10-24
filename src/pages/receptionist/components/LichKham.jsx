@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
 import { AppointmentModal, getAvailableShiftIds } from '../../doctor/components/TabHenTaiKham';
+import { useNotification } from '../../../components/NotificationContext';
 
 const MODAL_STYLE = `
   @keyframes modalIn {
@@ -19,6 +20,7 @@ const MODAL_STYLE = `
 `;
 
 const LichKham = ({ onCheckIn, compact, simple, user }) => {
+  const { showWarning, showError } = useNotification();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -150,18 +152,18 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
     if (dateChanged) {
       const todayStr = new Date().toISOString().split('T')[0];
       if (newDate < todayStr) {
-        alert('Không thể chọn ngày trong quá khứ');
+        showWarning('Không thể chọn ngày trong quá khứ');
         return;
       }
       if (newDate === todayStr) {
-        alert('Không thể chọn ngày hôm nay. Vui lòng chọn từ ngày mai trở đi.');
+        showWarning('Không thể chọn ngày hôm nay. Vui lòng chọn từ ngày mai trở đi.');
         return;
       }
     }
 
     // Nếu đổi ngày mà chưa tick "Hoãn" → chặn
     if (dateChanged && !hoanLich) {
-      alert('Bạn đã đổi ngày khám. Vui lòng tick "Hoãn lịch" và nhập lý do để lưu.');
+      showWarning('Bạn đã đổi ngày khám. Vui lòng tick "Hoãn lịch" và nhập lý do để lưu.');
       return;
     }
 
@@ -188,7 +190,7 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
       closeEditModal();
       await refreshList();
     } catch (err) {
-      alert('Lỗi cập nhật: ' + err.message);
+      showError('Lỗi cập nhật: ' + err.message);
     } finally {
       setSavingEdit(false);
     }

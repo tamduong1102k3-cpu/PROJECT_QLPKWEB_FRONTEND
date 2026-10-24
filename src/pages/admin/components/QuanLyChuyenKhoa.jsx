@@ -15,7 +15,7 @@ const QuanLyChuyenKhoa = () => {
     moTa: '',
     soLuongToiDa: 0
   });
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess, showError, showConfirm } = useNotification();
 
   const fetchData = async () => {
     setLoading(true);
@@ -77,15 +77,16 @@ const QuanLyChuyenKhoa = () => {
   };
 
   const handleDelete = async (item) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa chuyên khoa "${item.tenChuyenKhoa}"?`)) return;
-    try {
-      await chuyenKhoaApi.deleteApi(item.maChuyenKhoa);
-      fetchData();
-      showSuccess('Xóa chuyên khoa thành công!');
-    } catch (err) {
-      console.error('Error deleting chuyen khoa:', err);
-      showError('Lỗi kết nối máy chủ. Vui lòng thử lại.');
-    }
+    showConfirm(`Bạn có chắc muốn xóa chuyên khoa "${item.tenChuyenKhoa}"?`, async () => {
+      try {
+        await chuyenKhoaApi.deleteApi(item.maChuyenKhoa);
+        fetchData();
+        showSuccess('Xóa chuyên khoa thành công!');
+      } catch (err) {
+        console.error('Error deleting chuyen khoa:', err);
+        showError('Lỗi kết nối máy chủ. Vui lòng thử lại.');
+      }
+    });
   };
 
   // Lọc dữ liệu theo từ khóa tìm kiếm

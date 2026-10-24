@@ -1,11 +1,13 @@
 import { createApi, searchApi, updateApi } from '../../../api/benhNhanApi';
 import React, { useState, useRef, useEffect } from 'react';
+import { useNotification } from '../../../components/NotificationContext';
 
 const DangKyBenhNhan = ({
   onCancel,
   onSuccess,
   editPatient = null
 }) => {
+  const { showError } = useNotification();
   const [formData, setFormData] = useState({
     hoTen: '',
     ngaySinh: '',
@@ -210,7 +212,7 @@ const DangKyBenhNhan = ({
       }
       onSuccess(data);
     } catch (error) {
-      alert(`Lỗi ${editPatient ? 'cập nhật' : 'đăng ký'}: ${error.message}`);
+      showError(`Lỗi ${editPatient ? 'cập nhật' : 'đăng ký'}: ${error.message}`);
     }
   };
   return <div className="bg-white rounded-3xl">

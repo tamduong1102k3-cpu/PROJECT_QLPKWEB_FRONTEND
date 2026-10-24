@@ -1,5 +1,6 @@
 import * as appointmentApi from '../../../api/appointmentApi';
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '../../../components/NotificationContext';
 const formatStatus = status => {
   switch (status) {
     case 'CHUA_DEN':
@@ -26,6 +27,7 @@ const formatStatus = status => {
 };
 
 const QuanLyLichHen = ({ showActions = 'all', onQuickCheckIn }) => {
+  const { showError, showConfirm } = useNotification();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -52,25 +54,18 @@ const QuanLyLichHen = ({ showActions = 'all', onQuickCheckIn }) => {
       setEditing(null);
       fetchAppointments();
     } catch (error) {
-      alert("Lỗi khi cập nhật lịch hẹn");
+      showError("Lỗi khi cập nhật lịch hẹn: " + error.message);
     }
   };
   const handleDelete = async id => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa lịch hẹn này?")) return;
-    try {
-      let res = {
-        ok: false
-      };
+    showConfirm("Bạn có chắc chắn muốn xóa lịch hẹn này?", async () => {
       try {
         await appointmentApi.deleteApi(id);
-        res.ok = true;
-      } catch (e) {}
-      if (res.ok) {
         fetchAppointments();
+      } catch (error) {
+        showError("Lỗi khi xóa lịch hẹn: " + error.message);
       }
-    } catch (error) {
-      alert("Lỗi khi xóa lịch hẹn");
-    }
+    });
   };
   const filtered = appointments.filter(a => {
     // Không hiển thị lịch hẹn đã đến (DA_DEN) hoặc đã hoàn thành (HOAN)

@@ -3,6 +3,7 @@ import { getAllKhoApi } from '../../../api/khoThuocApi';
 import { card, th, td, formatDate } from './styles';
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
+import { useNotification } from '../../../components/NotificationContext';
 
 const stockBadge = qty => {
   if (qty == null) return { bg: '#f3f4f6', color: '#6b7280', label: '—' };
@@ -12,6 +13,7 @@ const stockBadge = qty => {
 };
 
 const KhoThuocTab = ({ thuocMap }) => {
+  const { showError } = useNotification();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,12 +55,12 @@ const KhoThuocTab = ({ thuocMap }) => {
         const data = await getAllKhoApi();
         setItems(data || []);
       } catch (e) {
-        alert(e.message);
+        showError(e.message);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [showError]);
 
   return <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
     <div style={{ ...card, padding: '20px 24px' }}>

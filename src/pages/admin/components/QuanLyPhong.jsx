@@ -1,5 +1,6 @@
 import * as danhMucApi from '../../../api/danhMucApi';
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '../../../components/NotificationContext';
 const empty = {
   tenPhong: '',
   loaiPhong: '',
@@ -35,6 +36,7 @@ const LOAI_PHONG_OPTIONS = [
   { value: 'THU_TIEN', label: 'Thu tiền' }
 ];
 export default function QuanLyPhong() {
+  const { showSuccess, showError, showWarning, showConfirm } = useNotification();
   const [phongList, setPhongList] = useState([]);
   const [chucVuList, setChucVuList] = useState([]);
   const [ckList, setCkList] = useState([]);
@@ -87,7 +89,7 @@ export default function QuanLyPhong() {
   // Save
   const handleSave = async () => {
     if (!form.tenPhong.trim()) {
-      alert('Vui lòng nhập tên phòng!');
+      showWarning('Vui lòng nhập tên phòng!');
       return;
     }
     setSaving(true);
@@ -105,8 +107,9 @@ export default function QuanLyPhong() {
       }
       setModal(null);
       fetchAll();
+      showSuccess(modal === 'edit' ? 'Cập nhật phòng thành công!' : 'Thêm phòng thành công!');
     } catch (e) {
-      alert(e.message);
+      showError(e.message);
     } finally {
       setSaving(false);
     }
@@ -114,16 +117,18 @@ export default function QuanLyPhong() {
 
   // Delete
   const handleDelete = async id => {
-    if (!window.confirm('Xóa phòng này?')) return;
-    setDeleting(id);
-    try {
-      await danhMucApi.deletePhongApi(id);
-      fetchAll();
-    } catch (e) {
-      alert(e.message);
-    } finally {
-      setDeleting(null);
-    }
+    showConfirm('Xóa phòng này?', async () => {
+      setDeleting(id);
+      try {
+        await danhMucApi.deletePhongApi(id);
+        fetchAll();
+        showSuccess('Xóa phòng thành công!');
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        setDeleting(null);
+      }
+    });
   };
   return <div style={{
     fontFamily: 'Inter, sans-serif'

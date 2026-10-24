@@ -1,11 +1,13 @@
 import React from 'react';
+import { useNotification } from '../../../components/NotificationContext';
 
 const InPhieuTiepDon = ({ printData, className = '' }) => {
+  const { showError } = useNotification();
   const handlePrint = () => {
     if (!printData) return;
     const w = window.open('', '_blank', 'width=450,height=600');
     if (!w) {
-      alert("Không thể mở cửa sổ in. Vui lòng cho phép popup trên trình duyệt.");
+      showError("Không thể mở cửa sổ in. Vui lòng cho phép popup trên trình duyệt.");
       return;
     }
 
