@@ -268,10 +268,7 @@ export default function QuanLyCaLamViec() {
   const [calSelectedShiftIds, setCalSelectedShiftIds] = useState([]);
   const [calNghiPhepModal, setCalNghiPhepModal] = useState(null);
   const [calShowEditAllThu, setCalShowEditAllThu] = useState(false);
-  const [calEditAllThuForm, setCalEditAllThuForm] = useState({
-    phong: null,
-    caIds: [""],
-  });
+  const [calEditAllThuForm, setCalEditAllThuForm] = useState({ phong: null });
 
   /* ============================================================
      3) SHIFT CATEGORY STATE
@@ -869,14 +866,8 @@ const calDeleteDefault = async (m) => {
     if (macDinh.length === 0) return;
 
 
-    const firstDefault = macDinh[0];
-    const caIds = macDinh
-      .map((m) => String(m.ca?.id || m.maCa || ""))
-      .filter(Boolean);
-
     setCalEditAllThuForm({
-      phong: firstDefault.phong ?? null,
-      caIds: caIds.length > 0 ? caIds : [""],
+      phong: macDinh[0].phong ?? null,
     });
     setCalShowEditAllThu(true);
 
@@ -886,20 +877,13 @@ const calDeleteDefault = async (m) => {
 
   const calCancelEditAllThu = () => {
     setCalShowEditAllThu(false);
-    setCalEditAllThuForm({ phong: null, caIds: [""] });
+    setCalEditAllThuForm({ phong: null });
   };
 
   const calSaveEditAllThu = async () => {
     if (!calSelectedDay || !calSelectedMaNV) return;
     if (calEditAllThuForm.phong == null) {
       showError("Vui lòng chọn phòng!");
-      return;
-    }
-    const selectedCaIds = (calEditAllThuForm.caIds || [])
-      .map((id) => (id ? parseInt(id, 10) : null))
-      .filter((id) => id !== null);
-    if (selectedCaIds.length === 0) {
-      showError("Vui lòng chọn ít nhất 1 ca!");
       return;
     }
     setCalSaving(true);
@@ -910,17 +894,16 @@ const calDeleteDefault = async (m) => {
         thang: calMonth,
         thu: calSelectedDay.thu,
         phong: calEditAllThuForm.phong,
-        maCaIds: selectedCaIds,
       });
       setCalShowEditAllThu(false);
-      setCalEditAllThuForm({ phong: null, caIds: [""] });
+      setCalEditAllThuForm({ phong: null });
       const data = await fetchCalMonth();
       if (calSelectedDay) {
         const key = calSelectedDay.ngay;
         setCalSelectedDay(data?.days?.find((x) => x.ngay === key) || null);
       }
       showSuccess(
-        `Đã cập nhật ca mặc định cho tất cả ${calSelectedDay.thu} trong tháng`,
+        `Đã cập nhật phòng cho các ca mặc định ${calSelectedDay.thu} trong tháng`,
       );
     } catch (e) {
       showError("Lỗi cập nhật ca mặc định: " + e.message);
@@ -2536,7 +2519,7 @@ const calDeleteDefault = async (m) => {
                                 marginBottom: "10px",
                               }}
                             >
-                              ✏️ Chỉnh sửa tất cả ca mặc định{" "}
+                              ✏️ Cập nhật phòng cho ca mặc định{" "}
                               {calSelectedDay.thu}
                             </div>
 
@@ -2580,122 +2563,14 @@ const calDeleteDefault = async (m) => {
                               </select>
                             </label>
 
-                            {/* Chọn ca */}
-                            <div style={{ marginBottom: "12px" }}>
-                              <label
-                                style={{
-                                  fontSize: "12px",
-                                  display: "block",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                Ca làm việc:
-                              </label>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: "6px",
-                                  marginTop: "3px",
-                                }}
-                              >
-                                {(calEditAllThuForm.caIds || [""]).map(
-                                  (caId, idx) => (
-                                    <div
-                                      key={idx}
-                                      style={{
-                                        display: "flex",
-                                        gap: "6px",
-                                        alignItems: "center",
-                                      }}
-                                    >
-                                      <select
-                                        value={caId}
-                                        onChange={(e) => {
-                                          const newCaIds = [
-                                            ...(calEditAllThuForm.caIds || []),
-                                          ];
-                                          newCaIds[idx] = e.target.value;
-                                          setCalEditAllThuForm({
-                                            ...calEditAllThuForm,
-                                            caIds: newCaIds,
-                                          });
-                                        }}
-                                        disabled={calSaving}
-                                        style={{
-                                          flex: 1,
-                                          padding: "7px",
-                                          borderRadius: "5px",
-                                          border: "1px solid #ddd",
-                                        }}
-                                      >
-                                        <option value="">
-                                          -- Chọn ca --
-                                        </option>
-                                        {caLamList.map((ca) => (
-                                          <option key={ca.id} value={ca.id}>
-                                            {ca.tenCa} (
-                                            {fmtGio(ca.gioBatDau)} –{" "}
-                                            {fmtGio(ca.gioKetThuc)})
-                                          </option>
-                                        ))}
-                                      </select>
-                                      {(calEditAllThuForm.caIds || [])
-                                        .length > 1 && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const next = (
-                                              calEditAllThuForm.caIds || []
-                                            ).filter((_, i) => i !== idx);
-                                            setCalEditAllThuForm({
-                                              ...calEditAllThuForm,
-                                              caIds: next.length
-                                                ? next
-                                                : [""],
-                                            });
-                                          }}
-                                          style={{
-                                            width: "28px",
-                                            height: "28px",
-                                            borderRadius: "5px",
-                                            border: "1px solid #ddd",
-                                            background: "#fef2f2",
-                                            cursor: "pointer",
-                                            color: "#dc2626",
-                                          }}
-                                        >
-                                          ×
-                                        </button>
-                                      )}
-                                    </div>
-                                  ),
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setCalEditAllThuForm({
-                                      ...calEditAllThuForm,
-                                      caIds: [
-                                        ...(calEditAllThuForm.caIds || []),
-                                        "",
-                                      ],
-                                    })
-                                  }
-                                  style={{
-                                    width: "32px",
-                                    height: "32px",
-                                    borderRadius: "5px",
-                                    border: "1px solid #ddd",
-                                    background: "#f8fafc",
-                                    cursor: "pointer",
-                                    color: "#005bc0",
-                                    alignSelf: "flex-start",
-                                  }}
-                                >
-                                  +
-                                </button>
-                              </div>
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "#475569",
+                                marginBottom: "10px",
+                              }}
+                            >
+                              Ngày và ca làm việc hiện có sẽ được giữ nguyên.
                             </div>
 
                             {/* Warning */}
@@ -2710,10 +2585,9 @@ const calDeleteDefault = async (m) => {
                                 marginBottom: "10px",
                               }}
                             >
-                              ⚠️ Thay đổi này áp dụng cho tất cả ca mặc
-                              định {calSelectedDay.thu} trong tháng{" "}
-                              {calMonth}/{calYear}. Các ca đã nghỉ phép sẽ
-                              được giữ nguyên.
+                              ⚠️ Chỉ đổi phòng cho các ca mặc định{" "}
+                              {calSelectedDay.thu} trong tháng {calMonth}/
+                              {calYear}. Ngày, ca và giờ làm được giữ nguyên.
                             </div>
 
                             {/* Buttons */}
