@@ -10,17 +10,19 @@ import { loadingManager } from './loadingManager';
 import { getAccessToken, setAccessToken, clearAccessToken } from './tokenStore';
 import { API_ORIGIN } from './config';
 
-let isRefreshing = false;
-let refreshSubscribers = [];
+let refreshPromise = null;
+let sessionExpiredInProgress = false;
 
-// Hàng đợi các request đang chờ refresh xong
-const onRefreshed = (newToken) => {
-  refreshSubscribers.forEach(callback => callback(newToken));
-  refreshSubscribers = [];
+export const resetSessionExpiredHandling = () => {
+  sessionExpiredInProgress = false;
 };
 
-const addRefreshSubscriber = (callback) => {
-  refreshSubscribers.push(callback);
+const handleSessionExpired = () => {
+  clearAccessToken();
+  if (!sessionExpiredInProgress) {
+    sessionExpiredInProgress = true;
+    window.dispatchEvent(new CustomEvent('session-expired'));
+  }
 };
 
 const getAuthHeaders = () => {
@@ -62,36 +64,47 @@ const refreshTokenRequest = async () => {
       // Không body - refresh token nằm trong HttpOnly cookie
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      let code = null;
+      try {
+        const data = await response.clone().json();
+        code = data?.code;
+      } catch {
+        // ignore parse errors
+      }
+      if (response.status === 401) {
+        return { token: null, reason: code === 'SESSION_REVOKED' ? 'revoked' : 'invalid' };
+      }
+      if (response.status >= 500) {
+        return { token: null, reason: 'server' };
+      }
+      return { token: null, reason: 'invalid' };
+    }
 
     const data = await response.json();
     if (data.token) {
       setAccessToken(data.token);
-      return data.token;
+      return { token: data.token, reason: 'success' };
     }
-    return null;
+    return { token: null, reason: 'invalid' };
   } catch (error) {
-    return null;
+    if (error?.name === 'AbortError') {
+      return { token: null, reason: 'timeout' };
+    }
+    return { token: null, reason: 'network' };
   } finally {
     clearTimeout(timeoutId);
   }
 };
 
-const clearSession = () => {
-  clearAccessToken();
-};
+// clearSession removed (access token cleared via handleSessionExpired)
 
 const handleUnauthorized = () => {
-  clearSession();
-  if (window.location.pathname !== '/') {
-    window.location.href = '/';
-  } else {
-    window.location.reload();
-  }
+  handleSessionExpired();
 };
 
 // Map method -> message tiếng Việt cho loading overlay
-const getLoadingMessage = (method, url) => {
+const getLoadingMessage = (method) => {
   const baseMsg = {
     GET: 'Đang tải dữ liệu...',
     POST: 'Đang lưu dữ liệu...',
@@ -114,10 +127,11 @@ const fetchClient = async (url, options = {}) => {
   const skipLoading = options.skipLoading !== undefined ? options.skipLoading === true : defaultSkip;
 
   if (!skipLoading) {
-    loadingManager.show(getLoadingMessage(method, url));
+    loadingManager.show(getLoadingMessage(method));
   }
 
-  const { skipLoading: _, ...cleanOptions } = options;
+  const cleanOptions = { ...options };
+  delete cleanOptions.skipLoading;
   const enhancedOptions = {
     ...cleanOptions,
     credentials: 'include', // browser tự gửi HttpOnly refresh token cookie
@@ -134,80 +148,77 @@ const fetchClient = async (url, options = {}) => {
     if (response.status === 401 && !options.skipRefresh) {
       // Bỏ qua nếu là request login
       if (url.includes('/login')) {
-        clearSession();
+        clearAccessToken();
         throw new Error('Sai tài khoản hoặc mật khẩu!');
       }
 
-      // Queue cơ chế: nếu đang refresh thì chờ, nếu chưa thì refresh
-      if (!isRefreshing) {
-        isRefreshing = true;
-        const newToken = await refreshTokenRequest();
-
-        if (newToken) {
-          isRefreshing = false;
-          onRefreshed(newToken);
-          // Retry request ban đầu với token mới
-          const retryOptions = {
-            ...cleanOptions,
-            skipRefresh: true, // tránh loop refresh
-            credentials: 'include',
-            headers: {
-              ...(options.headers || {}),
-              'Authorization': `Bearer ${newToken}`
-            }
-          };
-          const retryResponse = await fetch(url, retryOptions);
-          if (!skipLoading) loadingManager.hide();
-          return retryResponse;
-        } else {
-          isRefreshing = false;
-          refreshSubscribers = [];
-          handleUnauthorized();
+      // Kiểm tra SESSION_REVOKED trực tiếp trong response 401
+      try {
+        const cloned = response.clone();
+        const bodyJson = await cloned.json();
+        if (bodyJson?.code === 'SESSION_REVOKED') {
+          handleSessionExpired();
           throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
         }
-      } else {
-        // Đang có request refresh khác chạy, chờ token mới
-        return new Promise((resolve, reject) => {
-          addRefreshSubscriber(async (newToken) => {
-            try {
-              const retryOptions = {
-                ...cleanOptions,
-                skipRefresh: true,
-                credentials: 'include',
-                headers: {
-                  ...(options.headers || {}),
-                  'Authorization': `Bearer ${newToken}`
-                }
-              };
-              const retryResponse = await fetch(url, retryOptions);
-              if (!skipLoading) loadingManager.hide();
-              resolve(retryResponse);
-            } catch (err) {
-              if (!skipLoading) loadingManager.hide();
-              reject(err);
-            }
-          });
+      } catch (e) {
+        if (e?.message === 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.') throw e;
+      }
+
+      // Single-flight: dùng chung một refreshPromise
+      if (!refreshPromise) {
+        refreshPromise = refreshTokenRequest().finally(() => {
+          refreshPromise = null;
         });
       }
+
+      const result = await refreshPromise;
+
+      if (result?.token) {
+        // Retry request ban đầu với token mới
+        const retryOptions = {
+          ...cleanOptions,
+          skipRefresh: true, // tránh loop refresh
+          credentials: 'include',
+          headers: {
+            ...(options.headers || {}),
+            'Authorization': `Bearer ${result.token}`
+          }
+        };
+        const retryResponse = await fetch(url, retryOptions);
+        if (!skipLoading) loadingManager.hide();
+        return retryResponse;
+      }
+
+      // Refresh thất bại
+      if (result?.reason === 'revoked' || result?.reason === 'invalid') {
+        handleSessionExpired();
+        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      }
+
+      // Network/server/timeout: giữ phiên, báo lỗi kết nối
+      throw new Error(
+        result?.reason === 'network' || result?.reason === 'timeout'
+          ? 'Lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.'
+          : 'Lỗi máy chủ. Vui lòng thử lại sau.'
+      );
     }
 
-    // Handle 403
+    // Handle 403 (không coi là hết phiên)
     if (response.status === 403) {
       try {
         const cloned = response.clone();
         const bodyText = await cloned.text();
         let bodyJson = null;
-        try { bodyJson = JSON.parse(bodyText); } catch (e) {}
-
-        if (bodyJson && bodyJson.message && bodyJson.message.includes('quyền')) {
+        try { bodyJson = JSON.parse(bodyText); } catch { /* ignore */ }
+        if (bodyJson && bodyJson.message) {
           throw new Error(bodyJson.message);
         }
       } catch (e) {
-        if (e.message && e.message.includes('quyền')) throw e;
+        if (e?.message && e.message !== 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.') {
+          // rethrow permission/server messages
+        }
       }
-
-      handleUnauthorized();
-      throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      throw new Error('Bạn không có quyền thực hiện hành động này.');
     }
 
     return response;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { NotificationProvider } from './components/NotificationContext';
 import { LoadingProvider } from './components/LoadingContext';
@@ -18,7 +18,9 @@ import BangDieuKhienKho from './pages/warehouse/BangDieuKhienKho';
 import PaymentResult from './pages/cashier/components/PaymentResult';
 import PaymentSuccess from './pages/checkout/PaymentSuccess';
 import { logoutApi } from './api/accountApi';
+import { validateSessionApi } from './api/accountApi';
 import { clearAccessToken, getAccessToken, getRoleFromAccessToken, decodeTokenPayload } from './api/tokenStore';
+import { resetSessionExpiredHandling } from './api/fetchClient';
 import './App.css';
 
 // Role hợp lệ nhưng UI chưa triển khai -> dành riêng cho under-development
@@ -88,6 +90,55 @@ function App() {
   const initialSession = resolveSession();
   const [currentUser, setCurrentUser] = useState(initialSession.user);
   const [currentView, setCurrentView] = useState(initialSession.view);
+  const [showSessionExpiredDialog, setShowSessionExpiredDialog] = useState(false);
+  const validationPromiseRef = useRef(null);
+
+  const runSessionValidation = useCallback(() => {
+    if (!getAccessToken()) return;
+    if (currentView === 'DangNhap' || currentView === 'forgot-password') return;
+    if (validationPromiseRef.current) return;
+    validationPromiseRef.current = validateSessionApi().finally(() => {
+      validationPromiseRef.current = null;
+    });
+    validationPromiseRef.current.catch(() => {});
+  }, [currentView]);
+
+  useEffect(() => {
+    const handler = () => setShowSessionExpiredDialog(true);
+    window.addEventListener('session-expired', handler);
+    return () => window.removeEventListener('session-expired', handler);
+  }, []);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        runSessionValidation();
+      }
+    };
+    const onPageShow = () => runSessionValidation();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pageshow', onPageShow);
+    };
+  }, [runSessionValidation]);
+
+  useEffect(() => {
+    // validate when entering a business view
+    if (currentView !== 'DangNhap' && currentView !== 'forgot-password' && currentView !== 'force-change-password') {
+      runSessionValidation();
+    }
+  }, [runSessionValidation, currentView]);
+
+  const confirmSessionExpired = () => {
+    resetSessionExpiredHandling();
+    clearAccessToken();
+    setCurrentUser(null);
+    setCurrentView('DangNhap');
+    setShowSessionExpiredDialog(false);
+    window.location.href = '/';
+  };
 
   /** Đăng xuất: gọi backend xóa cookie/revoke, xóa access token memory. */
   const handleLogout = async () => {
@@ -103,6 +154,7 @@ function App() {
   };
 
   const handleLoginSuccess = (user) => {
+    resetSessionExpiredHandling();
     const loginRole = getRoleFromAccessToken() || user.vaiTro || user.role || '';
     const view = getViewForRole(loginRole);
 
@@ -213,6 +265,22 @@ function App() {
   return (
     <LoadingProvider>
       <NotificationProvider>
+        {showSessionExpiredDialog && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+              <h3 className="text-lg font-bold text-slate-800 mb-3">Phiên đăng nhập đã hết hạn</h3>
+              <p className="text-sm text-slate-600 mb-6">
+                Phiên đăng nhập đã hết hạn hoặc đã được thay thế bởi một thiết bị khác. Vui lòng đăng nhập lại.
+              </p>
+              <button
+                onClick={confirmSessionExpired}
+                className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl"
+              >
+                Đăng nhập lại
+              </button>
+            </div>
+          </div>
+        )}
         {/* Gọi hàm render logic content */}
         {renderMainContent()}
       </NotificationProvider>

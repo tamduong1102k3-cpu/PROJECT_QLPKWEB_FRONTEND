@@ -220,6 +220,32 @@ export const ensureAuthenticated = async () => {
 };
 
 /**
+ * GET /validate-session
+ * Kiểm tra phiên đăng nhập hiện tại của nhân viên.
+ */
+export const validateSessionApi = async () => {
+  try {
+    const response = await fetchClient(`${API_URL}/validate-session`, {
+      method: 'GET',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    if (!response.ok) {
+      let data = null;
+      try { data = await response.clone().json(); } catch (e) {}
+      if (data?.code === 'SESSION_REVOKED') {
+        // fetchClient đã xử lý session expired; trả null để caller biết
+        return null;
+      }
+      await handleError(response);
+    }
+    return await handleResponse(response);
+  } catch (error) {
+    // Không log như lỗi nghiêm trọng cho session check
+    return null;
+  }
+};
+
+/**
  * POST /forgot-password/send-otp
  * Không cần JWT (public endpoint)
  */
