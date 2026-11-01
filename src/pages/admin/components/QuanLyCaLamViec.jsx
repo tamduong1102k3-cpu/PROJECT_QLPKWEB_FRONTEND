@@ -492,6 +492,12 @@ export default function QuanLyCaLamViec() {
 
   const calSaveException = async (confirmedReplacement = false) => {
     if (!calForm.loai || !calSelectedDay || !calSelectedMaNV) return;
+    if (calForm.id && (calForm.caIds || []).length > 1) {
+      showError(
+        "⚠️ Thao tác chưa hợp lệ: Bạn đang ở chế độ Chỉnh sửa ca hiện tại. Để thêm ca mới, vui lòng sử dụng nút \"+ Thêm ca thường ngoại lệ\" hoặc \"+ Thêm ca làm việc mặc định trong tháng\" ở khu vực tương ứng bên ngoài.",
+      );
+      return;
+    }
     if (calForm.loai === "THEM_CA" && calForm.phong == null) {
       showError("Vui lòng chọn phòng!");
       return;
@@ -803,6 +809,12 @@ const calDeleteDefault = async (m) => {
 
   const calSaveEditDefault = async () => {
     if (!calEditingDefaultId) return;
+    if ((calEditDefaultForm.caIds || []).length > 1) {
+      showError(
+        "⚠️ Thao tác chưa hợp lệ: Bạn đang ở chế độ Chỉnh sửa ca hiện tại. Để thêm ca mới, vui lòng sử dụng nút \"+ Thêm ca thường ngoại lệ\" hoặc \"+ Thêm ca làm việc mặc định trong tháng\" ở khu vực tương ứng bên ngoài.",
+      );
+      return;
+    }
     if (calEditDefaultForm.phong == null) {
       showError("Vui lòng chọn phòng!");
       return;
