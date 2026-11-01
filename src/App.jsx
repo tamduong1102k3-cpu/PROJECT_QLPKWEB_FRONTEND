@@ -267,9 +267,9 @@ function App() {
       <NotificationProvider>
         {showSessionExpiredDialog && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
-              <h3 className="text-lg font-bold text-slate-800 mb-3">Phiên đăng nhập đã hết hạn</h3>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed break-words">
+            <div className="bg-white rounded-2xl p-6 w-[90vw] max-w-md shadow-2xl text-center" style={{ minWidth: '300px', wordBreak: 'normal', overflowWrap: 'break-word' }}>
+              <h3 className="text-lg font-bold text-slate-800 mb-3" style={{ wordBreak: 'normal' }}>Phiên đăng nhập đã hết hạn</h3>
+              <p className="text-sm text-slate-600 mb-6 leading-relaxed" style={{ wordBreak: 'normal', overflowWrap: 'break-word' }}>
                 Phiên đăng nhập đã hết hạn hoặc đã được thay thế bởi một thiết bị khác. Vui lòng đăng nhập lại.
               </p>
               <button
