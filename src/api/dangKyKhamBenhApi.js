@@ -34,6 +34,27 @@ export const getTodayApi = async (keyword = '') => {
   }
 };
 
+export const getAllTodayApi = async () => {
+  try {
+    const response = await fetchClient(`${API_URL}/today/all`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : [];
+  } catch (error) {
+    console.error('Error in getAllTodayApi:', error);
+    throw error;
+  }
+};
+
 /**
  * GET /
  * Lấy tất cả đăng ký khám bệnh
@@ -205,4 +226,3 @@ export const updateStatusApi = async (id, data) => {
     throw error;
   }
 };
-

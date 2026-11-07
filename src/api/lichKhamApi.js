@@ -18,6 +18,23 @@ export const getAllApi = async () => {
   }
 };
 
+export const getTodayApi = async (ngayKham) => {
+  try {
+    const query = new URLSearchParams({ ngayKham });
+    const response = await fetchClient(`${API_URL}/today?${query}`, { method: 'GET' });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : [];
+  } catch (error) {
+    console.error('Error in lichKhamApi.getTodayApi:', error);
+    throw error;
+  }
+};
+
 export const updateTrangThaiApi = async (id, trangThai) => {
   try {
     const response = await fetchClient(`${API_URL}/${id}/trang-thai`, {

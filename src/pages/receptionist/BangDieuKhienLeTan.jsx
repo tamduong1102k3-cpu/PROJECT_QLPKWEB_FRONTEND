@@ -1,11 +1,10 @@
-import { getAllApi as _getAllAppointments } from '../../api/appointmentApi';
+import { getTodayApi as _getTodayAppointments } from '../../api/lichKhamApi';
+import { getAllTodayApi as _getAllTodayRegistrations } from '../../api/dangKyKhamBenhApi';
 import { getTodayApi as _getTodayDangKy } from '../../api/dangKyKhamBenhApi';
 import { getTodayApi as _getTodayPhieuKham } from '../../api/phieuKhamApi';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import TheThongKe from './components/TheThongKe';
-import DanhSachCho from './components/DanhSachCho';
-import LichHenHomNay from './components/LichHenHomNay';
 import QuyTrinhTiepDon from './components/QuyTrinhTiepDon';
 import DangKyBenhNhan from './components/DangKyBenhNhan';
 import LichKham from './components/LichKham';
@@ -31,35 +30,56 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
     completedToday: 0,
     todayRevenue: 0
   });
+  const [todayRegistrations, setTodayRegistrations] = useState([]);
+  const [todayRegistrationsLoading, setTodayRegistrationsLoading] = useState(true);
+  const [todayRegistrationsError, setTodayRegistrationsError] = useState('');
   const [quickCheckInAppt, setQuickCheckInAppt] = useState(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const fetchTodayRegistrations = useCallback(async () => {
+    try {
+      const registrations = await _getAllTodayRegistrations();
+      if (registrations != null && !Array.isArray(registrations)) {
+        throw new Error('API đăng ký khám bệnh trả về dữ liệu không đúng định dạng.');
+      }
+      setTodayRegistrations(Array.isArray(registrations) ? registrations : []);
+      setTodayRegistrationsError('');
+    } catch (error) {
+      console.error('Error fetching today registrations:', error);
+      setTodayRegistrationsError('Không thể tải danh sách đăng ký hôm nay.');
+    } finally {
+      setTodayRegistrationsLoading(false);
+    }
+  }, []);
 
   const fetchStats = useCallback(async () => {
-    try {
-      // Today's appointments
-      const appointments = await _getAllAppointments() || [];
-      const todayApp = appointments.filter(a => {
-        const d = new Date(a.ngayTaiKham);
-        const today = new Date();
-        return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
-      }).length;
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-      // Lấy danh sách đăng ký hôm nay (Bảng Đăng ký khám bệnh)
+    try {
+      const appointments = await _getTodayAppointments(todayKey);
+      if (appointments != null && !Array.isArray(appointments)) {
+        throw new Error('API lịch khám trả về dữ liệu không đúng định dạng.');
+      }
+      const todayList = Array.isArray(appointments) ? appointments : [];
+      setStats(current => ({ ...current, LichHenHomNay: todayList.length }));
+    } catch (error) {
+      console.error('Error fetching today appointments:', error);
+    }
+
+    try {
       const registrations = await _getTodayDangKy() || [];
       const waitingRegs = registrations.filter(r => r.trangThai === 'CHO_KHAM');
-
-      // Waiting patients (PhieuKham with status 'CHO')
       const pks = await _getTodayPhieuKham() || [];
       const completed = pks.filter(p => p.trangThai === 'HOAN_THANH').length;
 
-      setStats({
-        LichHenHomNay: todayApp,
+      setStats(current => ({
+        ...current,
         waitingPatients: waitingRegs.length,
         completedToday: completed,
-        todayRevenue: 0 // Fetch from statistics if needed
-      });
+        todayRevenue: 0
+      }));
     } catch (error) {
-      console.error("Error fetching stats:", error);
+      console.error('Error fetching receptionist statistics:', error);
     }
   }, []);
 
@@ -69,10 +89,15 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
     return () => clearInterval(interval);
   }, [fetchStats]);
 
+  useEffect(() => {
+    fetchTodayRegistrations();
+    const interval = setInterval(fetchTodayRegistrations, 30000);
+    return () => clearInterval(interval);
+  }, [fetchTodayRegistrations]);
+
   const navItems = [
     { id: 'dashboard', label: 'Tổng Quan', icon: 'dashboard' },
     { id: 'checkin', label: 'Tiếp Đón', icon: 'person_add' },
-    { id: 'waitingList', label: 'Đăng Ký Hôm Nay', icon: 'format_list_numbered' },
     { id: 'patients', label: 'Thông Tin Bệnh Nhân', icon: 'patient_list' },
     { id: 'invoices', label: 'Thanh Toán', icon: 'payments' },
     { id: 'services', label: 'Bảng Giá Dịch Vụ', icon: 'medical_services' },
@@ -110,20 +135,6 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
             ? (quickCheckInAppt.nguonTao || '').toUpperCase() === 'DAT_LICH_APP' && !quickCheckInAppt.daXacMinhDanhTinh
             : false}
         />;
-      case 'waitingList':
-        return (
-          <div className="animate-fade-in space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[500px]">
-              <div className="mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Danh Sách Bệnh Nhân Đăng Ký Hôm Nay</h2>
-                <p className="text-sm text-gray-500">Danh sách tất cả bệnh nhân đã đăng ký khám bệnh trong ngày hôm nay</p>
-              </div>
-              <div className="space-y-4">
-                <DanhSachCho type="waiting" refreshTrigger={refreshTrigger} />
-              </div>
-            </div>
-          </div>
-        );
       case 'patients':
         return <QuanLyBenhNhan allowViewDetail={false} title="Thông Tin Bệnh Nhân" />;
       case 'invoices':
@@ -143,7 +154,7 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
         topics={['/topic/phieu-kham', '/topic/dang-ky-kham']}
         onMessage={(topic, data) => {
           fetchStats();
-          setRefreshTrigger(prev => prev + 1);
+          fetchTodayRegistrations();
         }}
       />
       {/* Sidebar */}
@@ -185,25 +196,88 @@ const BangDieuKhienLeTan = ({ onLogout, user }) => {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4">
+        <nav className="shrink-0 py-4">
           <ul className="space-y-1 px-3">
             {navItems.map((item) => (
               <li key={item.id}>
                 <button
                   onClick={() => setActiveTab(item.id)}
+                  title={item.label}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all ${activeTab === item.id
                     ? 'bg-primary/10 text-primary font-bold translate-x-1'
                     : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
                     }`}
                 >
                   <span className="material-symbols-outlined">{item.icon}</span>
-                  {isSidebarOpen && <span>{item.label}</span>}
+                  {isSidebarOpen && <span className="text-left text-sm leading-5">{item.label}</span>}
                 </button>
               </li>
             ))}
           </ul>
-
         </nav>
+        <section
+          aria-label="Danh sách bệnh nhân đăng ký hôm nay"
+          className="flex-1 min-h-0 overflow-hidden border-t border-gray-100 px-3 py-4"
+        >
+          {isSidebarOpen ? (
+            <div className="flex h-full min-h-0 flex-col">
+              <h2 className="mb-3 px-1 text-sm font-bold leading-5 text-gray-700">
+                Danh sách bệnh nhân đăng ký hôm nay
+              </h2>
+              <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain">
+                {todayRegistrationsLoading ? (
+                  <p className="px-1 py-2 text-xs leading-5 text-gray-400">Đang tải danh sách...</p>
+                ) : todayRegistrationsError ? (
+                  <div className="px-1 py-2">
+                    <p className="text-xs leading-5 text-red-500">{todayRegistrationsError}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTodayRegistrationsLoading(true);
+                        fetchTodayRegistrations();
+                      }}
+                      className="mt-2 text-xs font-semibold text-primary hover:underline"
+                    >
+                      Thử tải lại
+                    </button>
+                  </div>
+                ) : todayRegistrations.length === 0 ? (
+                  <p className="px-1 py-2 text-xs leading-5 text-gray-400">
+                    Hôm nay chưa có bệnh nhân đăng ký
+                  </p>
+                ) : (
+                  <ol className="space-y-1">
+                    {todayRegistrations.map((registration, index) => (
+                      <li
+                        key={registration.id || `${registration.maBenhNhan}-${index}`}
+                        className="flex gap-2 rounded-lg px-1 py-2"
+                        title={`${registration.hoTen || '—'} - ${registration.tenDichVu || '—'}`}
+                      >
+                        <span className="pt-0.5 text-xs font-medium text-gray-400">{index + 1}.</span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-gray-700">
+                            {registration.hoTen || '—'}
+                          </p>
+                          <p className="truncate text-[11px] text-gray-500">
+                            {registration.tenDichVu || '—'}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div
+              className="flex justify-center text-gray-500"
+              title={`Danh sách bệnh nhân đăng ký hôm nay (${todayRegistrations.length})`}
+              aria-label={`Danh sách bệnh nhân đăng ký hôm nay, ${todayRegistrations.length} bệnh nhân`}
+            >
+              <span className="material-symbols-outlined">format_list_numbered</span>
+            </div>
+          )}
+        </section>
       </aside>
 
       {/* Main Content */}
