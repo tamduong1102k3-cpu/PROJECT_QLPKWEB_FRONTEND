@@ -67,22 +67,48 @@ export const submitTestResultApi = async (data) => {
   }
 };
 
+const throwClsResultApiError = async (response) => {
+  let errorData = {};
+  try {
+    errorData = await response.json();
+  } catch {
+    // Error responses may have an empty or non-JSON body.
+  }
+
+  const statusMessages = {
+    403: "Bạn không có quyền thực hiện thao tác này.",
+    404: "Không tìm thấy kết quả cần xử lý.",
+    409: "Kết quả đã thay đổi hoặc không còn ở trạng thái cho phép xử lý. Vui lòng tải lại danh sách."
+  };
+  const message = (typeof errorData?.message === 'string' && errorData.message.trim())
+    || statusMessages[response.status]
+    || `Không thể xử lý kết quả (HTTP ${response.status}).`;
+  throw new Error(message);
+};
+
 /**
  * 4. Bác sĩ tạo chỉ số/phiếu chỉ định mới
  * POST /
  */
 export const createReferralApi = async (data) => {
-  try {
-    const response = await fetchClient(`${API_URL}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) throw new Error("Lỗi khi tạo chỉ định");
-    return await response.json();
-  } catch (error) {
-    throw error;
+  const response = await fetchClient(`${API_URL}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) {
+    let message = `Không thể tạo chỉ định (HTTP ${response.status}).`;
+    try {
+      const errorData = await response.json();
+      if (typeof errorData?.message === 'string' && errorData.message.trim()) {
+        message = errorData.message;
+      }
+    } catch {
+      // Keep the status-based message for an empty or non-JSON error response.
+    }
+    throw new Error(message);
   }
+  return await response.json();
 };
 
 export const createApi = createReferralApi;
@@ -170,6 +196,7 @@ export const approveTestResultApi = async (id, data) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
+  if (!res.ok) await throwClsResultApiError(res);
   return await res.json();
 };
 
@@ -179,6 +206,7 @@ export const rejectTestResultApi = async (id, data) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
+  if (!res.ok) await throwClsResultApiError(res);
   return await res.json();
 };
 
@@ -193,6 +221,7 @@ export const approveCdhaResultApi = async (detailId, data) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
+  if (!res.ok) await throwClsResultApiError(res);
   return await res.json();
 };
 
@@ -202,6 +231,7 @@ export const rejectCdhaResultApi = async (detailId, data) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
+  if (!res.ok) await throwClsResultApiError(res);
   return await res.json();
 };
 
@@ -253,6 +283,39 @@ export const getApprovedListApi = async (params = {}) => {
   const response = await fetchClient(url, { skipLoading: true });
   if (!response.ok) return [];
   return await response.json();
+};
+
+const DOCTOR_CLS_API_URL = `${API_URL}/doctor/cls`;
+
+const readDoctorClsResponse = async (response) => {
+  if (!response.ok) {
+    let message = `Không thể tải dữ liệu (HTTP ${response.status})`;
+    try {
+      const error = await response.json();
+      message = error.message || error.detail || error.title || message;
+    } catch (e) {
+      // Use the status-based message when the server response is not JSON.
+    }
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
+};
+
+export const getDoctorClsReviewQueueApi = async (params = {}) => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, String(value));
+    }
+  });
+  const suffix = query.toString();
+  const response = await fetchClient(
+    `${DOCTOR_CLS_API_URL}/review-queue${suffix ? `?${suffix}` : ''}`,
+    { skipLoading: true }
+  );
+  return readDoctorClsResponse(response);
 };
 
 /**

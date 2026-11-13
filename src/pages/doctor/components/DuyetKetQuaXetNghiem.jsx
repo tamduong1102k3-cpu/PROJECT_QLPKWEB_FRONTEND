@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   getXetNhiemResultsByPhieuKhamApi, 
+  getXetNhiemResultApi,
   approveTestResultApi, 
   rejectTestResultApi 
 } from "../../../api/phieuChiDinhApi";
@@ -13,7 +14,8 @@ const DuyetKetQuaXetNghiem = ({
   patient,
   user,
   onBack,
-  readOnly = false
+  readOnly = false,
+  viewOnly = false
 }) => {
   const { showSuccess, showError, showWarning } = useNotification();
   const [loading, setLoading] = useState(true);
@@ -26,17 +28,23 @@ const DuyetKetQuaXetNghiem = ({
 
   useEffect(() => {
     fetchData();
-  }, [patient.maPhieuKham]);
+  }, [patient.maPhieuKham, patient.chiTietId]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const [data, tiepNhanData] = await Promise.all([
-        getXetNhiemResultsByPhieuKhamApi(patient.maPhieuKham),
+        patient.chiTietId == null
+          ? getXetNhiemResultsByPhieuKhamApi(patient.maPhieuKham)
+          : getXetNhiemResultApi(patient.chiTietId),
         getTiepNhanClsByPhieuKhamApi(patient.maPhieuKham)
       ]);
       if (data) {
-        setResults(data.map(item => ({
+        const resultList = Array.isArray(data) ? data : [data];
+        const scopedResults = patient.chiTietId == null
+          ? resultList
+          : resultList.filter(item => Number(item.maChiTietChiDinh) === Number(patient.chiTietId));
+        setResults(scopedResults.map(item => ({
           ...item,
           ketLuan: item.ketLuan || '',
           ketQua: item.ketQua || '',
@@ -77,7 +85,8 @@ const DuyetKetQuaXetNghiem = ({
       };
       await approveTestResultApi(result.id, payload);
       showSuccess(readOnly ? "Đã cập nhật kết quả thành công!" : "Đã ký duyệt kết quả xét nghiệm thành công!");
-      fetchData();
+      if (readOnly) fetchData();
+      else onBack();
     } catch (e) {
       console.error(e);
       showError("Lỗi khi duyệt kết quả: " + e.message);
@@ -187,6 +196,10 @@ const DuyetKetQuaXetNghiem = ({
         </div> : <div className="space-y-6">
           {results.map((result, rIdx) => {
         const isApproved = result.trangThai === 'DA_DUYET';
+          const isRejected = result.trangThai === 'TU_CHOI';
+            const isViewOnlyResult = viewOnly && result.trangThai !== 'CHO_DUYET';
+            const isLocked = isViewOnlyResult || isRejected || (!isApproved && result.trangThai !== 'CHO_DUYET')
+            || (isApproved && !readOnly);
         return <div key={result.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -201,6 +214,9 @@ const DuyetKetQuaXetNghiem = ({
                   {isApproved ? <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold flex items-center gap-1">
                       <span className="material-symbols-outlined text-sm">check_circle</span>
                       ĐÃ PHÊ DUYỆT
+                    </span> : isRejected ? <span className="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-xs font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm">cancel</span>
+                      TỪ CHỐI
                     </span> : <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
                       <span className="material-symbols-outlined text-sm">pending_actions</span>
                       CHỜ PHÊ DUYỆT
@@ -224,23 +240,31 @@ const DuyetKetQuaXetNghiem = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Ghi Chú Thêm</label>
-                      <textarea rows="3" value={result.ghiChuThem} disabled={isApproved && !readOnly} placeholder="Ghi chú thêm từ kỹ thuật viên hoặc bác sĩ..." onChange={e => handleMetaChange(rIdx, 'ghiChuThem', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-medium" />
+                      <textarea rows="3" value={result.ghiChuThem} disabled={isLocked} placeholder="Ghi chú thêm từ kỹ thuật viên hoặc bác sĩ..." onChange={e => handleMetaChange(rIdx, 'ghiChuThem', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-medium" />
                     </div>
 
                     <div className="flex flex-col justify-between">
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Kết Luận Của Bác Sĩ Xét Nghiệm <span className="text-rose-500">*</span></label>
-                        <textarea rows="6" value={result.ketLuan} disabled={isApproved && !readOnly} placeholder="VD: Các chỉ số trong giới hạn bình thường. Không có biểu hiện bệnh lý..." onChange={e => handleMetaChange(rIdx, 'ketLuan', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-bold text-gray-800" />
+                        <textarea rows="6" value={result.ketLuan} disabled={isLocked} placeholder="VD: Các chỉ số trong giới hạn bình thường. Không có biểu hiện bệnh lý..." onChange={e => handleMetaChange(rIdx, 'ketLuan', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-sm font-bold text-gray-800" />
                       </div>
 
                       <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 bg-gray-50/50 p-4 rounded-xl">
                         <span className="text-xs text-gray-400 font-bold">KTV Thực hiện: {result.tenNguoiThucHien || `ID #${result.nguoiThucHien || '---'}`}</span>
-                        {readOnly ? (
+                        {isViewOnlyResult ? (
+                          isApproved ? <PrintButton
+                            targetId={`test-print-area-${result.id}`}
+                            variant="success"
+                            title="IN KẾT QUẢ XÉT NGHIỆM"
+                          /> : <span className="text-xs font-bold text-rose-700">
+                            {isRejected ? 'KTV xử lý và gửi lại kết quả' : 'Chỉ xem kết quả'}
+                          </span>
+                        ) : readOnly && isApproved ? (
                           <button type="button" disabled={submitting} onClick={() => handleApprove(result, rIdx)} className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-rose-100 flex items-center gap-2">
                             <span className="material-symbols-outlined text-sm">save</span>
                             LƯU CẬP NHẬT (GIỮ NGUYÊN TRẠNG THÁI)
                           </button>
-                        ) : !isApproved ? (
+                        ) : result.trangThai === 'CHO_DUYET' ? (
                           <div className="flex gap-2">
                             <button type="button" disabled={submitting} onClick={() => openRejectModal(result, rIdx)} className="px-5 py-2.5 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 text-xs font-bold rounded-xl transition-all border border-gray-200 flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-sm">cancel</span>
@@ -251,12 +275,14 @@ const DuyetKetQuaXetNghiem = ({
                               DUYỆT & KĐ KẾT QUẢ
                             </button>
                           </div>
-                        ) : (
+                        ) : isApproved ? (
                           <PrintButton 
                             targetId={`test-print-area-${result.id}`} 
                             variant="success" 
                             title="IN KẾT QUẢ XÉT NGHIỆM" 
                           />
+                        ) : (
+                          <span className="text-xs font-bold text-rose-700">KTV xử lý và gửi lại kết quả</span>
                         )}
                       </div>
                     </div>

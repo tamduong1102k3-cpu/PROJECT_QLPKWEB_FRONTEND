@@ -302,6 +302,46 @@ export const getWorkingTodayApi = async () => {
   }
 };
 
+export const getAvailableClsRoomsApi = async (maDichVu) => {
+  try {
+    const params = new URLSearchParams({ maDichVu: String(maDichVu) });
+    const response = await fetchClient(`${API_URL}/phong-cls?${params}`, {
+      method: "GET",
+    });
+    if (!response.ok) {
+      const errorData = await parseJsonResponse(response);
+      throw new Error(
+        errorData?.message ||
+          `Lỗi: ${response.status} - Không thể lấy phòng CLS đang trực`,
+      );
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error in getAvailableClsRoomsApi:", error);
+    throw error;
+  }
+};
+
+export const getAvailableClsRoomsForReferralApi = async (maDichVu) => {
+  try {
+    const params = new URLSearchParams({ maDichVu: String(maDichVu) });
+    const response = await fetchClient(`${API_URL}/phong-cls-chi-dinh?${params}`, {
+      method: "GET",
+    });
+    if (!response.ok) {
+      const errorData = await parseJsonResponse(response);
+      throw new Error(
+        errorData?.message ||
+          `Lỗi: ${response.status} - Không thể lấy phòng CLS đang trực`,
+      );
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error in getAvailableClsRoomsForReferralApi:", error);
+    throw error;
+  }
+};
+
 /**
  * Lấy phòng làm việc hiện tại của một nhân viên dựa trên thời gian thực
  * Endpoint: GET /api/phan-cong/current-room/{maNhanVien}

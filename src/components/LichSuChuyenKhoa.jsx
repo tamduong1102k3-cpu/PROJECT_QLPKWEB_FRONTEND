@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { getSpecialtyHistoryApi, getAvailableClsResultsApi } from '../api/phieuKhamApi';
+import { getCdhaResultApi } from '../api/phieuChiDinhApi';
+import { getDetailClsResultApi } from '../api/ketQuaClsApi';
 import { getByPhieuKhamApi as _getToaThuocByPhieuKhamApi, getDetailsApi as _getToaThuocDetailsApi } from '../api/toaThuocApi';
 import { getByPhieuKhamApi } from '../api/khamLamSangApi';
 import { useNotification } from '../components/NotificationContext';
@@ -10,7 +12,21 @@ import Pagination from './Pagination';
 
 const PAGE_SIZE = 8;
 
-const LichSuChuyenKhoa = ({ user }) => {
+const SERVICE_STATUS_PRESENTATION = {
+  CHUA_THUC_HIEN: { label: 'Chưa thực hiện', className: 'bg-slate-100 text-slate-600' },
+  CHO_DUYET: { label: 'Chờ duyệt kết quả', className: 'bg-amber-100 text-amber-700' },
+  DA_DUYET: { label: 'Đã hoàn thành', className: 'bg-emerald-100 text-emerald-700' },
+  TU_CHOI: { label: 'Cần chỉnh sửa', className: 'bg-rose-100 text-rose-700' },
+  KHONG_XAC_DINH: { label: 'Chưa xác định', className: 'bg-slate-100 text-slate-500' },
+};
+
+const RESULT_STATUS_LABELS = {
+  DA_DUYET: 'Đã duyệt',
+  CHO_DUYET: 'Chờ duyệt',
+  TU_CHOI: 'Từ chối',
+};
+
+const LichSuChuyenKhoa = ({ user, showServiceStatus = false, showClsDetails = false }) => {
   const { showError } = useNotification();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +36,7 @@ const LichSuChuyenKhoa = ({ user }) => {
   const [detailData, setDetailData] = useState(null);
 
   const maChuyenKhoa = user?.maChuyenKhoa;
+  const columnCount = showServiceStatus ? 7 : 6;
 
   const fetchHistory = useCallback(async () => {
     if (!maChuyenKhoa) return;
@@ -63,29 +80,59 @@ const LichSuChuyenKhoa = ({ user }) => {
     setDetailLoading(true);
     setDetailData(null);
     try {
+      let hasKhamLamSang = false;
+      let khamLamSangLoadError = false;
       // 0. Fetch KhamLamSang details by maPhieuKham
       try {
         const khamLamSangData = await getByPhieuKhamApi(historyItem.maPhieuKham);
         if (khamLamSangData) {
+          hasKhamLamSang = true;
           historyItem = {
             ...historyItem,
             lyDoKham: khamLamSangData.lyDoKham || historyItem.lyDoKham,
             khamLamSang: khamLamSangData.khamLamSang || historyItem.khamLamSang,
-            chanDoanSoBo: khamLamSangData.chanDoanSoBo || historyItem.chanDoanSoBo,
+            chanDoanSoBo: khamLamSangData.chanDoanSoBo
+              || historyItem.chanDoanSoBo
+              || (showClsDetails ? historyItem.chanDoan : undefined),
             loiDanBacSi: khamLamSangData.loiDanBacSi || historyItem.loiDanBacSi,
           };
-          setSelectedHistoryItem(historyItem);
         }
       } catch (err) {
         console.error("Lỗi lấy khám lâm sàng lịch sử:", err);
+        khamLamSangLoadError = true;
       }
+      historyItem = { ...historyItem, hasKhamLamSang, khamLamSangLoadError };
+      setSelectedHistoryItem(historyItem);
 
       // 1. Fetch CLS results
       let clsResults = [];
+      let clsResultsError = false;
       try {
-        clsResults = await getAvailableClsResultsApi(historyItem.maPhieuKham);
+        const availableClsResults = await getAvailableClsResultsApi(historyItem.maPhieuKham);
+        clsResults = showClsDetails
+          ? await Promise.all((availableClsResults || []).map(async (item) => {
+            try {
+              const result = item.loai === 'XET_NGHIEM'
+                ? await getDetailClsResultApi(item.id)
+                : item.loai === 'CDHA'
+                  ? await getCdhaResultApi(item.id)
+                  : null;
+
+              if (!result) return { ...item, detailStatus: 'unavailable' };
+              if (result.trangThai !== 'DA_DUYET') {
+                return { ...item, detailStatus: 'not-approved' };
+              }
+
+              return { ...item, ...result, loai: item.loai, detailLoaded: true };
+            } catch (error) {
+              console.error(`Lỗi tải chi tiết CLS #${item.id}:`, error);
+              return { ...item, detailStatus: 'error' };
+            }
+          }))
+          : availableClsResults || [];
       } catch (err) {
         console.error("Lỗi lấy CLS lịch sử:", err);
+        clsResultsError = true;
       }
 
       // 2. Fetch Prescription details
@@ -113,6 +160,7 @@ const LichSuChuyenKhoa = ({ user }) => {
 
       setDetailData({
         clsResults: clsResults || [],
+        clsResultsError,
         meds: meds || []
       });
     } catch (error) {
@@ -182,14 +230,16 @@ const LichSuChuyenKhoa = ({ user }) => {
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Ngày Khám</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Bác Sĩ</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Dịch Vụ</th>
-              <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Chẩn Đoán</th>
+              {showServiceStatus && (
+                <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Trạng Thái</th>
+              )}
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider text-right">Thao Tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {loading ? (
               <tr>
-                <td colSpan="5" className="px-6 py-12 text-center text-slate-400 font-medium">
+                <td colSpan={columnCount} className="px-6 py-12 text-center text-slate-400 font-medium">
                   <div className="flex items-center justify-center gap-2">
                     <span className="material-symbols-outlined animate-spin">progress_activity</span>
                     Đang tải dữ liệu...
@@ -198,7 +248,7 @@ const LichSuChuyenKhoa = ({ user }) => {
               </tr>
             ) : filteredHistory.length === 0 ? (
               <tr>
-                <td colSpan="5" className="px-6 py-12 text-center text-slate-400 font-medium">
+                <td colSpan={columnCount} className="px-6 py-12 text-center text-slate-400 font-medium">
                   Không tìm thấy lịch sử khám nào.
                 </td>
               </tr>
@@ -224,7 +274,17 @@ const LichSuChuyenKhoa = ({ user }) => {
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-600 font-medium">{item.tenNhanVien || '--'}</td>
                   <td className="px-6 py-4 text-xs text-slate-600">{item.tenDichVu || '--'}</td>
-                  <td className="px-6 py-4 text-xs text-slate-600 max-w-[200px] truncate">{item.chanDoan || '--'}</td>
+                  {showServiceStatus && (
+                    <td className="px-6 py-4">
+                      {SERVICE_STATUS_PRESENTATION[item.trangThaiDichVu] ? (
+                        <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${SERVICE_STATUS_PRESENTATION[item.trangThaiDichVu].className}`}>
+                          {SERVICE_STATUS_PRESENTATION[item.trangThaiDichVu].label}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">--</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-6 py-4 text-right">
                     <button
                       onClick={() => handleViewDetail(item)}
@@ -287,12 +347,18 @@ const LichSuChuyenKhoa = ({ user }) => {
             {/* Modal Content */}
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* SECTION 1: KHÁM LÂM SÀNG & SINH HIỆU */}
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4">
+              <div className={`bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4 ${showClsDetails && !selectedHistoryItem.hasKhamLamSang && !selectedHistoryItem.khamLamSangLoadError ? 'hidden' : ''}`}>
                 <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider flex items-center gap-2 border-b border-gray-200 pb-2">
                   <span className="material-symbols-outlined text-sm text-indigo-600">clinical_notes</span>
                   1. Khám Lâm Sàng
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {showClsDetails && !selectedHistoryItem.hasKhamLamSang ? (
+                  selectedHistoryItem.khamLamSangLoadError ? (
+                    <p className="text-sm text-rose-600">Không tải được dữ liệu khám lâm sàng.</p>
+                  ) : (
+                    <p className="text-sm text-slate-500">Phiếu này không có bản ghi khám lâm sàng.</p>
+                  )
+                ) : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase block mb-0.5">Lý do khám</span>
@@ -321,7 +387,7 @@ const LichSuChuyenKhoa = ({ user }) => {
                       </p>
                     </div>
                   </div>
-                </div>
+                </div>}
               </div>
 
               {/* SECTION 2: KẾT QUẢ CẬN LÂM SÀNG */}
@@ -330,7 +396,9 @@ const LichSuChuyenKhoa = ({ user }) => {
                   <span className="material-symbols-outlined text-sm text-indigo-600">biotech</span>
                   2. Kết Quả Cận Lâm Sàng ({detailData.clsResults.length})
                 </h4>
-                {detailData.clsResults.length > 0 ? (
+                {detailData.clsResultsError ? (
+                  <p className="text-sm text-rose-600 text-center py-4">Không tải được kết quả cận lâm sàng.</p>
+                ) : detailData.clsResults.length > 0 ? (
                   <div className="space-y-3">
                     {detailData.clsResults.map((cls, idx) => (
                       <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200/60 shadow-2xs space-y-2">
@@ -347,13 +415,103 @@ const LichSuChuyenKhoa = ({ user }) => {
                             {cls.loai === 'XET_NGHIEM' ? 'Xét nghiệm' : 'CĐHA'}
                           </span>
                         </div>
-                        {cls.noiDungKetQua && (
+                        {showClsDetails && !cls.detailLoaded ? (
+                          <p className={`text-xs ${cls.detailStatus === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+                            {cls.detailStatus === 'not-approved'
+                              ? 'Kết quả hiện không còn ở trạng thái đã duyệt.'
+                              : cls.detailStatus === 'error'
+                                ? 'Không tải được chi tiết kết quả.'
+                                : 'Không tìm thấy chi tiết kết quả.'}
+                          </p>
+                        ) : showClsDetails && cls.loai === 'XET_NGHIEM' ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                              <p><span className="font-bold text-slate-500">Ngày thực hiện:</span> {cls.ngayThucHien ? new Date(cls.ngayThucHien).toLocaleString('vi-VN') : '--'}</p>
+                              <p><span className="font-bold text-slate-500">Người thực hiện:</span> {cls.tenNguoiThucHien || (cls.nguoiThucHien ? `#${cls.nguoiThucHien}` : '--')}</p>
+                              <p><span className="font-bold text-slate-500">Trạng thái:</span> {RESULT_STATUS_LABELS[cls.trangThai] || cls.trangThai || '--'}</p>
+                              {(cls.tenBsKetLuan || cls.maBsKetLuan) && (
+                                <p><span className="font-bold text-slate-500">Bác sĩ kết luận:</span> {cls.tenBsKetLuan || `#${cls.maBsKetLuan}`}</p>
+                              )}
+                            </div>
+                            {cls.noiDungKetQua && (
+                              <div>
+                                <span className="text-[10px] font-bold text-gray-400 block">Nội dung kết quả</span>
+                                <p className="text-xs text-gray-600 bg-gray-50/50 p-2 rounded border border-gray-100 whitespace-pre-wrap">{cls.noiDungKetQua}</p>
+                              </div>
+                            )}
+                            {cls.ketLuan && (
+                              <p className="text-xs"><span className="font-bold text-slate-500">Kết luận xét nghiệm:</span> {cls.ketLuan}</p>
+                            )}
+                            {cls.ghiChuThem && (
+                              <p className="text-xs"><span className="font-bold text-slate-500">Ghi chú thêm:</span> {cls.ghiChuThem}</p>
+                            )}
+                            {cls.chiTietKetQua?.length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <thead className="bg-slate-50 text-slate-500">
+                                    <tr>
+                                      <th className="p-2.5 font-bold">Chỉ số xét nghiệm</th>
+                                      <th className="p-2.5 font-bold">Giá trị</th>
+                                      <th className="p-2.5 font-bold">Đơn vị</th>
+                                      <th className="p-2.5 font-bold">Ghi chú</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {cls.chiTietKetQua.map((row, rowIndex) => (
+                                      <tr key={`${row.maChiSo || 'index'}-${rowIndex}`}>
+                                        <td className="p-2.5 font-medium text-slate-700">{row.tenChiSo || '--'}</td>
+                                        <td className="p-2.5 text-slate-700">{row.giaTri || '--'}</td>
+                                        <td className="p-2.5 text-slate-500">{row.donVi || '--'}</td>
+                                        <td className="p-2.5 text-slate-500">{row.ghiChu || '--'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-500">Không có chi tiết chỉ số xét nghiệm.</p>
+                            )}
+                          </div>
+                        ) : showClsDetails && cls.loai === 'CDHA' ? (
+                          <div className="space-y-3">
+                            <p className="text-xs text-slate-700 whitespace-pre-wrap">
+                              <span className="font-bold text-slate-500">Mô tả hình ảnh:</span> {cls.moTaHinhAnh || '--'}
+                            </p>
+                            <p className="text-xs text-slate-700 whitespace-pre-wrap">
+                              <span className="font-bold text-slate-500">Kết luận CĐHA:</span> {cls.ketLuan || '--'}
+                            </p>
+                            {cls.deNghi && (
+                              <p className="text-xs text-slate-700 whitespace-pre-wrap">
+                                <span className="font-bold text-slate-500">Đề nghị:</span> {cls.deNghi}
+                              </p>
+                            )}
+                            {(() => {
+                              const images = cls.danhSachAnh?.length
+                                ? cls.danhSachAnh
+                                : [cls.duongDanAnh1, cls.duongDanAnh2].filter(Boolean);
+                              return images.length > 0 ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                  {images.map((url, imageIndex) => (
+                                    <img
+                                      key={`${url}-${imageIndex}`}
+                                      src={url}
+                                      alt={`Ảnh CĐHA ${imageIndex + 1}`}
+                                      className="w-full max-h-64 rounded-lg border border-slate-200 object-contain bg-slate-50"
+                                    />
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-500">Không có hình ảnh đính kèm.</p>
+                              );
+                            })()}
+                          </div>
+                        ) : cls.noiDungKetQua && (
                           <div>
                             <span className="text-[10px] font-bold text-gray-400 block">Chi tiết kết quả:</span>
                             <p className="text-xs text-gray-600 bg-gray-50/50 p-2 rounded border border-gray-100 whitespace-pre-wrap">{cls.noiDungKetQua}</p>
                           </div>
                         )}
-                        {cls.ketLuan && (
+                        {!showClsDetails && cls.ketLuan && (
                           <div>
                             <span className="text-[10px] font-bold text-gray-400 block">Kết luận:</span>
                             <p className="text-xs font-bold text-rose-600">{cls.ketLuan}</p>
@@ -364,7 +522,9 @@ const LichSuChuyenKhoa = ({ user }) => {
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400 italic text-center py-4 bg-white rounded-xl border border-gray-100">
-                    Không chỉ định cận lâm sàng nào trong phiên khám này.
+                    {showClsDetails
+                      ? 'Chưa có kết quả cận lâm sàng đã được duyệt trong phiên khám này.'
+                      : 'Không chỉ định cận lâm sàng nào trong phiên khám này.'}
                   </p>
                 )}
               </div>

@@ -40,7 +40,9 @@ const BangDanhSachCongViec = ({
     // Filter "Đang chờ": chỉ hiển thị bệnh nhân đang chờ khám (CHO_KHAM)
     // Bệnh nhân VANG_MAT chỉ hiển thị khi chọn "Tất cả"
     if (filterMode === 'pending') {
-      data = data.filter(p => p.trangThai === 'CHO_KHAM' || p.trangThai === 'DANG_KHAM');
+      data = data.filter(p => p.trangThaiDv != null
+        || p.trangThai === 'CHO_KHAM'
+        || p.trangThai === 'DANG_KHAM');
     }
     
     return sortPatientList(data);

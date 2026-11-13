@@ -30,7 +30,7 @@ import {
 } from '../../../api/phieuKhamApi';
 import { saveAndUpdateApi as _saveChiSoKhamTongHopApi } from '../../../api/chiSoKhamTongHopApi';
 import { getByIdApi as _getBenhNhanByIdApi } from '../../../api/benhNhanApi';
-import { getPhongByChuyenKhoaApi } from '../../../api/danhMucApi';
+import { getAvailableClsRoomsForReferralApi } from '../../../api/shiftApi';
 
 import HienThiSinhHieu from './HienThiSinhHieu';
 import TabKhamLamSang from './TabKhamLamSang';
@@ -43,6 +43,8 @@ import TabKhamRHM from './TabKhamRHM';
 import TabKhamTimMach from './TabKhamTimMach';
 import TabKhamNhi from './TabKhamNhi';
 import TabHenTaiKham from './TabHenTaiKham';
+
+const CLS_SERVICE_TYPES = new Set(['CLS_XET_NGHIEM', 'CLS_CHAN_DOAN_HINH_ANH']);
 
 // Ô thông tin bệnh nhân trong lưới header
 const InfoBlock = ({ icon, label, value, href, alert = false }) => {
@@ -111,7 +113,13 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   });
   const [allServices, setAllServices] = useState([]);
   const [selectedServices, setSelectedServices] = useState([]);
-  const [phongMap, setPhongMap] = useState({}); 
+  const selectedServicesRef = useRef([]);
+  const persistedServiceCodesRef = useRef(new Set());
+  const savingReferralRef = useRef(false);
+  const [isSavingReferral, setIsSavingReferral] = useState(false);
+  const [phongMap, setPhongMap] = useState({});
+  const [phongLoading, setPhongLoading] = useState({});
+  const [phongErrors, setPhongErrors] = useState({});
   const [serviceSearch, setServiceSearch] = useState('');
   const [showServiceList, setShowServiceList] = useState(false);
   const [prescribedHistory, setPrescribedHistory] = useState([]);
@@ -123,6 +131,9 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const [examHistory, setExamHistory] = useState([]);
   const [prescriptionSavedAt, setPrescriptionSavedAt] = useState(null);
 
+  useEffect(() => {
+    selectedServicesRef.current = selectedServices;
+  }, [selectedServices]);
 
   const [examData, setExamData] = useState({
     tinhTrangMui: '',
@@ -226,10 +237,32 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
 
   const detailMaDv = (d) => d?.maDichVu;
 
+  const loadClsRooms = async (maDichVu) => {
+    setPhongLoading(prev => ({ ...prev, [maDichVu]: true }));
+    setPhongErrors(prev => ({ ...prev, [maDichVu]: null }));
+    try {
+      const rooms = await getAvailableClsRoomsForReferralApi(maDichVu);
+      if (!Array.isArray(rooms)) {
+        throw new Error('Dữ liệu danh sách phòng CLS không hợp lệ.');
+      }
+      setPhongMap(prev => ({ ...prev, [maDichVu]: rooms }));
+    } catch (error) {
+      setPhongErrors(prev => ({
+        ...prev,
+        [maDichVu]: error?.message || 'Không thể tải danh sách phòng CLS.'
+      }));
+      throw error;
+    } finally {
+      setPhongLoading(prev => ({ ...prev, [maDichVu]: false }));
+    }
+  };
+
 
   useEffect(() => {
     if (selectedPatient) {
 
+      selectedServicesRef.current = [];
+      persistedServiceCodesRef.current = new Set();
       setSelectedServices([]);
       setSelectedMeds([]);
       setPrescriptionSavedAt(null);
@@ -262,16 +295,18 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
                         id: d.id
                       });
                   
-                      const ck = catalogService?.maChuyenKhoa;
-                      if (ck && !phongMapRef.current[detailMaDv(d)]) {
-                        getPhongByChuyenKhoaApi(ck)
-                          .then(list => setPhongMap(prev => ({ ...prev, [detailMaDv(d)]: list || [] })))
+                      if (d.maDichVu && !phongMapRef.current[detailMaDv(d)]) {
+                        loadClsRooms(d.maDichVu)
                           .catch(e => console.error("Lỗi tải danh sách phòng:", e));
                       }
                     }
                   }
                 }
               }
+              selectedServicesRef.current = loadedServices;
+              persistedServiceCodesRef.current = new Set(
+                loadedServices.map(service => service.maDichVu)
+              );
               setSelectedServices(loadedServices);
             }
           })
@@ -381,7 +416,9 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   const fetchServices = useCallback(async () => {
     try {
       const data = await _getDichVuAllApi();
-      if (data) setAllServices(data);
+      if (data) {
+        setAllServices(data.filter(service => CLS_SERVICE_TYPES.has(service?.loaiDichVu)));
+      }
     } catch (error) {
       console.error("Lỗi khi tải danh mục dịch vụ:", error);
     }
@@ -414,26 +451,39 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   }, [selectedPatient]);
 
   const handleAddService = async service => {
-    if (selectedServices.find(s => s.maDichVu === service.maDichVu)) {
-      showWarning("Dịch vụ này đã có trong danh sách!");
+    if (readOnly) return;
+    if (!CLS_SERVICE_TYPES.has(service?.loaiDichVu)) return;
+    if (
+      selectedServicesRef.current.some(s => s.maDichVu === service.maDichVu)
+      || persistedServiceCodesRef.current.has(service.maDichVu)
+    ) {
+      showWarning(`Dịch vụ ${service.tenDichVu} đã được thêm.`);
       return;
     }
-    setSelectedServices([...selectedServices, {
+    const newService = {
       ...service,
       soLuong: 1,
       trangThaiDv: 'CHUA_THUC_HIEN'
-    }]);
+    };
+    selectedServicesRef.current = [...selectedServicesRef.current, newService];
+    setSelectedServices(prev => (
+      prev.some(s => s.maDichVu === service.maDichVu) ? prev : [...prev, newService]
+    ));
     setShowServiceList(false);
     setServiceSearch('');
     // Fetch phòng theo chuyên khoa của dịch vụ để chọn phòng CLS
     const maDichVu = service.maDichVu;
-    const maChuyenKhoa = service.maChuyenKhoa;
-    if (maChuyenKhoa && !phongMap[maDichVu]) {
+    if (maDichVu && !phongMap[maDichVu]) {
       try {
-        const list = await getPhongByChuyenKhoaApi(maChuyenKhoa);
-        setPhongMap(prev => ({ ...prev, [maDichVu]: list || [] }));
-      } catch (e) { console.error("Lỗi tải danh sách phòng:", e); }
+        await loadClsRooms(maDichVu);
+      } catch (e) {
+        console.error("Lỗi tải danh sách phòng:", e);
+      }
     }
+  };
+
+  const retryLoadClsRooms = (maDichVu) => {
+    loadClsRooms(maDichVu).catch(e => console.error("Lỗi tải danh sách phòng:", e));
   };
 
   const handlePhongChange = (maDichVu, maPhong) => {
@@ -443,25 +493,47 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
   };
 
   const handleRemoveService = id => {
-    setSelectedServices(selectedServices.filter(s => s.maDichVu !== id));
+    if (readOnly) return;
+    selectedServicesRef.current = selectedServicesRef.current.filter(s => s.maDichVu !== id);
+    setSelectedServices(prev => prev.filter(s => s.maDichVu !== id));
   };
 
   const handleSaveReferral = async (silent = false) => {
-    if (!selectedPatient?.maPhieuKham) return;
+    if (readOnly || !selectedPatient?.maPhieuKham) return;
+    if (savingReferralRef.current) return;
+    if (selectedServices.length === 0) {
+      showWarning('Vui lòng chọn ít nhất một dịch vụ trước khi lưu!');
+      return;
+    }
+
+    const uniqueServiceCodes = new Set();
+    const servicesToSave = selectedServices.filter(service => {
+      if (!CLS_SERVICE_TYPES.has(service?.loaiDichVu) || service.maDichVu == null) return false;
+      if (uniqueServiceCodes.has(service.maDichVu)) return false;
+      uniqueServiceCodes.add(service.maDichVu);
+      return !persistedServiceCodesRef.current.has(service.maDichVu);
+    });
+    if (servicesToSave.length === 0) {
+      showWarning('Không có dịch vụ CLS mới để lưu.');
+      return;
+    }
+
+    savingReferralRef.current = true;
+    setIsSavingReferral(true);
     try {
-      const missing = selectedServices.filter(s => !s.maPhong);
+      const missing = servicesToSave.filter(s => !s.maPhong);
       if (missing.length > 0) {
         showWarning('Vui lòng chọn phòng cho tất cả dịch vụ');
         return;
       }
-      const total = selectedServices.reduce((acc, s) => acc + s.donGia * s.soLuong, 0);
+      const total = servicesToSave.reduce((acc, s) => acc + s.donGia * s.soLuong, 0);
       const payload = {
         phieuChiDinh: {
           maPhieuKham: selectedPatient.maPhieuKham,
           maNhanVienChiDinh: user?.maNhanVien,
           tongTien: total
         },
-        chiTietList: selectedServices.map(s => ({
+        chiTietList: servicesToSave.map(s => ({
           maDichVu: s.maDichVu,
           donGia: s.donGia,
           soLuong: s.soLuong,
@@ -470,11 +542,19 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
           maPhong: s.maPhong
         }))
       };
-      const res = await _createPhieuChiDinhApi(payload);
+      await _createPhieuChiDinhApi(payload);
+      const savedCodes = new Set(servicesToSave.map(service => service.maDichVu));
+      persistedServiceCodesRef.current = new Set([
+        ...persistedServiceCodesRef.current,
+        ...savedCodes
+      ]);
+      setSelectedServices(prev => prev.map(service => (
+        savedCodes.has(service.maDichVu) ? { ...service, daLuu: true } : service
+      )));
       if (!silent) {
         showSuccess("Đã cập nhật chỉ định dịch vụ thành công!");
       }
-      fetchPrescribedHistory();
+      await fetchPrescribedHistory();
 
       // Sau khi lưu chỉ định dịch vụ CLS, chuyển trạng thái phiếu khám sang CHO_CLS
       // CHỈ khi đang khám thực tế. Khi xem lại (readOnly) tuyệt đối không đổi trạng thái.
@@ -487,6 +567,10 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
       }
     } catch (error) {
       console.error("Lỗi khi lưu chỉ định:", error);
+      showError(error?.message || 'Không thể lưu chỉ định dịch vụ.');
+    } finally {
+      savingReferralRef.current = false;
+      setIsSavingReferral(false);
     }
   };
 
@@ -995,12 +1079,17 @@ const ManHinhKhamBenh = ({ selectedPatient, setSelectedPatient, user, onBackToQu
               handleAddService={handleAddService}
               handleRemoveService={handleRemoveService}
               handleSaveReferral={handleSaveReferral}
+              isSavingReferral={isSavingReferral}
               selectedServices={selectedServices}
               setSelectedServices={setSelectedServices}
               phongMap={phongMap}
+              phongLoading={phongLoading}
+              phongErrors={phongErrors}
+              retryLoadClsRooms={retryLoadClsRooms}
               onPhongChange={handlePhongChange}
               selectedPatient={selectedPatient}
               user={user}
+              readOnly={readOnly}
             />
           )}
 

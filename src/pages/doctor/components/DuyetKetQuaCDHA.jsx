@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   getCdhaResultsByPhieuKhamApi,
+  getCdhaResultApi,
   approveCdhaResultApi,
   rejectCdhaResultApi
 } from "../../../api/phieuChiDinhApi";
@@ -14,7 +15,8 @@ const DuyetKetQuaCDHA = ({
   patient,
   user,
   onBack,
-  readOnly = false
+  readOnly = false,
+  viewOnly = false
 }) => {
   const { showSuccess, showError, showWarning } = useNotification();
   const [loading, setLoading] = useState(true);
@@ -39,11 +41,17 @@ const DuyetKetQuaCDHA = ({
     try {
       setLoading(true);
       const [data, tiepNhanData] = await Promise.all([
-        getCdhaResultsByPhieuKhamApi(patient.maPhieuKham),
+        patient.chiTietId == null
+          ? getCdhaResultsByPhieuKhamApi(patient.maPhieuKham)
+          : getCdhaResultApi(patient.chiTietId),
         getTiepNhanClsByPhieuKhamApi(patient.maPhieuKham)
       ]);
       if (data) {
-        setResults(data.map(item => ({
+        const resultList = Array.isArray(data) ? data : [data];
+        const scopedResults = patient.chiTietId == null
+          ? resultList
+          : resultList.filter(item => Number(item.maChiTietChiDinh ?? item.idChiTietChiDinh) === Number(patient.chiTietId));
+        setResults(scopedResults.map(item => ({
           ...item,
           moTaHinhAnh: item.moTaHinhAnh || '',
           ketLuan: item.ketLuan || '',
@@ -63,7 +71,7 @@ const DuyetKetQuaCDHA = ({
     } finally {
       setLoading(false);
     }
-  }, [patient.maPhieuKham]);
+  }, [patient.maPhieuKham, patient.chiTietId]);
 
   useEffect(() => {
     fetchCdhaResults();
@@ -164,6 +172,10 @@ const DuyetKetQuaCDHA = ({
 
   const currentResult = results[selectedResultIndex];
   const isApproved = currentResult?.trangThai === 'DA_DUYET';
+  const isRejected = currentResult?.trangThai === 'TU_CHOI';
+  const isViewOnlyResult = viewOnly && currentResult?.trangThai !== 'CHO_DUYET';
+  const isLocked = isViewOnlyResult || isRejected || (!isApproved && currentResult?.trangThai !== 'CHO_DUYET')
+    || (isApproved && !readOnly);
   const currentGallery = getGallery(currentResult);
   const hasImages = currentGallery.length > 0;
 
@@ -282,7 +294,7 @@ const DuyetKetQuaCDHA = ({
                   <span className="material-symbols-outlined text-indigo-600">description</span>
                   Mô tả hình ảnh (Findings)
                 </h3>
-                {!isApproved && (
+                {!isApproved && !isViewOnlyResult && currentResult?.trangThai === 'CHO_DUYET' && (
                   <div className="flex gap-1.5">
                     {[
                       { key: 'ultrasound', label: 'Siêu âm' },
@@ -305,7 +317,7 @@ const DuyetKetQuaCDHA = ({
                 rows={9}
                 value={currentResult?.moTaHinhAnh || ''}
                 onChange={e => handleTextChange('moTaHinhAnh', e.target.value)}
-                disabled={isApproved && !readOnly}
+                disabled={isLocked}
                 placeholder="Nhập mô tả chi tiết hình ảnh chẩn đoán..."
                 className="w-full px-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-base leading-relaxed"
               />
@@ -321,7 +333,7 @@ const DuyetKetQuaCDHA = ({
                 rows={5}
                 value={currentResult?.ketLuan || ''}
                 onChange={e => handleTextChange('ketLuan', e.target.value)}
-                disabled={isApproved && !readOnly}
+                disabled={isLocked}
                 placeholder="VD: Viêm phổi thùy phải / Không có bất thường rõ..."
                 className="w-full px-5 py-4 border-2 border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-base font-bold text-indigo-900 leading-relaxed"
               />
@@ -337,7 +349,7 @@ const DuyetKetQuaCDHA = ({
                 type="text"
                 value={currentResult?.deNghi || ''}
                 onChange={e => handleTextChange('deNghi', e.target.value)}
-                disabled={isApproved && !readOnly}
+                disabled={isLocked}
                 placeholder="VD: Kết hợp lâm sàng hoặc đề nghị làm thêm xét nghiệm..."
                 className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-100 transition-all text-base"
               />
@@ -350,7 +362,16 @@ const DuyetKetQuaCDHA = ({
                 <span>🩺 BS duyệt: {user?.hoTen || user?.username}</span>
               </div>
               <div className="flex gap-4">
-                {readOnly ? (
+                {isViewOnlyResult ? (
+                  isApproved ? <PrintButton
+                    targetId={`cdha-print-area-${currentResult.id || currentResult.maChiTietChiDinh}`}
+                    variant="success"
+                    title="IN KẾT QUẢ CĐHA"
+                    className="w-full justify-center py-3.5 text-base"
+                  /> : <span className="text-sm font-bold text-rose-700">
+                    {isRejected ? 'KTV xử lý và gửi lại kết quả' : 'Chỉ xem kết quả'}
+                  </span>
+                ) : readOnly && isApproved ? (
                   <button
                     onClick={handleApprove}
                     disabled={submitting}
@@ -359,7 +380,7 @@ const DuyetKetQuaCDHA = ({
                     <span className="material-symbols-outlined">save</span>
                     LƯU CẬP NHẬT (GIỮ NGUYÊN TRẠNG THÁI)
                   </button>
-                ) : !isApproved ? (
+                ) : currentResult?.trangThai === 'CHO_DUYET' ? (
                   <>
                     <button
                       onClick={handleReject}
@@ -378,13 +399,15 @@ const DuyetKetQuaCDHA = ({
                       KÝ DUYỆT KẾT QUẢ
                     </button>
                   </>
-                ) : (
+                ) : isApproved ? (
                   <PrintButton
                     targetId={`cdha-print-area-${currentResult.id || currentResult.maChiTietChiDinh}`}
                     variant="success"
                     title="IN KẾT QUẢ CĐHA"
                     className="w-full justify-center py-3.5 text-base"
                   />
+                ) : (
+                  <span className="text-sm font-bold text-rose-700">KTV xử lý và gửi lại kết quả</span>
                 )}
               </div>
             </div>
@@ -397,9 +420,9 @@ const DuyetKetQuaCDHA = ({
               <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Dịch vụ</h4>
               <p className="text-sm font-bold text-gray-800">{currentResult?.tenDichVu || 'CĐHA'}</p>
               <div className="mt-3 pt-3 border-t border-gray-100">
-                <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${isApproved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${isApproved ? 'bg-green-100 text-green-700' : isRejected ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
                   }`}>
-                  {isApproved ? '✓ ĐÃ DUYỆT' : '⏳ CHỜ DUYỆT'}
+                {isApproved ? '✓ ĐÃ DUYỆT' : isRejected ? '✕ TỪ CHỐI' : '⏳ CHỜ DUYỆT'}
                 </span>
               </div>
             </div>
@@ -442,6 +465,12 @@ const DuyetKetQuaCDHA = ({
             aria-modal="true"
             aria-labelledby="reject-cdha-title"
             className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+            style={{
+              boxSizing: 'border-box',
+              flex: 'none',
+              width: '32rem',
+              maxWidth: 'calc(100vw - 2rem)'
+            }}
           >
             <h3 id="reject-cdha-title" className="mb-2 text-lg font-bold text-slate-800">
               Từ chối kết quả CĐHA
@@ -457,6 +486,7 @@ const DuyetKetQuaCDHA = ({
               onChange={e => setRejectReason(e.target.value)}
               placeholder="Nhập lý do..."
               className="w-full resize-y rounded-xl border border-slate-300 p-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              style={{ boxSizing: 'border-box', width: '100%' }}
             />
             <div className="mt-5 flex justify-end gap-3">
               <button

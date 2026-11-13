@@ -4,6 +4,8 @@ import { sqlLikeMatch } from '../../../utils/searchUtils';
 import { useNotification } from '../../../components/NotificationContext';
 import formatGender from '../../../utils/formatGender';
 
+const CLS_SERVICE_TYPES = new Set(['CLS_XET_NGHIEM', 'CLS_CHAN_DOAN_HINH_ANH']);
+
 const TabDichVuChiDinh = ({
   serviceSearch,
   setServiceSearch,
@@ -13,18 +15,23 @@ const TabDichVuChiDinh = ({
   handleAddService,
   handleRemoveService,
   handleSaveReferral,
+  isSavingReferral = false,
   selectedServices,
   setSelectedServices,
   phongMap = {},
+  phongLoading = {},
+  phongErrors = {},
+  retryLoadClsRooms = () => {},
   onPhongChange = () => {},
   isAssistant,
   selectedPatient,
   user,
-  readOnly
+  readOnly = false
 }) => {
   const { showWarning } = useNotification();
 
   const handleSaveWithValidation = () => {
+    if (readOnly || isSavingReferral) return;
     if (selectedServices.length === 0) {
       showWarning('Vui lòng chọn ít nhất một dịch vụ trước khi lưu!');
       return;
@@ -56,7 +63,10 @@ const TabDichVuChiDinh = ({
               />
               {showServiceList && (
                 <div className="absolute z-30 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
-                  {allServices.filter(s => !serviceSearch || sqlLikeMatch(s.tenDichVu, serviceSearch)).map(s => (
+                  {allServices
+                    .filter(s => CLS_SERVICE_TYPES.has(s?.loaiDichVu))
+                    .filter(s => !serviceSearch || sqlLikeMatch(s.tenDichVu, serviceSearch))
+                    .map(s => (
                     <div key={s.maDichVu} className="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0" onClick={() => handleAddService(s)}>
                       <div>
                         <div className="text-sm font-bold text-gray-800">{s.tenDichVu}</div>
@@ -70,9 +80,9 @@ const TabDichVuChiDinh = ({
             </div>
           )}
           {!readOnly && (
-            <button onClick={handleSaveWithValidation} className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center gap-2">
+            <button onClick={handleSaveWithValidation} disabled={isSavingReferral} className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
               <span className="material-symbols-outlined text-sm">save</span>
-              {isAssistant ? 'LƯU NHÁP CHỈ ĐỊNH' : 'LƯU CHỈ ĐỊNH'}
+              {isSavingReferral ? 'ĐANG LƯU...' : isAssistant ? 'LƯU NHÁP CHỈ ĐỊNH' : 'LƯU CHỈ ĐỊNH'}
             </button>
           )}
           {selectedPatient && selectedServices.length > 0 && (
@@ -117,6 +127,7 @@ const TabDichVuChiDinh = ({
                         min="1" 
                         className="w-12 border rounded p-1 text-center bg-transparent" 
                         value={s.soLuong} 
+                        disabled={readOnly}
                         onChange={(e) => { 
                           const val = parseInt(e.target.value) || 1; 
                           setSelectedServices(selectedServices.map(item => item.maDichVu === s.maDichVu ? {...item, soLuong: val} : item)); 
@@ -132,16 +143,38 @@ const TabDichVuChiDinh = ({
                           value={s.maPhong || ''}
                           onChange={e => onPhongChange(s.maDichVu, e.target.value ? Number(e.target.value) : null)}
                         >
-                          <option value="">-- Chưa có phòng --</option>
+                          <option value="">
+                            {phongLoading[s.maDichVu]
+                              ? 'Đang tải phòng...'
+                              : phongErrors[s.maDichVu]
+                                ? 'Không tải được danh sách phòng'
+                                : (phongMap[s.maDichVu] || []).length === 0
+                                  ? 'Không có phòng phù hợp'
+                                  : '-- Chưa có phòng --'}
+                          </option>
                           {(phongMap[s.maDichVu] || []).map(p => {
-                            const full = (p.soLuongToiDa > 0) && (p.soDaDat >= p.soLuongToiDa);
+                            const soDaDat = p.soBenhNhanDangCho ?? p.soDaDat ?? 0;
+                            const full = (p.soLuongToiDa > 0) && (soDaDat >= p.soLuongToiDa);
                             return (
                               <option key={p.maPhong} value={p.maPhong} disabled={full}>
-                                {p.tenPhong} ({p.soDaDat}/{p.soLuongToiDa}){full ? ' — Đã đủ' : ''}
+                                {p.tenPhong} ({soDaDat}/{p.soLuongToiDa}){full ? ' — Đã đủ' : ''}
                               </option>
                             );
                           })}
                         </select>
+                      )}
+                      {!readOnly && phongErrors[s.maDichVu] && (
+                        <div className="mt-1 flex items-center gap-2 text-xs text-red-600" role="alert">
+                          <span>{phongErrors[s.maDichVu]}</span>
+                          <button
+                            type="button"
+                            className="font-semibold underline"
+                            disabled={phongLoading[s.maDichVu]}
+                            onClick={() => retryLoadClsRooms(s.maDichVu)}
+                          >
+                            Thử lại
+                          </button>
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-4 text-sm text-right font-medium text-gray-600">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(s.donGia)}</td>

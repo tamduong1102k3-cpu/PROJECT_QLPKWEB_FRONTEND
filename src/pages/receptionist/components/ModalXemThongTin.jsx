@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getAllNhanVienApi } from '../../../api/employeeApi';
 import ModalDoiMatKhau from './ModalDoiMatKhau';
 import formatGender from '../../../utils/formatGender';
@@ -54,7 +55,7 @@ const ModalXemThongTin = ({ user, onClose }) => {
     TRO_LY: 'Trợ lý'
   };
 
-  return (
+  return createPortal(
     <>
       {showChangePassword ? (
         <ModalDoiMatKhau 
@@ -71,7 +72,9 @@ const ModalXemThongTin = ({ user, onClose }) => {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9999,
-            padding: 16
+            padding: 16,
+            boxSizing: 'border-box',
+            overflowY: 'auto'
           }}
           onClick={onClose}
         >
@@ -85,7 +88,8 @@ const ModalXemThongTin = ({ user, onClose }) => {
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              maxHeight: '90vh'
+              maxHeight: 'calc(100vh - 32px)',
+              minHeight: 0
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -136,7 +140,8 @@ const ModalXemThongTin = ({ user, onClose }) => {
             {/* Body */}
             <div style={{
               overflowY: 'auto',
-              flex: 1,
+              flex: '1 1 auto',
+              minHeight: 0,
               padding: 24
             }}>
               {loading ? (
@@ -282,7 +287,8 @@ const ModalXemThongTin = ({ user, onClose }) => {
           </div>
         </div>
       )}
-    </>
+    </>,
+    document.body
   );
 };
 

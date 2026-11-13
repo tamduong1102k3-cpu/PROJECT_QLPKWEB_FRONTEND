@@ -1,12 +1,12 @@
-import { getAllNhanVienApi as _getNhanVienAll } from '../../../api/employeeApi';
+import { getBacSiByChuyenKhoaApi } from '../../../api/employeeApi';
 import { getAllApi as _getDichVuAll } from '../../../api/dichVuApi';
-import { getWorkingTodayApi as _getWorkingToday, getPhongTheoBacSiApi as _getPhongTheoBacSi } from '../../../api/shiftApi';
+import { getWorkingTodayApi as _getWorkingToday, getPhongTheoBacSiApi as _getPhongTheoBacSi, getAvailableClsRoomsApi } from '../../../api/shiftApi';
 import { getAllApi as getBenhNhanAll, searchApi, updateApi as updateBenhNhanApi } from '../../../api/benhNhanApi';
 import { createApi as createDangKyApi, getTodayApi as _getTodayRegistrations } from '../../../api/dangKyKhamBenhApi';
 import { updateTrangThaiApi } from '../../../api/lichKhamApi';
 import { getAllChuyenKhoaApi as _getChuyenKhoaAll, getAllPhongApi as _getPhongAll } from '../../../api/danhMucApi';
 import { useNotification } from '../../../components/NotificationContext';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import InPhieuTiepDon from './InPhieuTiepDon';
 import DangKyBenhNhan from './DangKyBenhNhan';
@@ -43,10 +43,9 @@ const isDoctorOnLeaveToday = (maNhanVien, shifts) => {
   );
 };
 
-const normalizeRoomName = (value) => {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-};
+const isClsService = service =>
+  service?.loaiDichVu === 'CLS_XET_NGHIEM' ||
+  service?.loaiDichVu === 'CLS_CHAN_DOAN_HINH_ANH';
 
 const getAssignedRoomOptions = ({ shiftsToday, selectedDepartment, phongList }) => {
   const catalog = Array.isArray(phongList) ? phongList : [];
@@ -95,8 +94,13 @@ const QuyTrinhTiepDon = ({
 
   const [departments, setDepartments] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
+  const [doctorLoadError, setDoctorLoadError] = useState('');
   const [services, setServices] = useState([]);
   const [phongList, setPhongList] = useState([]);
+  const [clsRoomOptions, setClsRoomOptions] = useState([]);
+  const [clsRoomsLoading, setClsRoomsLoading] = useState(false);
+  const [clsRoomError, setClsRoomError] = useState('');
   const [todayRegistrations, setTodayRegistrations] = useState([]);
   const [shiftsToday, setShiftsToday] = useState([]);
 
@@ -107,6 +111,9 @@ const QuyTrinhTiepDon = ({
   const [printData, setPrintData] = useState(null);
   const [roomLocked, setRoomLocked] = useState(false);
   const [roomLockError, setRoomLockError] = useState('');
+  const doctorRoomRequestId = useRef(0);
+  const doctorsRef = useRef([]);
+  const selectedDoctorIdRef = useRef(presetDoctor ? String(presetDoctor) : '');
 
   // Xác minh danh tính: lễ tân phải tick đối chiếu CCCD trước khi tiếp đón
   const [cccdVerified, setCccdVerified] = useState(false);
@@ -169,7 +176,6 @@ const QuyTrinhTiepDon = ({
   useEffect(() => {
     // Load danh mục
     _getChuyenKhoaAll().then(setDepartments).catch(() => setDepartments([]));
-    _getNhanVienAll().then(setDoctors).catch(() => setDoctors([]));
     _getDichVuAll().then(setServices).catch(() => setServices([]));
     _getPhongAll().then(setPhongList).catch(() => setPhongList([]));
     _getTodayRegistrations().then(data => setTodayRegistrations(Array.isArray(data) ? data : [])).catch(() => setTodayRegistrations([]));
@@ -192,11 +198,18 @@ const QuyTrinhTiepDon = ({
     }
   }, [loadPatients]);
 
-  const availableRoomOptions = getAssignedRoomOptions({
-    shiftsToday,
-    selectedDepartment: checkInData.maChuyenKhoa,
-    phongList,
-  });
+  const selectedService = services.find(
+    service => String(service.maDichVu) === String(checkInData.maDichVu)
+  );
+  const selectedServiceIsCls = isClsService(selectedService);
+
+  const availableRoomOptions = selectedServiceIsCls
+    ? clsRoomOptions
+    : getAssignedRoomOptions({
+      shiftsToday,
+      selectedDepartment: checkInData.maChuyenKhoa,
+      phongList,
+    });
 
   const selectedRoom = availableRoomOptions.find(room => Number(room.maPhong) === Number(checkInData.maPhong)) || null;
 
@@ -223,8 +236,138 @@ const QuyTrinhTiepDon = ({
     return Number(doc.chuyenKhoa) === Number(checkInData.maChuyenKhoa);
   });
 
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (!active) return;
+      const service = services.find(
+        item => String(item.maDichVu) === String(checkInData.maDichVu)
+      );
+      ++doctorRoomRequestId.current;
+
+      if (!service || !service.maChuyenKhoa) {
+        doctorsRef.current = [];
+        setDoctors([]);
+        setDoctorsLoading(false);
+        setDoctorLoadError('');
+        setClsRoomOptions([]);
+        setClsRoomsLoading(false);
+        setClsRoomError('');
+        if (services.length > 0) {
+          selectedDoctorIdRef.current = '';
+          setRoomLocked(false);
+          setRoomLockError('');
+          setCheckInData(prev => ({ ...prev, maNhanVien: '' }));
+        }
+        return;
+      }
+
+      const maChuyenKhoa = Number(service.maChuyenKhoa);
+      const currentDoctor = doctorsRef.current.find(
+        doctor => String(doctor.maNhanVien) === String(selectedDoctorIdRef.current)
+      );
+      const shouldClearDoctor = currentDoctor
+        && Number(currentDoctor.chuyenKhoa) !== maChuyenKhoa;
+      if (shouldClearDoctor) {
+        selectedDoctorIdRef.current = '';
+        setRoomLocked(false);
+        setRoomLockError('');
+      }
+
+      setCheckInData(prev => ({
+        ...prev,
+        maChuyenKhoa: String(maChuyenKhoa),
+        maNhanVien: shouldClearDoctor ? '' : prev.maNhanVien,
+        maPhong: shouldClearDoctor ? '' : prev.maPhong
+      }));
+
+      doctorsRef.current = [];
+      setDoctors([]);
+      setDoctorsLoading(true);
+      setDoctorLoadError('');
+      getBacSiByChuyenKhoaApi(maChuyenKhoa)
+        .then(data => {
+          if (!active) return;
+          const result = Array.isArray(data) ? data : [];
+          doctorsRef.current = result;
+          setDoctors(result);
+          const selectedDoctorStillAvailable = selectedDoctorIdRef.current
+            && result.some(doctor =>
+              String(doctor.maNhanVien) === String(selectedDoctorIdRef.current)
+            );
+          if (selectedDoctorIdRef.current && !selectedDoctorStillAvailable) {
+            selectedDoctorIdRef.current = '';
+            if (!isClsService(service)) {
+              setRoomLocked(false);
+              setRoomLockError('');
+            }
+            setCheckInData(prev => ({
+              ...prev,
+              maNhanVien: '',
+              maPhong: isClsService(service) ? prev.maPhong : ''
+            }));
+          }
+        })
+        .catch(error => {
+          if (!active) return;
+          doctorsRef.current = [];
+          setDoctors([]);
+          selectedDoctorIdRef.current = '';
+          if (!isClsService(service)) {
+            setRoomLocked(false);
+            setRoomLockError('');
+          }
+          setCheckInData(prev => ({
+            ...prev,
+            maNhanVien: '',
+            maPhong: isClsService(service) ? prev.maPhong : ''
+          }));
+          setDoctorLoadError(error.message || 'Không thể tải danh sách bác sĩ');
+        })
+        .finally(() => {
+          if (active) setDoctorsLoading(false);
+        });
+
+      if (isClsService(service)) {
+        setRoomLocked(false);
+        setRoomLockError('');
+        setCheckInData(prev => ({ ...prev, maPhong: '' }));
+        setClsRoomOptions([]);
+        setClsRoomsLoading(true);
+        setClsRoomError('');
+        getAvailableClsRoomsApi(service.maDichVu)
+          .then(data => {
+            if (!active) return;
+            setClsRoomOptions(Array.isArray(data) ? data : []);
+          })
+          .catch(error => {
+            if (!active) return;
+            setClsRoomOptions([]);
+            setClsRoomError(error.message || 'Không thể tải phòng kỹ thuật viên');
+          })
+          .finally(() => {
+            if (active) setClsRoomsLoading(false);
+          });
+      } else {
+        setClsRoomOptions([]);
+        setClsRoomsLoading(false);
+        setClsRoomError('');
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [checkInData.maDichVu, services]);
+
   // Hàm xử lý đổi bác sĩ: lookup phòng theo ca hiện tại + ngày hôm nay
   const handleDoctorChange = async (maNhanVien) => {
+    selectedDoctorIdRef.current = maNhanVien;
+    if (selectedServiceIsCls) {
+      setCheckInData(prev => ({ ...prev, maNhanVien }));
+      return;
+    }
+
     if (!maNhanVien) {
       // Clear bác sĩ → unlock phòng, reset phòng
       setRoomLocked(false);
@@ -236,15 +379,18 @@ const QuyTrinhTiepDon = ({
     setCheckInData(prev => ({ ...prev, maNhanVien }));
     setRoomLocked(true);
     setRoomLockError('');
+    const requestId = ++doctorRoomRequestId.current;
 
     try {
       // Lấy ngày theo giờ VN (tránh lỗi UTC lùi 1 ngày vào rạng sáng)
       const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
       const result = await _getPhongTheoBacSi(maNhanVien, todayStr);
+      if (requestId !== doctorRoomRequestId.current) return;
       setCheckInData(prev => ({ ...prev, maPhong: String(result.maPhong) }));
       setRoomLocked(true);
       setRoomLockError('');
     } catch (e) {
+      if (requestId !== doctorRoomRequestId.current) return;
       setCheckInData(prev => ({ ...prev, maPhong: '' }));
       setRoomLocked(true);
       setRoomLockError(e.message || 'Không thể lấy phòng theo bác sĩ');
@@ -253,6 +399,7 @@ const QuyTrinhTiepDon = ({
   };
 
   useEffect(() => {
+    if (selectedServiceIsCls) return;
     if (roomLocked) return;
     if (!checkInData.maChuyenKhoa) {
       setCheckInData(prev => ({ ...prev, maPhong: '' }));
@@ -276,7 +423,7 @@ const QuyTrinhTiepDon = ({
       }
       return prev;
     });
-  }, [checkInData.maChuyenKhoa, shiftsToday, phongList, roomLocked]);
+  }, [checkInData.maChuyenKhoa, shiftsToday, phongList, roomLocked, selectedServiceIsCls]);
 
   // Effect cho dịch vụ: tự động chọn dịch vụ đầu tiên của chuyên khoa khi chuyên khoa thay đổi hoặc services load xong
   useEffect(() => {
@@ -359,8 +506,15 @@ const QuyTrinhTiepDon = ({
       return;
     }
 
+    if (selectedServiceIsCls && clsRoomsLoading) {
+      showWarning("Đang tải danh sách phòng kỹ thuật viên. Vui lòng thử lại.");
+      return;
+    }
+
     if (!checkInData.maPhong) {
-      showWarning("Vui lòng chọn Phòng khám trước khi tiếp đón!");
+      showWarning(selectedServiceIsCls && !availableRoomOptions.length
+        ? (clsRoomError || "Không có phòng CLS với kỹ thuật viên đang trực.")
+        : "Vui lòng chọn Phòng khám trước khi tiếp đón!");
       return;
     }
 
@@ -394,6 +548,7 @@ const QuyTrinhTiepDon = ({
       const dangKyData = {
         maBenhNhan: selectedPatient.maBenhNhan,
         maNhanVien: maLeTan,
+        maBacSi: checkInData.maNhanVien ? parseInt(checkInData.maNhanVien) : null,
         maChuyenKhoa: parseInt(checkInData.maChuyenKhoa),
         maPhong: checkInData.maPhong ? parseInt(checkInData.maPhong) : null,
         maDichVu: checkInData.maDichVu ? parseInt(checkInData.maDichVu) : null,
@@ -724,14 +879,23 @@ const QuyTrinhTiepDon = ({
               </div>
               <div>
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Phòng khám</label>
-                <select required disabled={roomLocked} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold disabled:opacity-60 disabled:cursor-not-allowed" value={checkInData.maPhong} onChange={e => setCheckInData({ ...checkInData, maPhong: e.target.value })}>
+                <select required disabled={roomLocked || (selectedServiceIsCls && clsRoomsLoading)} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold disabled:opacity-60 disabled:cursor-not-allowed" value={checkInData.maPhong} onChange={e => setCheckInData({ ...checkInData, maPhong: e.target.value })}>
                   <option value="">-- Chọn phòng --</option>
                   {availableRoomOptions.map(room => (
                     <option key={room.maPhong} value={room.maPhong}>
-                      {room.tenPhong}
+                      {room.tenPhong}{selectedServiceIsCls ? ` (${room.soBenhNhanDangCho ?? 0} đang chờ)` : ''}
                     </option>
                   ))}
                 </select>
+                {selectedServiceIsCls && clsRoomsLoading && (
+                  <p className="mt-2 text-[11px] font-bold text-gray-500">Đang tải phòng có kỹ thuật viên trực...</p>
+                )}
+                {selectedServiceIsCls && clsRoomError && (
+                  <p className="mt-2 text-[11px] font-bold text-red-500">{clsRoomError}</p>
+                )}
+                {selectedServiceIsCls && !clsRoomsLoading && !clsRoomError && !availableRoomOptions.length && (
+                  <p className="mt-2 text-[11px] font-bold text-orange-600">Không có phòng CLS phù hợp đang có kỹ thuật viên trực.</p>
+                )}
                 {roomLocked && roomLockError && (
                   <p className="mt-2 text-[11px] font-bold text-red-500">{roomLockError}</p>
                 )}
@@ -743,7 +907,7 @@ const QuyTrinhTiepDon = ({
                     Còn lại: <span className={roomRemaining > 0 ? 'text-emerald-600' : 'text-red-500'}>{roomRemaining}</span> / {roomCapacity || 0} slot hôm nay
                   </p>
                 )}
-                {checkInData.maChuyenKhoa && !availableRoomOptions.length && !roomLocked && (
+                {checkInData.maChuyenKhoa && !selectedServiceIsCls && !availableRoomOptions.length && !roomLocked && (
                   <p className="text-[10px] text-orange-500 mt-1 font-bold italic">* Chuyên khoa này chưa có phòng được cấu hình</p>
                 )}
               </div>
@@ -816,7 +980,11 @@ const QuyTrinhTiepDon = ({
                   {availableDoctors.map(d => <option key={d.maNhanVien} value={d.maNhanVien}>{d.hoTen}</option>)}
                 </select>
                 {checkInData.maChuyenKhoa && availableDoctors.length === 0 && <p className="text-[10px] text-orange-500 mt-1 font-bold italic">
-                  * Hiện không có bác sĩ nào trực ở chuyên khoa này hôm nay
+                  {doctorsLoading
+                    ? '* Đang tải danh sách bác sĩ...'
+                    : doctorLoadError
+                      ? `* ${doctorLoadError}`
+                      : '* Hiện không có bác sĩ nào trực ở chuyên khoa này hôm nay'}
                 </p>}
               </div>
             </div>

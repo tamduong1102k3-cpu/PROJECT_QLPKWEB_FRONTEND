@@ -313,6 +313,9 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
       <WebSocketAutoRefresh
         topics={['/topic/phieu-kham', '/topic/cls', '/topic/dang-ky-kham']}
         onMessage={(topic, data) => {
+          if (isImaging && data?.action === 'REJECTED' && data?.loai === 'CDHA') {
+            setWorklistTab('pending');
+          }
           fetchWorklist(false);
         }}
       />
@@ -392,7 +395,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
 
         <main className="flex-1 overflow-y-auto p-8 bg-slate-50/50 scroll-smooth">
           {activeTab === 'lichlamviec' ? <LichLamViecTab user={user} /> : activeTab === 'patients' ? <QuanLyBenhNhan title="Thông Tin Bệnh Nhân" /> : activeTab === 'history' ? (
-            <LichSuChuyenKhoa user={user} onReview={(item) => setViewingResult({
+            <LichSuChuyenKhoa user={user} showServiceStatus showClsDetails onReview={(item) => setViewingResult({
               ...item,
               id: item.maPhieuKham,
               tenDichVu: item.tenChuyenKhoa || deptName,

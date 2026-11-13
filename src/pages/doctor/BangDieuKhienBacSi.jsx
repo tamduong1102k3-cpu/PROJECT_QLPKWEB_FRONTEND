@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import QuanLyBenhNhan from '../../pages/admin/components/QuanLyBenhNhan';
 import LichSuChuyenKhoa from '../../components/LichSuChuyenKhoa';
-import BangDieuKhienChanDoan from './components/BangDieuKhienChanDoan';
+import BangDieuKhienChanDoan from './components/BangDieuKhienClsBacSi';
 import HangDoiKham from './components/HangDoiKham';
 import ManHinhKhamBenh from './components/ManHinhKhamBenh';
 import TabHenTaiKham from './components/TabHenTaiKham';

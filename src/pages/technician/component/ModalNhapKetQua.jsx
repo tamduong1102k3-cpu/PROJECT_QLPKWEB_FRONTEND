@@ -10,6 +10,7 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
   const [useTemplate, setUseTemplate] = useState(true);
   const [templateValues, setTemplateValues] = useState({});
   const [danhSachAnh, setDanhSachAnh] = useState([]);
+  const [rejectionReason, setRejectionReason] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,7 +28,10 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
   const selectedTemplate = getTemplateForService(test.tenDichVu, isImaging);
 
   useEffect(() => {
+    let active = true;
     let initialValues = {};
+    setDanhSachAnh([]);
+    setRejectionReason('');
     if (selectedTemplate) {
       selectedTemplate.fields.forEach(f => initialValues[f.key] = f.defaultValue || '');
       setTemplateValues(initialValues);
@@ -36,8 +40,11 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
 
     if (isImaging) {
       getCdhaResultApi(test.id).then(data => {
-        if (data) {
+        if (active && data) {
           setDanhSachAnh(extractGallery(data));
+          setRejectionReason(data.trangThai === 'TU_CHOI' && data.deNghi
+            ? String(data.deNghi).replace(/^YÊU CẦU LÀM LẠI:\s*/i, '')
+            : '');
           
           if (selectedTemplate && selectedTemplate.key === 'CDHA_GENERIC') {
             const vals = {
@@ -49,6 +56,10 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
         }
       });
     }
+
+    return () => {
+      active = false;
+    };
   }, [test.id, isImaging, test.tenDichVu]);
 
   const handleTemplateValueChange = (key, value) => {
@@ -134,6 +145,16 @@ const ModalNhapKetQua = ({ test, user, isImaging, onClose, onSuccess }) => {
             <span className="material-symbols-outlined group-hover:rotate-90 transition-transform duration-300">close</span>
           </button>
         </div>
+
+        {rejectionReason && (
+          <div className="mx-6 mt-4 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
+            <span className="material-symbols-outlined mt-0.5 text-rose-600">report</span>
+            <div>
+              <p className="text-sm font-bold">Kết quả CĐHA bị từ chối — vui lòng xử lý và gửi lại</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm">{rejectionReason}</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto flex flex-col bg-white">
           {/* Form template - thu gọn phía trên */}

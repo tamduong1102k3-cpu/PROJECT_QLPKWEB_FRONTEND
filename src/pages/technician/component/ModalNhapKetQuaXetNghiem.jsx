@@ -39,6 +39,7 @@ const ModalNhapKetQuaXetNghiem = ({ test, user, servicesList = [], onClose, onSu
   // Tải lại kết quả đã nhập trước đó + ghi chú từ bác sĩ khi mở form
   useEffect(() => {
     let active = true;
+    setLyDoTuChoi("");
     (async () => {
       try {
         const data = await getXetNhiemResultApi(test.id);
@@ -48,7 +49,11 @@ const ModalNhapKetQuaXetNghiem = ({ test, user, servicesList = [], onClose, onSu
             setTestResultText(data.ketQua);
             setHasLoadedOldResult(true);
           }
-          if (data.ghiChuThem) setLyDoTuChoi(data.ghiChuThem);
+          if (data.trangThai === 'TU_CHOI' && data.ghiChuThem) {
+            setLyDoTuChoi(data.ghiChuThem);
+          } else {
+            setLyDoTuChoi("");
+          }
         }
       } catch (e) { /* chưa có kết quả nào */ }
     })();

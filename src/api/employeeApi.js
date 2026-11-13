@@ -37,6 +37,20 @@ export const getAllNhanVienApi = async () => {
   }
 };
 
+export const getBacSiByChuyenKhoaApi = async (chuyenKhoa) => {
+  try {
+    const params = new URLSearchParams({ chuyenKhoa: String(chuyenKhoa) });
+    const response = await fetchClient(`${API_URL}/bac-si-by-chuyen-khoa?${params}`, {
+      method: 'GET'
+    });
+    if (!response.ok) await handleError(response);
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error in getBacSiByChuyenKhoaApi:", error);
+    throw error;
+  }
+};
+
 /**
  * GET /search - tìm kiếm bằng LIKE và lọc theo chuyên khoa/vai trò
  */
