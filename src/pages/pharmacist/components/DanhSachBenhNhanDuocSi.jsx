@@ -220,7 +220,7 @@ const DanhSachBenhNhanDuocSi = ({ patients, onSelectPatient, formatCurrency, for
                   <th className="text-left px-5 py-3 text-[11px] font-bold uppercase text-gray-500 tracking-wider">Hóa đơn</th>
                   <th className="text-center px-5 py-3 text-[11px] font-bold uppercase text-gray-500 tracking-wider">Trạng thái</th>
                   <th className="text-right px-5 py-3 text-[11px] font-bold uppercase text-gray-500 tracking-wider">Tổng tiền</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-bold uppercase text-gray-500 tracking-wider">Ngày thanh toán</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-bold uppercase text-gray-500 tracking-wider">Ngày</th>
                   <th className="text-center px-5 py-3 text-[11px] font-bold uppercase text-gray-500 tracking-wider">Thao tác</th>
                 </tr>
               </thead>

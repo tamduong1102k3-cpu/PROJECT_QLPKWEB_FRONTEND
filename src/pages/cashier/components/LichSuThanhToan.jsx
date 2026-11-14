@@ -226,7 +226,7 @@ const LichSuThanhToan = ({ formatCurrency }) => {
               <tr className="bg-slate-50/30 border-b border-slate-100">
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Mã HĐ</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Bệnh Nhân</th>
-                <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Ngày Thanh Toán</th>
+                <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Ngày</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Số Điện Thoại</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider text-center">Trạng Thái</th>
                 <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider text-right">Tổng Tiền</th>

@@ -142,6 +142,12 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
   };
   const tabLabels = getTabLabel();
 
+  const formatPatientDate = (value) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('vi-VN');
+  };
+
   const getStatusBadge = () => {
     if (activeTab === 'waiting') {
       return { label: 'CHỜ KHÁM', bg: 'bg-amber-100', text: 'text-amber-700' };
@@ -276,6 +282,7 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
                 <th className="px-6 py-4">Mã</th>
                 <th className="px-6 py-4">CCCD</th>
                 <th className="px-6 py-4">Dịch vụ</th>
+                <th className="px-6 py-4">Ngày</th>
                 <th className="px-6 py-4">Ghi chú</th>
                 <th className="px-6 py-4">Trạng thái</th>
                 <th className="px-6 py-4 text-right">Thao tác</th>
@@ -284,11 +291,11 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
             <tbody className="divide-y divide-gray-100">
               {loadingQueue ? (
                 <tr>
-                  <td colSpan="8" className="text-center py-10 text-gray-400">Đang tải...</td>
+                  <td colSpan="9" className="text-center py-10 text-gray-400">Đang tải...</td>
                 </tr>
               ) : allDisplayed.length === 0 ? (
                 <tr className="h-full">
-                  <td colSpan="8" className="text-center py-10 text-gray-400">
+                  <td colSpan="9" className="text-center py-10 text-gray-400">
                     {appliedSearch
                       ? `Không tìm thấy bệnh nhân với từ khóa "${appliedSearch}"`
                       : activeTab === 'waiting'
@@ -306,6 +313,9 @@ const HangDoiKham = ({ user, handleSelectPatient, refreshTrigger }) => {
                     <td className="px-6 py-4 text-sm text-gray-600">#{p.maPhieuKham || p.maBenhNhan || p.maChiTiet || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{p.cccd || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{p.tenChuyenKhoa || p.tenDichVu || p.dichVu || p.phong || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                      {formatPatientDate(p.ngayChiDinh || p.ngayKham || p.ngayThucHien || p.thoiGian || p.thoiGianDangKy)}
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-600 max-w-[150px] truncate" title={p.ghiChu || ''}>{p.ghiChu || '-'}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${statusBadge.bg} ${statusBadge.text}`}>

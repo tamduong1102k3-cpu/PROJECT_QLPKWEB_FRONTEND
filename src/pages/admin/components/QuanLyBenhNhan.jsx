@@ -767,7 +767,7 @@ const QuanLyBenhNhan = ({
                     >
                       <tr>
                         <th style={{ ...S.th, fontSize: "11px" }}>Mã PK</th>
-                        <th style={{ ...S.th, fontSize: "11px" }}>Ngày Khám</th>
+                        <th style={{ ...S.th, fontSize: "11px" }}>Ngày</th>
                         <th style={{ ...S.th, fontSize: "11px" }}>
                           Chuyên Khoa
                         </th>

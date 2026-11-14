@@ -106,7 +106,7 @@ const QuanLyLichHen = ({ showActions = 'all', onQuickCheckIn }) => {
                 <th className="px-4 py-3">Chuyên Khoa</th>
                 <th className="px-4 py-3">Bác Sĩ</th>
                 <th className="px-4 py-3">Ca Khám</th>
-                <th className="px-4 py-3">Ngày Hẹn</th>
+                <th className="px-4 py-3">Ngày</th>
                 <th className="px-4 py-3">Trạng Thái</th>
                 <th className="px-4 py-3 text-right">Thao Tác</th>
               </tr>

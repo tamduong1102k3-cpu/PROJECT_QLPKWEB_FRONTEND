@@ -1532,7 +1532,7 @@ const TabHenTaiKham = ({ user, patient, appointments: externalAppointments }) =>
               <table className="w-full">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    {['ID', 'Bệnh nhân', 'Chuyên khoa', 'Dịch vụ', 'Bác sĩ', 'Ca khám', 'Phòng', 'Ngày tái khám', 'Trạng thái', 'Nguồn tạo', 'Ghi chú', 'Thao tác'].map(h => (
+                    {['ID', 'Bệnh nhân', 'Chuyên khoa', 'Dịch vụ', 'Bác sĩ', 'Ca khám', 'Phòng', 'Ngày', 'Trạng thái', 'Nguồn tạo', 'Ghi chú', 'Thao tác'].map(h => (
                       <th
                         key={h}
                         className={`px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 ${!h || h === 'Trạng thái' ? 'text-center' : 'text-left'}`}

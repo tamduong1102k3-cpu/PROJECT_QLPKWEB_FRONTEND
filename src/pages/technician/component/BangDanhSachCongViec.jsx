@@ -24,6 +24,8 @@ const BangDanhSachCongViec = ({
   onMarkPresent, 
   searchQuery, 
   setSearchQuery, 
+  dateFilter = 'today',
+  setDateFilter,
   isRefreshing, 
   onManualRefresh, 
   loading, 
@@ -99,6 +101,20 @@ const BangDanhSachCongViec = ({
               </>
             )}
           </div>
+          {setDateFilter && worklistTab !== 'reception' && (
+            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-600">
+              <span className="material-symbols-outlined text-lg text-slate-400">calendar_month</span>
+              <select
+                aria-label="Lọc theo ngày"
+                value={dateFilter}
+                onChange={e => setDateFilter(e.target.value)}
+                className="border-0 bg-transparent p-0 pr-6 text-sm font-bold text-slate-600 focus:ring-0"
+              >
+                <option value="today">Hôm nay</option>
+                <option value="all">Tất cả ngày</option>
+              </select>
+            </label>
+          )}
         </div>
 
         <div className="relative w-72">
@@ -134,13 +150,14 @@ const BangDanhSachCongViec = ({
               <th className="py-5 px-6 hidden lg:table-cell">SĐT</th>
               <th className="py-5 px-6 hidden xl:table-cell">CCCD</th>
               <th className="py-5 px-6">Dịch vụ</th>
+              <th className="py-5 px-6 whitespace-nowrap">Ngày</th>
               <th className="py-5 px-6 text-center w-56">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {displayData.length === 0 ? (
               <tr>
-                <td colSpan="6" className="py-16 text-center text-slate-400">
+                <td colSpan="7" className="py-16 text-center text-slate-400">
                   <div className="flex flex-col items-center gap-3">
                     <span className="material-symbols-outlined text-4xl text-slate-300">search_off</span>
                     <p className="font-medium">Không tìm thấy dữ liệu.</p>
@@ -192,6 +209,9 @@ const BangDanhSachCongViec = ({
                     <span className={`w-2 h-2 rounded-full ${item.trangThai === 'VANG_MAT' ? 'bg-red-400' : worklistTab === 'pending' ? 'bg-amber-400 animate-pulse' : worklistTab === 'completed' ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
                     <span className="font-bold text-slate-700">{item.tenDichVu || item.tenChuyenKhoa || 'Khám bệnh'}</span>
                   </div>
+                </td>
+                <td className="py-4 px-6 whitespace-nowrap text-xs font-semibold text-slate-600">
+                  {formatQueueDate(item.ngayChiDinh || item.thoiGian || item.thoiGianDangKy || item.ngayKham)}
                 </td>
                 <td className="py-4 px-6 text-center">
                   {worklistTab === 'pending' ? (
@@ -288,6 +308,15 @@ const BangDanhSachCongViec = ({
       </div>
     </div>
   );
+};
+
+const formatQueueDate = value => {
+  if (!value) return '—';
+  const dateOnly = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const date = new Date(dateOnly ? `${value}T00:00:00` : value);
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
 export default BangDanhSachCongViec;

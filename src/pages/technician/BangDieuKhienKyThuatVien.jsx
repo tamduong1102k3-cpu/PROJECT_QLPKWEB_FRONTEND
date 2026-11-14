@@ -26,6 +26,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
   const deptName = isImaging ? 'Chẩn Đoán Hình Ảnh' : 'Xét Nghiệm';
   const [activeTab, setActiveTab] = useState('worklist');
   const [worklistTab, setWorklistTab] = useState('pending');
+  const [dateFilter, setDateFilter] = useState('today');
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1280);
   const [pendingTests, setPendingTests] = useState([]);
   const [completedTests, setCompletedTests] = useState([]);
@@ -59,8 +60,8 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
     try {
       const maChuyenKhoa = user?.maChuyenKhoa || '';
       const [pending, completed, registrations] = await Promise.all([
-        getPendingTestsApi({ maChuyenKhoa }),
-        getCompletedTestsTodayApi({ maChuyenKhoa }),
+        getPendingTestsApi({ maChuyenKhoa, allDates: dateFilter === 'all' }),
+        getCompletedTestsTodayApi({ maChuyenKhoa, allDates: dateFilter === 'all' }),
         getTodayDangKyApi()
       ]);
 
@@ -119,7 +120,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
       setVitalsMap(prev => ({ ...prev, ...newVitalsMap }));
       setVitalsDataMap(prev => ({ ...prev, ...newVitalsDataMap }));
     } finally { if (shouldShowLoading) setLoading(false); }
-  }, [user]);
+  }, [user, dateFilter]);
 
   useEffect(() => {
     fetchWorklist(true);
@@ -425,6 +426,7 @@ const BangDieuKhienKyThuatVien = ({ onLogout, user }) => {
                 worklistTab={worklistTab} setWorklistTab={setWorklistTab}
                 isImaging={isImaging} loading={loading} isRefreshing={isRefreshing}
                 searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+                dateFilter={dateFilter} setDateFilter={setDateFilter}
                 onOpenResult={handleOpenResult} onOpenView={setViewingResult}
                 onOpenVitals={handleOpenVitals}
                 onEditResult={handleOpenResult}

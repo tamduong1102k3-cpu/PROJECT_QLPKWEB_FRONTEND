@@ -73,7 +73,7 @@ const LichSuKham = ({
             <tr>
               <th className="px-6 py-4">Mã Phiếu</th>
               <th className="px-6 py-4">Bệnh Nhân</th>
-              <th className="px-6 py-4">{isXetNghiemDoc ? 'Giờ Duyệt' : 'Giờ Khám'}</th>
+              <th className="px-6 py-4">Ngày</th>
               <th className="px-6 py-4">{isXetNghiemDoc ? 'Dịch Vụ Xét Nghiệm' : 'Chẩn Đoán'}</th>
               <th className="px-6 py-4 text-right">Thao Tác</th>
             </tr>
@@ -87,10 +87,7 @@ const LichSuKham = ({
                   <td className="px-6 py-4 font-medium text-indigo-600">#{item.maPhieuKham}</td>
                   <td className="px-6 py-4 font-bold text-gray-800">{item.hoTen}</td>
                   <td className="px-6 py-4 text-gray-500 text-sm">
-                    {new Date(item.ngayKham).toLocaleString('vi-VN', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    {item.ngayKham ? new Date(item.ngayKham).toLocaleDateString('vi-VN') : '—'}
                   </td>
                   <td className="px-6 py-4 text-gray-600 italic text-sm">{item.chanDoan || 'Đang cập nhật...'}</td>
                   <td className="px-6 py-4 text-right">

@@ -94,6 +94,12 @@ const BangDieuKhienChanDoan = ({ user, onBack }) => {
     try { return new Date(d).getFullYear().toString(); } catch { return d; }
   };
 
+  const formatPatientDate = (value) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('vi-VN');
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       {/* Header Section with Glassmorphism */}
@@ -210,13 +216,14 @@ const BangDieuKhienChanDoan = ({ user, onBack }) => {
                     <th className="py-4 px-5 text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Dịch vụ</th>
                     <th className="py-4 px-5 text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">SĐT</th>
                     <th className="py-4 px-5 text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Năm sinh</th>
+                    <th className="py-4 px-5 text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Ngày</th>
                     <th className="py-4 px-5 text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap text-right rounded-tr-2xl">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100/80">
                   {filteredList.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-24 text-center">
+                      <td colSpan={8} className="py-24 text-center">
                         <div className="flex flex-col items-center justify-center w-full min-w-[350px] mx-auto">
                           <div className="w-20 h-20 rounded-full bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center mb-5 shadow-sm mx-auto">
                             <span className="material-symbols-outlined text-4xl text-slate-300">
@@ -281,6 +288,9 @@ const BangDieuKhienChanDoan = ({ user, onBack }) => {
                         </td>
                         <td className="py-4 px-5">
                           <span className="text-sm font-semibold text-slate-600">{formatYear(item.ngaySinh)}</span>
+                        </td>
+                        <td className="py-4 px-5 whitespace-nowrap text-sm text-slate-600">
+                          {formatPatientDate(item.ngayThucHien || item.ngayChiDinh)}
                         </td>
                         <td className="py-4 px-5 text-right">
                           <div className="flex items-center justify-end gap-3">

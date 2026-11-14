@@ -83,7 +83,13 @@ const throwClsResultApiError = async (response) => {
   const message = (typeof errorData?.message === 'string' && errorData.message.trim())
     || statusMessages[response.status]
     || `Không thể xử lý kết quả (HTTP ${response.status}).`;
+
   throw new Error(message);
+
+  const error = new Error(message);
+  error.status = response.status;
+  throw error;
+
 };
 
 /**
@@ -318,10 +324,15 @@ export const getDoctorClsReviewQueueApi = async (params = {}) => {
   return readDoctorClsResponse(response);
 };
 
-/**
- * 16. Lấy danh sách kết quả CĐHA theo mã phiếu khám (Dành cho bác sĩ / tab cận lâm sàng)
- * GET /phieu-kham/{maPhieuKham}/result-cdha
- */
+
+export const claimDoctorClsResultApi = async (detailId) => {
+  const response = await fetchClient(`${API_URL}/doctor/claim-result/${detailId}`, {
+    method: 'POST'
+  });
+  return readDoctorClsResponse(response);
+};
+
+
 export const getCdhaResultsByPhieuKhamApi = async (maPhieuKham) => {
   try {
     const response = await fetchClient(`${API_URL}/phieu-kham/${maPhieuKham}/result-cdha`);

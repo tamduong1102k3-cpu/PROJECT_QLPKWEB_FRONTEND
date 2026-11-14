@@ -139,7 +139,7 @@ const TabDichVuChiDinh = ({
                         <span className="font-medium text-gray-700">{s.tenPhong || (s.maPhong ? `Phòng #${s.maPhong}` : 'Chưa có phòng')}</span>
                       ) : (
                         <select
-                          className="border border-gray-300 rounded-lg px-2 py-1 text-sm bg-white max-w-[220px]"
+                          className="border border-gray-300 rounded-lg px-2 py-1 text-sm bg-white min-w-[190px] max-w-[240px]"
                           value={s.maPhong || ''}
                           onChange={e => onPhongChange(s.maDichVu, e.target.value ? Number(e.target.value) : null)}
                         >
@@ -155,13 +155,19 @@ const TabDichVuChiDinh = ({
                           {(phongMap[s.maDichVu] || []).map(p => {
                             const soDaDat = p.soBenhNhanDangCho ?? p.soDaDat ?? 0;
                             const full = (p.soLuongToiDa > 0) && (soDaDat >= p.soLuongToiDa);
+                            const sucChua = p.soLuongToiDa > 0 ? p.soLuongToiDa : 'Không giới hạn';
                             return (
                               <option key={p.maPhong} value={p.maPhong} disabled={full}>
-                                {p.tenPhong} ({soDaDat}/{p.soLuongToiDa}){full ? ' — Đã đủ' : ''}
+                                {p.tenPhong} — Đang chờ: {soDaDat} / Tối đa: {sucChua}{full ? ' — Đã đủ' : ''}
                               </option>
                             );
                           })}
                         </select>
+                      )}
+                      {!readOnly && (phongMap[s.maDichVu] || []).length > 0 && (
+                        <p className="mt-1 text-[10px] text-gray-500">
+                          Số bệnh nhân đang chờ / sức chứa tối đa
+                        </p>
                       )}
                       {!readOnly && phongErrors[s.maDichVu] && (
                         <div className="mt-1 flex items-center gap-2 text-xs text-red-600" role="alert">

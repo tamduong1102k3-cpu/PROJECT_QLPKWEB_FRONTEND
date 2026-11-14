@@ -340,7 +340,7 @@ const LichKham = ({ onCheckIn, compact, simple, user }) => {
               <th className="px-4 py-3">Chuyên Khoa</th>
               <th className="px-4 py-3">Dịch Vụ</th>
               <th className="px-4 py-3">Bác Sĩ</th>
-              <th className="px-4 py-3">Ngày Khám</th>
+              <th className="px-4 py-3">Ngày</th>
               <th className="px-4 py-3">Nguồn</th>
               <th className="px-4 py-3">Trạng Thái</th>
               <th className="px-4 py-3">Ghi Chú</th>

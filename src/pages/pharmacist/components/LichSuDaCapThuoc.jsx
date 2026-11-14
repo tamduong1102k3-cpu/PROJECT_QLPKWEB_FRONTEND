@@ -91,7 +91,7 @@ const LichSuDaCapThuoc = ({ onReview, formatCurrency, formatDateTime }) => {
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Mã BN</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Bệnh Nhân</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Hóa Đơn</th>
-              <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Ngày Cấp Thuốc</th>
+              <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Ngày</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider text-center">Trạng Thái</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Tổng Tiền</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider text-right">Thao Tác</th>

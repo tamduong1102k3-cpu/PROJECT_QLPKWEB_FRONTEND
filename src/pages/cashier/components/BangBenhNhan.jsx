@@ -47,6 +47,7 @@ const BangBenhNhan = ({
               <th className="py-5 px-4 w-14 text-center">STT</th>
               <th className="py-5 px-4 w-36">Mã Khám</th>
               <th className="py-5 px-4">Bệnh nhân</th>
+              <th className="py-5 px-4">Ngày</th>
               <th className="py-5 px-4">CCCD</th>
               <th className="py-5 px-4">SĐT</th>
               <th className="py-5 px-4">Chuyên khoa</th>
@@ -56,7 +57,7 @@ const BangBenhNhan = ({
           <tbody className="divide-y divide-slate-100 bg-white">
             {isLoading ? (
               <tr>
-                <td colSpan="7" className="py-16 text-center text-slate-400">
+                <td colSpan="8" className="py-16 text-center text-slate-400">
                   <div className="flex items-center justify-center">
                     <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
                     Đang tải...
@@ -65,7 +66,7 @@ const BangBenhNhan = ({
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan="7" className="py-16 text-center text-slate-400">
+                <td colSpan="8" className="py-16 text-center text-slate-400">
                   <div className="flex flex-col items-center gap-3">
                     <span className="material-symbols-outlined text-4xl text-slate-300">search_off</span>
                     <p className="font-medium">Không tìm thấy bệnh nhân.</p>
@@ -96,6 +97,9 @@ const BangBenhNhan = ({
                           <h4 className="font-black text-slate-800 text-base truncate">{item.hoTen}</h4>
                         </div>
                       </div>
+                    </td>
+                    <td className="py-4 px-4 whitespace-nowrap text-sm text-slate-600">
+                      {item.ngayKham ? new Date(item.ngayKham).toLocaleDateString('vi-VN') : '—'}
                     </td>
                     <td className="py-4 px-4">
                       <span className="text-sm font-medium text-slate-700">{item.cccd || <span className="text-slate-300 italic">N/A</span>}</span>

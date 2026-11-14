@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { getDoctorClsReviewQueueApi } from '../../../api/phieuChiDinhApi';
+
+import { claimDoctorClsResultApi, getDoctorClsReviewQueueApi } from '../../../api/phieuChiDinhApi';
 import { getAllApi as getAllServicesApi } from '../../../api/dichVuApi';
+import { useNotification } from '../../../components/NotificationContext';
+
 import DuyetKetQuaCDHA from './DuyetKetQuaCDHA';
 import DuyetKetQuaXetNghiem from './DuyetKetQuaXetNghiem';
 
@@ -28,8 +31,10 @@ const statusLabel = (item) => {
 };
 
 const BangDieuKhienClsBacSi = ({ user }) => {
+  const { showError } = useNotification();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
+  const [openingDetailId, setOpeningDetailId] = useState(null);
   const [services, setServices] = useState([]);
   const [servicesError, setServicesError] = useState('');
   const [reviewQueue, setReviewQueue] = useState(EMPTY_PAGE);
@@ -121,24 +126,43 @@ const BangDieuKhienClsBacSi = ({ user }) => {
     );
   }, [currentList, query]);
 
-  const openResult = (item) => {
+  const openResult = async (item) => {
     const resultType = getResultType(item);
-    if (!resultType || item.ketQuaId == null) return;
-    setSelected({
-      patient: {
-        maPhieuKham: item.maPhieuKham,
-        maBenhNhan: item.maBenhNhan,
-        hoTen: item.hoTen,
-        gioiTinh: item.gioiTinh,
-        ngaySinh: item.ngaySinh,
-        soDienThoai: item.soDienThoai,
-        cccd: item.cccd,
-        loaiDichVu: item.loaiDichVu,
-        chiTietId: getDetailId(item)
-      },
-      resultType,
-      viewOnly: item.trangThaiKq !== 'CHO_DUYET'
-    });
+    const detailId = getDetailId(item);
+    if (!resultType || item.ketQuaId == null || detailId == null || openingDetailId != null) return;
+    setOpeningDetailId(detailId);
+    try {
+      if (item.trangThaiKq === 'CHO_DUYET') {
+        const claimResult = await claimDoctorClsResultApi(detailId);
+        if (!claimResult?.claimed) {
+          const error = new Error(
+            claimResult?.message || 'Không thể tiếp nhận kết quả CLS để xử lý.'
+          );
+          error.status = 409;
+          throw error;
+        }
+      }
+      setSelected({
+        patient: {
+          maPhieuKham: item.maPhieuKham,
+          maBenhNhan: item.maBenhNhan,
+          hoTen: item.hoTen,
+          gioiTinh: item.gioiTinh,
+          ngaySinh: item.ngaySinh,
+          soDienThoai: item.soDienThoai,
+          cccd: item.cccd,
+          loaiDichVu: item.loaiDichVu,
+          chiTietId: detailId
+        },
+        resultType,
+        viewOnly: item.trangThaiKq !== 'CHO_DUYET'
+      });
+    } catch (error) {
+      showError(error.message || 'Không thể mở kết quả CLS.');
+      if (error.status === 409) await loadReviewQueue(page, filters);
+    } finally {
+      setOpeningDetailId(null);
+    }
   };
 
   const closeResult = async () => {
@@ -331,8 +355,8 @@ const BangDieuKhienClsBacSi = ({ user }) => {
                         </td>
                         <td className="px-4 py-4 text-right whitespace-nowrap">
                           {canOpenResult && (
-                            <button type="button" onClick={() => openResult(item)} className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100">
-                              {item.trangThaiKq === 'CHO_DUYET' ? 'Xem / duyệt' : 'Xem kết quả'}
+                            <button type="button" disabled={openingDetailId != null} onClick={() => openResult(item)} className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">
+                              {openingDetailId === chiTietId ? 'Đang mở...' : item.trangThaiKq === 'CHO_DUYET' ? 'Xem / duyệt' : 'Xem kết quả'}
                             </button>
                           )}
                           {!canOpenResult && (

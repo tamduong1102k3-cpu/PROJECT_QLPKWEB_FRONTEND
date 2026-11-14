@@ -1,10 +1,55 @@
 import React, { useState, useEffect, useRef } from 'react';
+import fetchClient from '../api/fetchClient';
+import { getAccessToken, decodeTokenPayload } from '../api/tokenStore';
+import { API_BASE_URL } from '../api/config';
 
-const NotificationBell = ({ notifications = [], onMarkAsRead, onMarkAllAsRead, onClearAll, onDelete }) => {
+const EMPTY_NOTIFICATIONS = [];
+
+const NotificationBell = ({ notifications = EMPTY_NOTIFICATIONS, onMarkAsRead, onMarkAllAsRead, onClearAll, onDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(null);
   const dropdownRef = useRef(null);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const tokenPayload = decodeTokenPayload(getAccessToken());
+  const maTaiKhoan = tokenPayload?.maTaiKhoan ?? tokenPayload?.maTaiKhoanBn ?? null;
+  const role = tokenPayload?.role || '';
+  const loaiNguoiNhan = role === 'QUAN_TRI_VIEN'
+    ? 'QUAN_TRI_VIEN'
+    : (role === 'BENH_NHAN' ? 'BENH_NHAN' : 'NHAN_VIEN');
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchUnreadCount = async () => {
+      if (maTaiKhoan == null) {
+        setUnreadCount(null);
+        console.error('Cannot load unread notification count: missing account ID');
+        return;
+      }
+
+      try {
+        const response = await fetchClient(
+          `${API_BASE_URL}/thong-bao/${maTaiKhoan}/${loaiNguoiNhan}/unread-count`,
+          { skipLoading: true }
+        );
+        if (!response.ok) {
+          throw new Error(`Unread count request failed with status ${response.status}`);
+        }
+        const result = await response.json();
+        if (!Number.isFinite(result?.unreadCount)) {
+          throw new Error('Unread count response is invalid');
+        }
+        if (active) setUnreadCount(result.unreadCount);
+      } catch (error) {
+        console.error('Failed to load unread notification count:', error);
+      }
+    };
+
+    fetchUnreadCount();
+    return () => {
+      active = false;
+    };
+  }, [maTaiKhoan, loaiNguoiNhan, notifications]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -90,7 +135,7 @@ const NotificationBell = ({ notifications = [], onMarkAsRead, onMarkAllAsRead, o
             <div>
               <h3 className="font-bold text-slate-800 text-base">Thông báo</h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Bạn có {unreadCount} thông báo chưa đọc
+                Bạn có {unreadCount ?? '...'} thông báo chưa đọc
               </p>
             </div>
             {unreadCount > 0 && (

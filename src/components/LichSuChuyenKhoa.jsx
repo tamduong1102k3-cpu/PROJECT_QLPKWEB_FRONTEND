@@ -227,7 +227,7 @@ const LichSuChuyenKhoa = ({ user, showServiceStatus = false, showClsDetails = fa
             <tr className="bg-slate-50/30 border-b border-slate-100">
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Mã Phiếu</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Bệnh Nhân</th>
-              <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Ngày Khám</th>
+              <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Ngày</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Bác Sĩ</th>
               <th className="px-6 py-4 text-[11px] font-bold uppercase text-slate-400 tracking-wider">Dịch Vụ</th>
               {showServiceStatus && (
