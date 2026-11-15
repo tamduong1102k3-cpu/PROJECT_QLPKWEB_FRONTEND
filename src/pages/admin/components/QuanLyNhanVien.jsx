@@ -15,11 +15,16 @@ import {
 import usePagination from '../../../hooks/usePagination';
 import Pagination from '../../../components/Pagination';
 import { useNotification } from '../../../components/NotificationContext';
+import { removeVietnameseTones } from '../../../utils/searchUtils';
 
 const isPatientRole = role => {
   const normalized = String(role || '').trim().toLowerCase();
   return normalized === 'patient' || normalized === 'benh_nhan' || normalized === 'bệnh nhân';
 };
+
+const createUsernameFromName = fullName => removeVietnameseTones(fullName)
+  .toLowerCase()
+  .replace(/[^a-z0-9]/g, '');
 
 const QuanLyNhanVien = () => {
   const { showSuccess, showError, showWarning, showConfirm } = useNotification();
@@ -226,6 +231,14 @@ const QuanLyNhanVien = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'ho_ten' && !isEditMode) {
+      setFormData(prev => ({
+        ...prev,
+        ho_ten: value,
+        username: createUsernameFromName(value)
+      }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
