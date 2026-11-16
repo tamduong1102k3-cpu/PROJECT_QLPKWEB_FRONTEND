@@ -4,6 +4,7 @@ import { useNotification } from '../../../components/NotificationContext';
 const empty = {
   tenPhong: '',
   loaiPhong: '',
+  soLuongToiDa: '',
   maChuyenKhoa: '',
   maChucVu: ''
 };
@@ -79,6 +80,7 @@ export default function QuanLyPhong() {
     setForm({
       tenPhong: p.tenPhong || '',
       loaiPhong: p.loaiPhong || '',
+      soLuongToiDa: p.soLuongToiDa ?? '',
       maChuyenKhoa: p.maChuyenKhoa ?? '',
       maChucVu: p.maChucVu ?? ''
     });
@@ -92,10 +94,15 @@ export default function QuanLyPhong() {
       showWarning('Vui lòng nhập tên phòng!');
       return;
     }
+    if (form.soLuongToiDa !== '' && (!Number.isInteger(Number(form.soLuongToiDa)) || Number(form.soLuongToiDa) < 1)) {
+      showWarning('Số lượng bệnh nhân tối đa phải là số nguyên lớn hơn 0!');
+      return;
+    }
     setSaving(true);
     const body = {
       tenPhong: form.tenPhong.trim(),
       loaiPhong: form.loaiPhong || null,
+      soLuongToiDa: form.soLuongToiDa !== '' ? Number(form.soLuongToiDa) : null,
       maChuyenKhoa: form.maChuyenKhoa !== '' ? Number(form.maChuyenKhoa) : null,
       maChucVu: form.maChucVu !== '' ? Number(form.maChucVu) : null
     };
@@ -133,6 +140,7 @@ export default function QuanLyPhong() {
   return <div style={{
     fontFamily: 'Inter, sans-serif'
   }}>
+      <style>{`.quan-ly-phong-search::placeholder { color: #fff !important; opacity: 1; }`}</style>
 
       {/* Header */}
       <div style={{
@@ -164,17 +172,14 @@ export default function QuanLyPhong() {
         gap: '10px',
         alignItems: 'center'
       }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm tên phòng..." style={{
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm tên phòng..." className="quan-ly-phong-search" style={{
           padding: '8px 14px',
           borderRadius: '8px',
           border: 'none',
           fontSize: '13px',
           background: 'rgba(255,255,255,0.2)',
           color: '#fff',
-          outline: 'none',
-          '::placeholder': {
-            color: '#rgba(255,255,255,0.6)'
-          }
+          outline: 'none'
         }} />
           <button onClick={openAdd} style={{
           padding: '8px 18px',
@@ -428,6 +433,27 @@ export default function QuanLyPhong() {
                   <option value="">-- Chọn loại --</option>
                   {LOAI_PHONG_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
+              </label>
+
+              <label style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            fontSize: '13px'
+          }}>
+                <span style={{
+              fontWeight: 600,
+              color: '#374151'
+            }}>Số Lượng Bệnh Nhân Tối Đa</span>
+                <input type="number" min="1" step="1" value={form.soLuongToiDa} onChange={e => setForm({
+              ...form,
+              soLuongToiDa: e.target.value
+            })} placeholder="VD: 20" style={{
+              padding: '10px 12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              fontSize: '13px'
+            }} />
               </label>
 
               <div style={{
