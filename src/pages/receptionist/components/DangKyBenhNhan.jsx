@@ -140,13 +140,6 @@ const DangKyBenhNhan = ({
     let newValue = type === 'checkbox' ? checked : value;
     
 
-    if (name === 'hoTen') {
-      newValue = newValue
-        .toLowerCase()
-        .replace(/\b\w/g, char => char.toUpperCase());
-    }
-    
-
     if (name === 'soDienThoai' || name === 'soDienThoaiNguoiGiamHo') {
       newValue = formatPhone(newValue);
     }
