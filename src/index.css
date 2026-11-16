@@ -206,7 +206,7 @@
   }
 
   .confirm-container {
-    max-width: 460px;
+    max-width: 520px;
     width: 100%;
   }
 
@@ -265,7 +265,16 @@
     background: #fffbeb;
     border: 1px solid #fcd34d;
     color: #92400e;
-    max-width: 420px;
+  }
+
+  .confirm-container .toast-notification.confirm {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+    column-gap: 12px;
+    row-gap: 16px;
+    width: 100%;
+    min-width: 0;
   }
 
   .toast-actions {
@@ -274,6 +283,12 @@
     align-items: center;
     flex-shrink: 0;
     margin-left: 4px;
+  }
+
+  .confirm-container .toast-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    margin-left: 0;
   }
 
   .toast-btn {

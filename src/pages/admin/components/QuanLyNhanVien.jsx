@@ -5,6 +5,7 @@ import {
   addNhanVienApi as createEmployeeApi, 
   updateNhanVienApi as updateEmployeeApi, 
   deleteNhanVienApi as deleteEmployeeApi,
+  permanentlyDeleteNhanVienApi,
   activateNhanVienAccountApi
 } from '../../../api/employeeApi';
 import { 
@@ -25,6 +26,24 @@ const isPatientRole = role => {
 const createUsernameFromName = fullName => removeVietnameseTones(fullName)
   .toLowerCase()
   .replace(/[^a-z0-9]/g, '');
+
+const getTodayLocalDate = () => {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${today.getFullYear()}-${month}-${day}`;
+};
+
+const isSpecialtyRequired = (jobTitle, role) => {
+  const normalizedJobTitle = removeVietnameseTones(jobTitle || '').toLowerCase();
+  const normalizedRole = String(role || '').trim().toUpperCase();
+
+  return normalizedJobTitle.includes('duoc si')
+    || normalizedJobTitle.includes('bac si')
+    || normalizedRole === 'DUOC_SI'
+    || normalizedRole.startsWith('BAC_SI')
+    || normalizedRole.startsWith('TRO_LY_BAC_SI');
+};
 
 const QuanLyNhanVien = () => {
   const { showSuccess, showError, showWarning, showConfirm } = useNotification();
@@ -200,6 +219,21 @@ const QuanLyNhanVien = () => {
     });
   };
 
+  const handlePermanentDelete = async (id) => {
+    showConfirm(
+      "Xóa vĩnh viễn hồ sơ nhân viên và tài khoản? Chỉ xóa được khi nhân viên chưa có dữ liệu liên quan. Nếu đã phát sinh dữ liệu, hãy dùng chức năng khóa tài khoản.",
+      async () => {
+        try {
+          await permanentlyDeleteNhanVienApi(id);
+          showSuccess("Xóa nhân viên và tài khoản thành công!");
+          fetchEmployees();
+        } catch (error) {
+          showError(error.message);
+        }
+      }
+    );
+  };
+
   const handleActivate = async (id) => {
     showConfirm("Bạn có chắc muốn MỞ KHÓA tài khoản nhân viên này? Nhân viên sẽ có thể đăng nhập trở lại.", async () => {
       try {
@@ -242,28 +276,73 @@ const QuanLyNhanVien = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Kiểm tra các trường bắt buộc
-    if (!formData.ho_ten.trim() || !formData.cccd.trim() || !formData.chuc_vu || !formData.email.trim()) {
-      showWarning("Vui lòng nhập đầy đủ các thông tin bắt buộc (có đánh dấu sao *) !");
-      return;
-    }
-    
-    if (!isEditMode && (!formData.username.trim() || !formData.role || !formData.email.trim())) {
-      showWarning("Vui lòng nhập Email, Username và Quyền để tạo tài khoản!");
-      return;
+  const validateForm = () => {
+    const email = formData.email.trim();
+    const phone = formData.so_dien_thoai.trim();
+    const cccd = formData.cccd.trim();
+    const today = getTodayLocalDate();
+
+    if (!formData.ho_ten.trim() || !cccd || !formData.chuc_vu || !email || !phone) {
+      showError("Vui lòng nhập đầy đủ Họ và tên, CCCD, số điện thoại, Email và Chức vụ.");
+      return false;
     }
 
+    if (!isEditMode && (!formData.username.trim() || !formData.role)) {
+      showError("Vui lòng nhập Username và chọn Quyền để tạo tài khoản.");
+      return false;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showError("Email không hợp lệ. Vui lòng nhập đúng định dạng, ví dụ ten@domain.com.");
+      return false;
+    }
+
+    if (!/^0\d{9}$/.test(phone)) {
+      showError("Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0.");
+      return false;
+    }
+
+    if (!/^(?:\d{9}|\d{12})$/.test(cccd)) {
+      showError("CCCD phải gồm đúng 9 hoặc 12 chữ số.");
+      return false;
+    }
+
+    if (formData.ngay_sinh && formData.ngay_sinh > today) {
+      showError("Ngày sinh không được ở tương lai.");
+      return false;
+    }
+
+    if (formData.ngay_vao_lam && formData.ngay_vao_lam > today) {
+      showError("Ngày vào làm không được ở tương lai.");
+      return false;
+    }
+
+    if (formData.ngay_sinh && formData.ngay_vao_lam && formData.ngay_vao_lam < formData.ngay_sinh) {
+      showError("Ngày vào làm không thể trước ngày sinh.");
+      return false;
+    }
+
+    if (isSpecialtyRequired(formData.chuc_vu, formData.role) && !formData.chuyen_khoa) {
+      showError("Vui lòng chọn chuyên khoa cho chức vụ này.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
 
     const payload = {
       ...formData,
       gioiTinh: parseInt(formData.gioi_tinh),
       hoTen: formData.ho_ten,
       ngaySinh: formData.ngay_sinh,
+      cccd: formData.cccd.trim(),
       diaChi: formData.dia_chi,
-      soDienThoai: formData.so_dien_thoai,
+      soDienThoai: formData.so_dien_thoai.trim(),
+      email: formData.email.trim(),
       chuyenKhoa: formData.chuyen_khoa ? parseInt(formData.chuyen_khoa) : null,
       bangCap: formData.bang_cap,
       chucVu: formData.chuc_vu,
@@ -411,6 +490,14 @@ const QuanLyNhanVien = () => {
                         <span className="material-symbols-outlined text-[20px]">lock_open</span>
                       </button>
                     )}
+                    <button
+                      onClick={() => handlePermanentDelete(emp.maNhanVien)}
+                      title="Xóa hồ sơ và tài khoản (chỉ khi chưa có dữ liệu liên quan)"
+                      aria-label="Xóa hồ sơ và tài khoản nhân viên"
+                      className="text-gray-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition-colors ml-2"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">delete</span>
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -458,7 +545,7 @@ const QuanLyNhanVien = () => {
 
             {/* Modal Body - Form */}
             <div className="p-6">
-              <form id="employeeForm" onSubmit={handleSubmit} className="space-y-6">
+              <form id="employeeForm" onSubmit={handleSubmit} noValidate className="space-y-6">
                 
                 {/* Section 1: Thông tin cá nhân */}
                 <div>
@@ -477,15 +564,15 @@ const QuanLyNhanVien = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
-                      <input type="date" name="ngay_sinh" value={formData.ngay_sinh} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                      <input type="date" name="ngay_sinh" value={formData.ngay_sinh} max={getTodayLocalDate()} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Số CCCD <span className="text-red-500">*</span></label>
-                      <input required type="text" name="cccd" value={formData.cccd} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                      <input required type="text" name="cccd" value={formData.cccd} maxLength={12} inputMode="numeric" onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
-                      <input type="tel" name="so_dien_thoai" value={formData.so_dien_thoai} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại <span className="text-red-500">*</span></label>
+                      <input required type="tel" name="so_dien_thoai" value={formData.so_dien_thoai} maxLength={10} inputMode="numeric" onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
@@ -512,7 +599,9 @@ const QuanLyNhanVien = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Chuyên khoa</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Chuyên khoa {isSpecialtyRequired(formData.chuc_vu, formData.role) && <span className="text-red-500">*</span>}
+                      </label>
                       <select name="chuyen_khoa" value={formData.chuyen_khoa} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none bg-white text-gray-900">
                         <option value="" className="bg-white text-gray-900">-- Chọn chuyên khoa --</option>
                         {dsChuyenKhoa.map(ck => (
@@ -526,7 +615,7 @@ const QuanLyNhanVien = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ngày vào làm</label>
-                      <input type="date" name="ngay_vao_lam" value={formData.ngay_vao_lam} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                      <input type="date" name="ngay_vao_lam" value={formData.ngay_vao_lam} max={getTodayLocalDate()} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
                     </div>
                   </div>
                 </div>

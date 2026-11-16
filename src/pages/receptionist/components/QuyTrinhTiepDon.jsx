@@ -107,6 +107,7 @@ const QuyTrinhTiepDon = ({
   const { showSuccess, showError, showWarning } = useNotification();
 
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printData, setPrintData] = useState(null);
   const [roomLocked, setRoomLocked] = useState(false);
@@ -433,6 +434,7 @@ const QuyTrinhTiepDon = ({
       );
       if (filteredServices.length > 0) {
         const firstService = filteredServices[0];
+        setServiceSearch('');
         setCheckInData(prev => ({
           ...prev,
           maDichVu: firstService.maDichVu.toString(),
@@ -440,6 +442,7 @@ const QuyTrinhTiepDon = ({
           tenDichVuDisplay: `#${firstService.maDichVu} ${firstService.tenDichVu} - ${new Intl.NumberFormat('vi-VN').format(firstService.donGia)}đ`
         }));
       } else {
+        setServiceSearch('');
         setCheckInData(prev => ({ ...prev, maDichVu: '', version: undefined, tenDichVuDisplay: '' }));
       }
     }
@@ -503,6 +506,11 @@ const QuyTrinhTiepDon = ({
     // Bắt buộc chọn chuyên khoa
     if (!checkInData.maChuyenKhoa) {
       showWarning("Vui lòng chọn Chuyên khoa khám!");
+      return;
+    }
+
+    if (!checkInData.maDichVu) {
+      showWarning("Vui lòng chọn dịch vụ khám từ danh sách!");
       return;
     }
 
@@ -914,26 +922,30 @@ const QuyTrinhTiepDon = ({
               <div className="relative md:col-span-2">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Dịch vụ khám</label>
                 <input
-                  required
+                  required={!checkInData.maDichVu}
                   placeholder="-- Gõ tên dịch vụ hoặc chọn --"
                   className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold"
-                  style={{ color: checkInData.maDichVu ? 'transparent' : 'inherit' }}
-                  value={checkInData.tenDichVuDisplay || ''}
+                  style={{ color: checkInData.maDichVu && !showServiceDropdown ? 'transparent' : 'inherit' }}
+                  value={showServiceDropdown ? serviceSearch : checkInData.tenDichVuDisplay || ''}
                   onChange={e => {
-                    const val = e.target.value;
-                    const match = val.match(/^#(\d+)\s*/);
-                    const maDichVu = match ? match[1] : '';
-                    setCheckInData(prev => ({ ...prev, maDichVu, tenDichVuDisplay: val }));
+                    setServiceSearch(e.target.value);
+                    setCheckInData(prev => ({ ...prev, maDichVu: '', version: undefined, tenDichVuDisplay: '' }));
                   }}
-                  onFocus={() => setShowServiceDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowServiceDropdown(false), 200)}
+                  onFocus={() => {
+                    setServiceSearch('');
+                    setShowServiceDropdown(true);
+                  }}
+                  onBlur={() => setTimeout(() => {
+                    setShowServiceDropdown(false);
+                    setServiceSearch('');
+                  }, 200)}
                 />
-                {checkInData.maDichVu && (
+                {checkInData.maDichVu && !showServiceDropdown && (
                   <div className="absolute left-5 top-[calc(50%+8px)] -translate-y-1/2 pointer-events-none font-bold text-gray-800">
                     {checkInData.tenDichVuDisplay.replace(/^#\d+\s*/, '')}
                   </div>
                 )}
-                {checkInData.maDichVu && (
+                {checkInData.maDichVu && !showServiceDropdown && (
                   <span className="absolute right-4 top-[calc(50%+8px)] -translate-y-1/2 text-emerald-600">
                     <span className="material-symbols-outlined text-sm">check_circle</span>
                   </span>
@@ -942,7 +954,7 @@ const QuyTrinhTiepDon = ({
                   <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto">
                     {availableServices
                       .filter(s => {
-                        const searchVal = checkInData.tenDichVuDisplay ? checkInData.tenDichVuDisplay.replace(/^#\d+\s*/, '') : '';
+                        const searchVal = serviceSearch;
                         return !searchVal || removeVietnameseTones(s.tenDichVu.toLowerCase()).includes(removeVietnameseTones(searchVal.toLowerCase()));
                       })
                       .map(s => (
@@ -951,6 +963,7 @@ const QuyTrinhTiepDon = ({
                           className={`px-5 py-3.5 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0 hover:bg-indigo-50 transition-colors ${checkInData.maDichVu === s.maDichVu.toString() ? 'bg-indigo-50' : ''}`}
                           onMouseDown={() => {
                             setCheckInData(prev => ({ ...prev, maDichVu: s.maDichVu.toString(), version: s.version ?? undefined, tenDichVuDisplay: `#${s.maDichVu} ${s.tenDichVu} - ${new Intl.NumberFormat('vi-VN').format(s.donGia)}đ` }));
+                            setServiceSearch('');
                             setShowServiceDropdown(false);
                           }}
                         >
@@ -962,7 +975,7 @@ const QuyTrinhTiepDon = ({
                         </div>
                       ))}
                     {availableServices.filter(s => {
-                      const searchVal = checkInData.tenDichVuDisplay ? checkInData.tenDichVuDisplay.replace(/^#\d+\s*/, '') : '';
+                      const searchVal = serviceSearch;
                       return !searchVal || removeVietnameseTones(s.tenDichVu.toLowerCase()).includes(removeVietnameseTones(searchVal.toLowerCase()));
                     }).length === 0 && (
                         <div className="px-5 py-8 text-center text-gray-400 italic text-sm">Không tìm thấy dịch vụ phù hợp</div>

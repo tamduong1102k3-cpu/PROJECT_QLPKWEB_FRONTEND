@@ -93,12 +93,8 @@ const DangKyBenhNhan = ({
     } else if (!isValidDate(ngaySinhDisplay)) {
       newErrors.ngaySinh = 'Ngày sinh không hợp lệ';
     } else {
-
-      const match = ngaySinhDisplay.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-      const d = parseInt(match[1], 10);
-      const m = parseInt(match[2], 10) - 1;
-      const y = parseInt(match[3], 10);
-      const dob = new Date(y, m, d);
+      const [d, m, y] = ngaySinhDisplay.split('/').map(Number);
+      const dob = new Date(y, m - 1, d);
       const today = new Date();
       today.setHours(23, 59, 59, 999);
       if (dob > today) {
@@ -119,6 +115,14 @@ const DangKyBenhNhan = ({
     }
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Định dạng email không hợp lệ';
+    }
+    const diaChi = formData.diaChi.trim();
+    if (!diaChi) {
+      newErrors.diaChi = 'Vui lòng nhập địa chỉ';
+    } else if (diaChi.length < 5) {
+      newErrors.diaChi = 'Địa chỉ phải có ít nhất 5 ký tự';
+    } else if (diaChi.length > 255) {
+      newErrors.diaChi = 'Địa chỉ tối đa 255 ký tự';
     }
     if (!formData.tienSuBenh.trim()) {
       newErrors.tienSuBenh = 'Tiền sử bệnh không được để trống';
@@ -294,13 +298,23 @@ const DangKyBenhNhan = ({
               {errors.email && <p className="text-red-500 text-[10px] mt-1 font-bold italic">{errors.email}</p>}
             </div>
             <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Địa Chỉ</label>
-              <input name="diaChi" value={formData.diaChi} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300" placeholder="TP. Hồ Chí Minh..." />
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Địa Chỉ *</label>
+              <input name="diaChi" value={formData.diaChi} onChange={handleChange} maxLength={255} className={`w-full px-5 py-3.5 bg-white border-2 ${errors.diaChi ? 'border-red-400' : 'border-gray-200'} rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300`} placeholder="TP. Hồ Chí Minh..." />
+              {errors.diaChi && <p className="text-red-500 text-[10px] mt-1 font-bold italic">{errors.diaChi}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
                <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Nhóm Máu</label>
-                  <input name="nhomMau" value={formData.nhomMau} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold placeholder:text-gray-300" placeholder="O+" />
+                  <select name="nhomMau" value={formData.nhomMau} onChange={handleChange} className="w-full px-5 py-3.5 bg-white border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-primary outline-none transition-all font-bold">
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
                </div>
                <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Nghề nghiệp</label>

@@ -235,9 +235,12 @@ export const deletePhongApi = async id => {
  * GET /nhom-dich-vu
  * Lấy danh sách nhóm dịch vụ.
  */
-export const getAllNhomDichVuApi = async () => {
+export const getAllNhomDichVuApi = async maChuyenKhoa => {
   try {
-    const response = await fetchClient(`${API_BASE_URL}/nhom-dich-vu`, {
+    const query = maChuyenKhoa == null || maChuyenKhoa === ''
+      ? ''
+      : `?maChuyenKhoa=${encodeURIComponent(maChuyenKhoa)}`;
+    const response = await fetchClient(`${API_BASE_URL}/nhom-dich-vu${query}`, {
       method: 'GET'
     });
     if (!response.ok) {

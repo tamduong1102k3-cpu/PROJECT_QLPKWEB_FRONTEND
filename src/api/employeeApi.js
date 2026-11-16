@@ -134,6 +134,17 @@ export const deleteNhanVienApi = async id => {
   }
 };
 
+export const permanentlyDeleteNhanVienApi = async id => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}/permanent`, { method: 'DELETE' });
+    if (!response.ok) await handleError(response);
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error in permanentlyDeleteNhanVienApi:", error);
+    throw error;
+  }
+};
+
 /**
  * PUT /{id}/activate
  */

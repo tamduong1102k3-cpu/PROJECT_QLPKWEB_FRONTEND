@@ -1,6 +1,6 @@
 import * as dichVuApi from '../../../api/dichVuApi';
 import * as danhMucApi from '../../../api/danhMucApi';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNotification } from '../../../components/NotificationContext';
 const empty = {
   tenDichVu: '',
@@ -28,6 +28,9 @@ export default function QuanLyDichVu() {
   const [list, setList] = useState([]);
   const [ckList, setCkList] = useState([]);
   const [nhomList, setNhomList] = useState([]);
+  const [formNhomList, setFormNhomList] = useState([]);
+  const [loadingNhom, setLoadingNhom] = useState(false);
+  const nhomRequestId = useRef(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterLoai, setFilterLoai] = useState('');
@@ -53,6 +56,41 @@ export default function QuanLyDichVu() {
     }
   };
 
+  const loadNhomByChuyenKhoa = async maChuyenKhoa => {
+    const requestId = ++nhomRequestId.current;
+    setFormNhomList([]);
+    if (maChuyenKhoa === '' || maChuyenKhoa == null) {
+      setLoadingNhom(false);
+      return;
+    }
+
+    setLoadingNhom(true);
+    try {
+      const groups = await danhMucApi.getAllNhomDichVuApi(maChuyenKhoa);
+      if (requestId === nhomRequestId.current) {
+        setFormNhomList(groups || []);
+      }
+    } catch (e) {
+      if (requestId === nhomRequestId.current) {
+        showError(e.message || 'Không thể tải nhóm dịch vụ.');
+      }
+    } finally {
+      if (requestId === nhomRequestId.current) {
+        setLoadingNhom(false);
+      }
+    }
+  };
+
+  const handleChuyenKhoaChange = e => {
+    const maChuyenKhoa = e.target.value;
+    setForm(current => ({
+      ...current,
+      maChuyenKhoa,
+      maNhomDichVu: ''
+    }));
+    loadNhomByChuyenKhoa(maChuyenKhoa);
+  };
+
   // Helpers
   const tenCK = id => ckList.find(c => c.maChuyenKhoa === id)?.tenChuyenKhoa || '—';
   const tenNhom = id => {
@@ -69,6 +107,9 @@ export default function QuanLyDichVu() {
     return matchSearch && matchLoai;
   });
   const openAdd = () => {
+    nhomRequestId.current += 1;
+    setFormNhomList([]);
+    setLoadingNhom(false);
     setForm(empty);
     setEditId(null);
     setModal('add');
@@ -84,6 +125,7 @@ export default function QuanLyDichVu() {
     });
     setEditId(d.maDichVu);
     setModal('edit');
+    loadNhomByChuyenKhoa(d.maChuyenKhoa ?? '');
   };
   const handleSave = async () => {
     if (!form.tenDichVu.trim()) {
@@ -93,6 +135,20 @@ export default function QuanLyDichVu() {
     if (!form.donGia || isNaN(Number(form.donGia))) {
       showWarning('Vui lòng nhập đơn giá hợp lệ!');
       return;
+    }
+    if (form.maNhomDichVu !== '' && loadingNhom) {
+      showWarning('Vui lòng đợi tải danh sách nhóm dịch vụ.');
+      return;
+    }
+    if (form.maNhomDichVu !== '') {
+      const selectedNhom = formNhomList.find(
+        n => Number(n.maNhom) === Number(form.maNhomDichVu)
+      );
+      if (!form.maChuyenKhoa || !selectedNhom
+          || Number(selectedNhom.maChuyenKhoa) !== Number(form.maChuyenKhoa)) {
+        showError('Nhóm dịch vụ không thuộc chuyên khoa đã chọn!');
+        return;
+      }
     }
     setSaving(true);
     const body = {
@@ -548,10 +604,7 @@ export default function QuanLyDichVu() {
               fontWeight: 600,
               color: '#374151'
             }}>Chuyên Khoa</span>
-                <select value={form.maChuyenKhoa} onChange={e => setForm({
-              ...form,
-              maChuyenKhoa: e.target.value
-            })} style={{
+                <select value={form.maChuyenKhoa} onChange={handleChuyenKhoaChange} style={{
               padding: '10px 12px',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
@@ -572,17 +625,19 @@ export default function QuanLyDichVu() {
               fontWeight: 600,
               color: '#374151'
             }}>Nhóm Dịch Vụ</span>
-                <select value={form.maNhomDichVu ?? ''} onChange={e => setForm({
+                <select value={form.maNhomDichVu ?? ''} disabled={!form.maChuyenKhoa || loadingNhom} onChange={e => setForm({
               ...form,
               maNhomDichVu: e.target.value
             })} style={{
               padding: '10px 12px',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
-              fontSize: '13px'
+              fontSize: '13px',
+              background: !form.maChuyenKhoa || loadingNhom ? '#f3f4f6' : '#fff',
+              cursor: !form.maChuyenKhoa || loadingNhom ? 'not-allowed' : 'pointer'
             }}>
-                  <option value="">-- Chọn nhóm --</option>
-                  {nhomList.map(n => <option key={n.maNhom} value={n.maNhom}>{n.tenNhom}</option>)}
+                  <option value="">{loadingNhom ? 'Đang tải nhóm...' : '-- Chọn nhóm --'}</option>
+                  {formNhomList.map(n => <option key={n.maNhom} value={n.maNhom}>{n.tenNhom}</option>)}
                 </select>
               </label>
             </div>
