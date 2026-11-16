@@ -220,7 +220,7 @@ export default function QuanLyPhong() {
               <tr style={{
             background: '#f8fafc'
           }}>
-                {['#', 'Tên Phòng', 'Loại Phòng', 'Chuyên Khoa', 'Chức Vụ', 'Thao Tác'].map(h => <th key={h} style={{
+                {['#', 'Tên Phòng', 'Loại Phòng', 'Số lượng bệnh nhân', 'Chuyên Khoa', 'Chức Vụ', 'Thao Tác'].map(h => <th key={h} style={{
               padding: '12px 14px',
               textAlign: h === 'Thao Tác' ? 'center' : 'left',
               color: '#6b7280',
@@ -231,7 +231,7 @@ export default function QuanLyPhong() {
               </tr>
             </thead>
             <tbody>
-              {displayed.length === 0 ? <tr><td colSpan={6} style={{
+              {displayed.length === 0 ? <tr><td colSpan={7} style={{
               padding: '50px',
               textAlign: 'center',
               color: '#9ca3af'
@@ -269,6 +269,13 @@ export default function QuanLyPhong() {
               }}>
                         {fmtLoaiPhong(p.loaiPhong)}
                       </span> : '—'}
+                  </td>
+                  <td style={{
+              padding: '11px 14px',
+              color: '#374151',
+              textAlign: 'center'
+            }}>
+                    {p.soLuongToiDa ?? '—'}
                   </td>
                   <td style={{
               padding: '11px 14px',
