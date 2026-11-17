@@ -54,8 +54,27 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
     }
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData.entries());
-    data.donGiaNhap = parseFloat(data.donGiaNhap) || 0;
-    data.donGiaBan = parseFloat(data.donGiaBan) || 0;
+    const tenThuoc = String(data.tenThuoc || '').trim();
+    if (tenThuoc.length < 2) {
+      showError("Tên phải từ 2 ký tự trở lên!");
+      return;
+    }
+    if (tenThuoc.length > 200) {
+      showError("Tên không được vượt quá 200 ký tự!");
+      return;
+    }
+    if (String(data.donGiaNhap).trim() === '' || String(data.donGiaBan).trim() === ''
+      || !Number.isFinite(Number(data.donGiaNhap)) || !Number.isFinite(Number(data.donGiaBan))) {
+      showError("Vui lòng nhập giá nhập và giá bán hợp lệ!");
+      return;
+    }
+    if (Number(data.donGiaNhap) < 0 || Number(data.donGiaBan) < 0) {
+      showError("Giá tiền không được âm!");
+      return;
+    }
+    data.tenThuoc = tenThuoc;
+    data.donGiaNhap = Number(data.donGiaNhap);
+    data.donGiaBan = Number(data.donGiaBan);
     // Gửi version hiện tại của client khi UPDATE (Optimistic Lock) — không tự tăng version
     if (editing?.maThuoc && editing.version != null) {
       data.version = editing.version;
@@ -173,7 +192,7 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
         <form onSubmit={handleSave} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div style={{ gridColumn: 'span 2' }}>
             <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>Tên thuốc *</label>
-            <input name="tenThuoc" defaultValue={editing.tenThuoc} required
+            <input name="tenThuoc" defaultValue={editing.tenThuoc} required maxLength={200}
               style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db' }} />
           </div>
           <div>
@@ -208,12 +227,12 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>Giá nhập</label>
-            <input type="number" name="donGiaNhap" defaultValue={editing.donGiaNhap} readOnly={readOnly || isPharmacist}
+            <input type="number" min="0" name="donGiaNhap" defaultValue={editing.donGiaNhap} readOnly={readOnly || isPharmacist} required
               style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: (readOnly || isPharmacist) ? '#f3f4f6' : '#fff', cursor: (readOnly || isPharmacist) ? 'not-allowed' : 'text', color: (readOnly || isPharmacist) ? '#6b7280' : '#374151' }} />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>Giá bán</label>
-            <input type="number" name="donGiaBan" defaultValue={editing.donGiaBan} readOnly={readOnly || isPharmacist}
+            <input type="number" min="0" name="donGiaBan" defaultValue={editing.donGiaBan} readOnly={readOnly || isPharmacist} required
               style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: (readOnly || isPharmacist) ? '#f3f4f6' : '#fff', cursor: (readOnly || isPharmacist) ? 'not-allowed' : 'text', color: (readOnly || isPharmacist) ? '#6b7280' : '#374151' }} />
           </div>
           <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>

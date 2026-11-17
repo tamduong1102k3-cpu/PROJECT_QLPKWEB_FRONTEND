@@ -23,6 +23,35 @@ const isPatientRole = role => {
   return normalized === 'patient' || normalized === 'benh_nhan' || normalized === 'bệnh nhân';
 };
 
+const ROLE_CODE_BY_POSITION = {
+  'bac si': 'BAC_SI',
+  'bac si chuyen khoa': 'BAC_SI_CHUYEN_KHOA',
+  'bac si tong quat': 'BAC_SI_TONG_QUAT',
+  'tro ly bac si chuyen khoa': 'TRO_LY_BAC_SI_CHUYEN_KHOA',
+  'tro ly bac si tong quat': 'TRO_LY_BAC_SI_TONG_QUAT',
+  'y ta': 'Y_TA',
+  'le tan': 'LE_TAN',
+  'thu ngan': 'THU_NGAN',
+  'duoc si': 'DUOC_SI',
+  'nhan vien kho': 'NHAN_VIEN_KHO',
+  'ky thuat vien xet nghiem': 'KY_THUAT_VIEN_XET_NGHIEM',
+  'ky thuat vien chan doan hinh anh': 'KY_THUAT_VIEN_CHAN_DOAN_HINH_ANH',
+  'quan tri vien': 'QUAN_TRI_VIEN'
+};
+
+const normalizeCategoryLabel = label => removeVietnameseTones(String(label || ''))
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, ' ');
+
+const getRoleCodeForPosition = (position, roles) => {
+  const normalizedPosition = normalizeCategoryLabel(position);
+  const matchingRole = roles.find(role => (
+    normalizeCategoryLabel(role.tenBienThe) === normalizedPosition
+  ));
+  return matchingRole?.maVaiTro || ROLE_CODE_BY_POSITION[normalizedPosition] || '';
+};
+
 const createUsernameFromName = fullName => removeVietnameseTones(fullName)
   .toLowerCase()
   .replace(/[^a-z0-9]/g, '');
@@ -32,6 +61,13 @@ const getTodayLocalDate = () => {
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
   return `${today.getFullYear()}-${month}-${day}`;
+};
+
+const getLatestEligibleBirthDate = () => {
+  const [year, month, day] = getTodayLocalDate().split('-').map(Number);
+  const eligibleYear = year - 18;
+  const lastDayOfMonth = new Date(eligibleYear, month, 0).getDate();
+  return `${eligibleYear}-${String(month).padStart(2, '0')}-${String(Math.min(day, lastDayOfMonth)).padStart(2, '0')}`;
 };
 
 const isSpecialtyRequired = (jobTitle, role) => {
@@ -167,14 +203,14 @@ const QuanLyNhanVien = () => {
     chuc_vu: '', 
     ngay_vao_lam: '',
     username: '', 
-    role: 'BAC_SI_TONG_QUAT' // Default role
+    role: ''
   });
 
   const resetForm = () => {
     setFormData({
       ho_ten: '', gioi_tinh: '1', ngay_sinh: '', cccd: '', dia_chi: '', 
       so_dien_thoai: '', email: '', chuyen_khoa: '', bang_cap: '', 
-      chuc_vu: '', ngay_vao_lam: '', username: '', role: 'BAC_SI_TONG_QUAT'
+      chuc_vu: '', ngay_vao_lam: '', username: '', role: ''
     });
     setIsEditMode(false);
     setEditId(null);
@@ -200,7 +236,7 @@ const QuanLyNhanVien = () => {
       ngay_vao_lam: emp.ngayVaoLam ? emp.ngayVaoLam.split('T')[0] : '',
     
       username: '',
-      role: ''
+      role: getRoleCodeForPosition(emp.chucVu, dsVaiTro)
     });
     setEditId(emp.maNhanVien);
     setIsEditMode(true);
@@ -276,6 +312,15 @@ const QuanLyNhanVien = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleChucVuChange = (e) => {
+    const selectedValue = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      chuc_vu: selectedValue,
+      role: getRoleCodeForPosition(selectedValue, dsVaiTro)
+    }));
+  };
+
   const validateForm = () => {
     const email = formData.email.trim();
     const phone = formData.so_dien_thoai.trim();
@@ -287,8 +332,13 @@ const QuanLyNhanVien = () => {
       return false;
     }
 
-    if (!isEditMode && (!formData.username.trim() || !formData.role)) {
-      showError("Vui lòng nhập Username và chọn Quyền để tạo tài khoản.");
+    if (!formData.role) {
+      showError("Không tìm thấy quyền hệ thống tương ứng với chức vụ đã chọn.");
+      return false;
+    }
+
+    if (!isEditMode && !formData.username.trim()) {
+      showError("Vui lòng nhập Username để tạo tài khoản.");
       return false;
     }
 
@@ -310,6 +360,19 @@ const QuanLyNhanVien = () => {
     if (formData.ngay_sinh && formData.ngay_sinh > today) {
       showError("Ngày sinh không được ở tương lai.");
       return false;
+    }
+
+    if (formData.ngay_sinh) {
+      const [birthYear, birthMonth, birthDay] = formData.ngay_sinh.split('-').map(Number);
+      const [todayYear, todayMonth, todayDay] = today.split('-').map(Number);
+      let age = todayYear - birthYear;
+      if (todayMonth < birthMonth || (todayMonth === birthMonth && todayDay < birthDay)) {
+        age--;
+      }
+      if (age < 18) {
+        showError("Nhân viên phải từ đủ 18 tuổi trở lên!");
+        return false;
+      }
     }
 
     if (formData.ngay_vao_lam && formData.ngay_vao_lam > today) {
@@ -346,6 +409,7 @@ const QuanLyNhanVien = () => {
       chuyenKhoa: formData.chuyen_khoa ? parseInt(formData.chuyen_khoa) : null,
       bangCap: formData.bang_cap,
       chucVu: formData.chuc_vu,
+      role: formData.role,
       ngayVaoLam: formData.ngay_vao_lam
     };
 
@@ -564,7 +628,7 @@ const QuanLyNhanVien = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
-                      <input type="date" name="ngay_sinh" value={formData.ngay_sinh} max={getTodayLocalDate()} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                      <input type="date" name="ngay_sinh" value={formData.ngay_sinh} max={getLatestEligibleBirthDate()} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Số CCCD <span className="text-red-500">*</span></label>
@@ -591,7 +655,7 @@ const QuanLyNhanVien = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Chức vụ <span className="text-red-500">*</span></label>
-                      <select required name="chuc_vu" value={formData.chuc_vu} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none bg-white text-gray-900">
+                      <select required name="chuc_vu" value={formData.chuc_vu} onChange={handleChucVuChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none bg-white text-gray-900">
                         <option value="" className="bg-white text-gray-900">-- Chọn chức vụ --</option>
                         {dsChucVu.map(cv => (
                           <option key={cv.id} value={cv.tenChucVu} className="bg-white text-gray-900">{cv.tenChucVu}</option>
@@ -634,7 +698,7 @@ const QuanLyNhanVien = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Quyền (Role) <span className="text-red-500">*</span></label>
-                        <select required={!isEditMode} name="role" value={formData.role} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none bg-white text-gray-900">
+                        <select required={!isEditMode} disabled={true} name="role" value={formData.role} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none bg-white text-gray-900">
                           <option value="" className="bg-white text-gray-900">-- Chọn quyền --</option>
                           {dsVaiTro.map(vt => (
                             <option key={vt.maVaiTro} value={vt.maVaiTro} className="bg-white text-gray-900">{vt.tenBienThe}</option>

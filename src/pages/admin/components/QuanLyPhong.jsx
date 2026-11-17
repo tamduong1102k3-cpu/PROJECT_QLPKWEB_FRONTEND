@@ -68,7 +68,31 @@ export default function QuanLyPhong() {
   // Helpers
   const tenChucVu = id => chucVuList.find(c => c.id === id)?.tenChucVu || '—';
   const tenCK = id => ckList.find(c => c.maChuyenKhoa === id)?.tenChuyenKhoa || '—';
+  const getRoomCapacitySummary = () => {
+    if (form.maChuyenKhoa === '') return null;
+
+    const selectedKhoa = ckList.find(
+      khoa => Number(khoa.maChuyenKhoa) === Number(form.maChuyenKhoa)
+    );
+    if (!selectedKhoa || selectedKhoa.soLuongToiDa == null) return null;
+
+    const currentTotal = phongList
+      .filter(phong => (
+        Number(phong.maChuyenKhoa) === Number(form.maChuyenKhoa)
+        && !(modal === 'edit' && Number(phong.maPhong) === Number(editId))
+      ))
+      .reduce((total, phong) => total + (Number(phong.soLuongToiDa) || 0), 0);
+    const totalAfterSave = currentTotal + (Number(form.soLuongToiDa) || 0);
+    const specialtyLimit = Number(selectedKhoa.soLuongToiDa);
+
+    return {
+      total: totalAfterSave,
+      limit: specialtyLimit,
+      remaining: specialtyLimit - totalAfterSave
+    };
+  };
   const displayed = phongList.filter(p => p.tenPhong?.toLowerCase().includes(search.toLowerCase()) || p.loaiPhong?.toLowerCase().includes(search.toLowerCase()));
+  const roomCapacitySummary = getRoomCapacitySummary();
 
   // Open modal
   const openAdd = () => {
@@ -96,6 +120,13 @@ export default function QuanLyPhong() {
     }
     if (form.soLuongToiDa !== '' && (!Number.isInteger(Number(form.soLuongToiDa)) || Number(form.soLuongToiDa) < 1)) {
       showWarning('Số lượng bệnh nhân tối đa phải là số nguyên lớn hơn 0!');
+      return;
+    }
+    const capacitySummary = getRoomCapacitySummary();
+    if (capacitySummary && capacitySummary.total > capacitySummary.limit) {
+      showError(
+        `Tổng số lượng các phòng (${capacitySummary.total}) vượt quá giới hạn của chuyên khoa (${capacitySummary.limit}).`
+      );
       return;
     }
     setSaving(true);
@@ -461,6 +492,11 @@ export default function QuanLyPhong() {
               borderRadius: '8px',
               fontSize: '13px'
             }} />
+                {roomCapacitySummary && (
+                  <small style={{ color: roomCapacitySummary.remaining < 0 ? '#dc2626' : '#6b7280' }}>
+                    Đã sử dụng: {roomCapacitySummary.total} / {roomCapacitySummary.limit}. Còn trống: {roomCapacitySummary.remaining}
+                  </small>
+                )}
               </label>
 
               <div style={{

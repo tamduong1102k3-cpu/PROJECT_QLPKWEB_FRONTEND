@@ -60,11 +60,20 @@ const QuanLyChuyenKhoa = () => {
   };
 
   const handleSave = async () => {
+    const tenChuyenKhoa = formData.tenChuyenKhoa.trim();
+    if (tenChuyenKhoa.length < 2) {
+      showError("Tên phải từ 2 ký tự trở lên!");
+      return;
+    }
+    if (tenChuyenKhoa.length > 200) {
+      showError("Tên không được vượt quá 200 ký tự!");
+      return;
+    }
     try {
       if (editing) {
-        await chuyenKhoaApi.updateApi(editing.maChuyenKhoa, formData);
+        await chuyenKhoaApi.updateApi(editing.maChuyenKhoa, { ...formData, tenChuyenKhoa });
       } else {
-        await chuyenKhoaApi.createApi(formData);
+        await chuyenKhoaApi.createApi({ ...formData, tenChuyenKhoa });
       }
 
       handleCloseModal();
@@ -110,7 +119,7 @@ const QuanLyChuyenKhoa = () => {
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Tên Chuyên Khoa</label>
-            <input type="text" value={formData.tenChuyenKhoa} onChange={e => setFormData({ ...formData, tenChuyenKhoa: e.target.value })}
+            <input type="text" maxLength={200} value={formData.tenChuyenKhoa} onChange={e => setFormData({ ...formData, tenChuyenKhoa: e.target.value })}
               style={{ width: '100%', minWidth: 0, padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
               onFocus={e => { e.target.style.borderColor = '#005bbf'; e.target.style.boxShadow = '0 0 0 2px rgba(0,91,191,0.15)'; }}
               onBlur={e => { e.target.style.borderColor = '#e5e7eb'; e.target.style.boxShadow = 'none'; }}

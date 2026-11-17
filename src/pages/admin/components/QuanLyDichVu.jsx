@@ -128,12 +128,21 @@ export default function QuanLyDichVu() {
     loadNhomByChuyenKhoa(d.maChuyenKhoa ?? '');
   };
   const handleSave = async () => {
-    if (!form.tenDichVu.trim()) {
-      showWarning('Vui lòng nhập tên dịch vụ!');
+    const tenDichVu = form.tenDichVu.trim();
+    if (tenDichVu.length < 2) {
+      showError("Tên phải từ 2 ký tự trở lên!");
       return;
     }
-    if (!form.donGia || isNaN(Number(form.donGia))) {
+    if (tenDichVu.length > 200) {
+      showError("Tên không được vượt quá 200 ký tự!");
+      return;
+    }
+    if (form.donGia === '' || form.donGia == null || !Number.isFinite(Number(form.donGia))) {
       showWarning('Vui lòng nhập đơn giá hợp lệ!');
+      return;
+    }
+    if (Number(form.donGia) < 0) {
+      showError("Giá tiền không được âm!");
       return;
     }
     if (form.maNhomDichVu !== '' && loadingNhom) {
@@ -152,7 +161,7 @@ export default function QuanLyDichVu() {
     }
     setSaving(true);
     const body = {
-      tenDichVu: form.tenDichVu.trim(),
+      tenDichVu,
       donGia: Number(form.donGia),
       loaiDichVu: form.loaiDichVu || null,
       maChuyenKhoa: form.maChuyenKhoa !== '' ? Number(form.maChuyenKhoa) : null,
@@ -528,7 +537,7 @@ export default function QuanLyDichVu() {
             }}>Tên Dịch Vụ <span style={{
                 color: '#dc2626'
               }}>*</span></span>
-                <input value={form.tenDichVu} onChange={e => setForm({
+                <input maxLength={200} value={form.tenDichVu} onChange={e => setForm({
               ...form,
               tenDichVu: e.target.value
             })} placeholder="VD: Khám Nội Tổng Quát" style={{

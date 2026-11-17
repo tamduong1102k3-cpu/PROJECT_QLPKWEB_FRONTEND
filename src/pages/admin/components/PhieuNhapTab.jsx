@@ -96,6 +96,14 @@ const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, current
       showWarning('Vui lòng thêm ít nhất một loại thuốc');
       return;
     }
+    if (newSlip.chiTiet.some(item => !Number.isInteger(item.soLuongNhap) || item.soLuongNhap <= 0)) {
+      showError("Số lượng phải lớn hơn 0!");
+      return;
+    }
+    if (newSlip.chiTiet.some(item => !Number.isFinite(item.donGiaNhap) || item.donGiaNhap < 0)) {
+      showError("Giá tiền không được âm!");
+      return;
+    }
     const tongTien = newSlip.chiTiet.reduce((sum, item) => sum + item.soLuongNhap * item.donGiaNhap, 0);
     const body = { ...newSlip, tongTienNhap: tongTien };
     try {
@@ -359,12 +367,12 @@ const PhieuNhapTab = ({ nvMap, thuocMap, thuocList, onRefresh, readOnly, current
                   </select>
                 </td>
                 <td style={{ ...td, padding: '8px' }}>
-                  <input type="number" min="1" value={row.soLuongNhap}
+                  <input type="number" min="1" step="1" value={row.soLuongNhap}
                     onChange={e => handleUpdateRow(idx, 'soLuongNhap', e.target.value)}
                     style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '4px' }} />
                 </td>
                 <td style={{ ...td, padding: '8px' }}>
-                  <input type="number" value={row.donGiaNhap}
+                  <input type="number" min="0" value={row.donGiaNhap}
                     onChange={e => handleUpdateRow(idx, 'donGiaNhap', e.target.value)}
                     style={{ width: '100%', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '4px' }} />
                 </td>
