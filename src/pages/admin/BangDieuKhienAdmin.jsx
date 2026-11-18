@@ -27,6 +27,10 @@ const BangDieuKhienAdmin = ({
   const isResizing = React.useRef(false);
   const [sapHet, setSapHet] = useState([]);
   const [sapHetLoading, setSapHetLoading] = useState(true);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreFile, setRestoreFile] = useState(null);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const restoreFileInputRef = useRef(null);
   const [summary, setSummary] = useState({
     tongBenhNhan: 0,
     lichKhamHomNay: 0,
@@ -35,7 +39,7 @@ const BangDieuKhienAdmin = ({
     topDichVu: []
   });
 
-  const { bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell } = useNotification();
+  const { bellNotifications, addBellNotification, markBellAsRead, markAllBellAsRead, clearAllBell, showConfirm, showSuccess, showError } = useNotification();
   const thongBaoLoadedRef = useRef(false);
 
   // Lấy maTaiKhoan admin từ JWT (claim maTaiKhoan cho NHAN_VIEN/QUAN_TRI_VIEN)
@@ -144,6 +148,114 @@ const BangDieuKhienAdmin = ({
     }).catch(err => console.error("Error fetching dashboard summary:", err));
   }, [fetchThongBaoAdmin]);
 
+  const handleBackupDownload = async () => {
+    if (backupLoading) return;
+
+    setBackupLoading(true);
+
+    try {
+      const response = await fetchClient(`${API_BASE_URL}/admin/backup/export`, { skipLoading: true });
+      if (!response.ok) {
+        let errorMessage = 'Không thể tạo file backup. Vui lòng thử lại.';
+        try {
+          const errorBody = await response.json();
+          errorMessage = errorBody?.message || errorMessage;
+        } catch {
+          // Use the default message when the server response is not JSON.
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      if (blob.size === 0) {
+        throw new Error('File backup tải về bị rỗng.');
+      }
+
+      const disposition = response.headers.get('Content-Disposition');
+      const timestamp = new Date().toISOString()
+        .replace(/[-:]/g, '')
+        .replace('T', '_')
+        .replace(/\.\d{3}Z$/, '');
+      const filename = disposition?.match(/filename="?([^";]+)"?/i)?.[1]
+        || `backup_${timestamp}.sql`;
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = downloadUrl;
+      downloadLink.download = filename;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000);
+      showSuccess('Đã bắt đầu tải file backup.');
+    } catch (error) {
+      showError(error?.message || 'Không thể tải file backup. Vui lòng thử lại.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleBackupClick = () => {
+    if (backupLoading) return;
+    showConfirm(
+      'File backup chứa toàn bộ dữ liệu phòng khám. Bạn có muốn tải file về thiết bị này không?',
+      handleBackupDownload
+    );
+  };
+
+  const handleRestoreFileChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (file && !file.name.toLowerCase().endsWith('.sql')) {
+      event.target.value = '';
+      setRestoreFile(null);
+      showError('Chỉ chấp nhận file có định dạng .sql.');
+      return;
+    }
+    setRestoreFile(file);
+  };
+
+  const handleDatabaseRestore = async () => {
+    if (!restoreFile || restoreLoading) return;
+
+    setRestoreLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', restoreFile);
+      const response = await fetchClient(`${API_BASE_URL}/admin/backup/restore`, {
+        method: 'POST',
+        body: formData,
+        skipLoading: true,
+      });
+
+      let result = {};
+      try {
+        result = await response.json();
+      } catch {
+        // Use the fallback message if the server response is not JSON.
+      }
+      if (!response.ok) {
+        throw new Error(result?.message || 'Không thể phục hồi database. Vui lòng kiểm tra file và thử lại.');
+      }
+
+      setRestoreFile(null);
+      if (restoreFileInputRef.current) {
+        restoreFileInputRef.current.value = '';
+      }
+      showSuccess(result?.message || 'Phục hồi database thành công.');
+    } catch (error) {
+      showError(error?.message || 'Không thể phục hồi database. Vui lòng thử lại.');
+    } finally {
+      setRestoreLoading(false);
+    }
+  };
+
+  const handleRestoreClick = () => {
+    if (!restoreFile || restoreLoading) return;
+    showConfirm(
+      'CẢNH BÁO: Hành động này sẽ xóa toàn bộ dữ liệu hiện tại và thay thế bằng dữ liệu trong file. Bạn có chắc chắn muốn tiếp tục?',
+      handleDatabaseRestore
+    );
+  };
+
   // Dữ liệu cho Dashboard
   const stats = [{
     title: 'Tổng Bệnh Nhân',
@@ -207,6 +319,10 @@ const BangDieuKhienAdmin = ({
     id: 'specialties',
     label: 'Chuyên Khoa',
     icon: 'local_hospital'
+  }, {
+    id: 'backup',
+    label: 'Sao Lưu',
+    icon: 'database'
   }];
   return <div className="flex h-screen bg-[#f3f4f6] font-body-md text-on-background overflow-hidden">
       
@@ -419,7 +535,139 @@ const BangDieuKhienAdmin = ({
                     </table>
                   </div>}
               </div>
-      </div> : activeTab === 'patients' ? <QuanLyBenhNhan title="Thông Tin Bệnh Nhân" /> : activeTab === 'employees' ? <QuanLyNhanVien /> : activeTab === 'accounts' ? <QuanLyTaiKhoan /> : activeTab === 'pharmacy' ? <QuanLyNhaThuoc /> : activeTab === 'shifts' ? <QuanLyCaLamViec /> : activeTab === 'statistics' ? <QuanLyThongKe /> : activeTab === 'rooms' ? <QuanLyPhong /> : activeTab === 'services' ? <QuanLyDichVu /> : activeTab === 'specialties' ? <QuanLyChuyenKhoa /> :
+      </div> : activeTab === 'patients' ? <QuanLyBenhNhan title="Thông Tin Bệnh Nhân" /> : activeTab === 'employees' ? <QuanLyNhanVien /> : activeTab === 'accounts' ? <QuanLyTaiKhoan /> : activeTab === 'pharmacy' ? <QuanLyNhaThuoc /> : activeTab === 'shifts' ? <QuanLyCaLamViec /> : activeTab === 'statistics' ? <QuanLyThongKe /> : activeTab === 'rooms' ? <QuanLyPhong /> : activeTab === 'services' ? <QuanLyDichVu /> : activeTab === 'specialties' ? <QuanLyChuyenKhoa /> : activeTab === 'backup' ? (
+          <div className="animate-fade-in mx-auto w-full max-w-6xl space-y-6">
+            <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-800 p-6 text-white shadow-lg sm:p-8">
+              <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border-[32px] border-white/5" />
+              <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 right-40 h-56 w-56 rounded-full bg-blue-400/10 blur-2xl" />
+              <div className="relative z-10 w-full">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-blue-100">
+                  <span className="material-symbols-outlined text-base">admin_panel_settings</span>
+                  QUẢN TRỊ DỮ LIỆU
+                </div>
+                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Sao lưu &amp; phục hồi</h2>
+                <p className="mt-2 w-full text-sm leading-6 text-blue-100/80 sm:text-base">
+                  Tạo bản sao lưu SQL hoặc phục hồi dữ liệu hệ thống từ một file backup đã có.
+                </p>
+              </div>
+                <div className="pointer-events-none absolute right-0 top-0 hidden h-20 w-20 items-center justify-center rounded-2xl border border-white/10 bg-white/10 sm:flex">
+                  <span className="material-symbols-outlined text-5xl text-blue-100">database</span>
+                </div>
+            </section>
+
+            <div className="grid items-stretch gap-6 lg:grid-cols-2">
+              <section className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md sm:p-7">
+                <div className="mb-6 flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <span className="material-symbols-outlined text-2xl">cloud_download</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-600">01 · BACKUP</p>
+                    <h3 className="mt-1 text-lg font-bold text-slate-800">Tạo bản sao lưu</h3>
+                    <p className="mt-1 text-sm leading-5 text-slate-500">Xuất dữ liệu database thành một file SQL.</p>
+                  </div>
+                </div>
+
+                <div className="mb-6 flex flex-1 items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+                  <span className="material-symbols-outlined mt-0.5 text-lg text-blue-600">verified_user</span>
+                  <p className="text-sm leading-6 text-slate-600">
+                    File có thể chứa thông tin nhạy cảm của phòng khám. Hãy tải về thiết bị tin cậy và lưu trữ an toàn.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleBackupClick}
+                  disabled={backupLoading}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 font-semibold text-white shadow-sm transition hover:bg-blue-700 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className={`material-symbols-outlined ${backupLoading ? 'animate-spin' : ''}`}>
+                    {backupLoading ? 'progress_activity' : 'download'}
+                  </span>
+                  {backupLoading ? 'Đang tạo file backup...' : 'Tải Backup Database (.sql)'}
+                </button>
+              </section>
+
+              <section className="flex flex-col rounded-2xl border border-rose-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md sm:p-7">
+                <div className="mb-6 flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+                    <span className="material-symbols-outlined text-2xl">restore</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-rose-600">02 · RESTORE</p>
+                    <h3 className="mt-1 text-lg font-bold text-slate-800">Phục hồi dữ liệu</h3>
+                    <p className="mt-1 text-sm leading-5 text-slate-500">Nạp một file backup SQL vào database hiện tại.</p>
+                  </div>
+                </div>
+
+                <div className="mb-5 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4">
+                  <span className="material-symbols-outlined mt-0.5 text-lg text-rose-600">warning</span>
+                  <p className="text-sm leading-6 text-rose-800">
+                    Restore có thể làm gián đoạn ứng dụng hoặc để lại dữ liệu phục hồi dở dang. Hãy sao lưu dữ liệu hiện tại và dừng các thao tác ghi trước khi tiếp tục.
+                  </p>
+                </div>
+
+                <input
+                  ref={restoreFileInputRef}
+                  id="database-restore-file"
+                  type="file"
+                  accept=".sql"
+                  onChange={handleRestoreFileChange}
+                  disabled={restoreLoading}
+                  className="sr-only"
+                />
+                <label
+                  htmlFor="database-restore-file"
+                  className={`group flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-5 py-6 text-center transition ${
+                    restoreFile
+                      ? 'border-emerald-300 bg-emerald-50/60 hover:border-emerald-400'
+                      : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50/50'
+                  } ${restoreLoading ? 'pointer-events-none opacity-60' : ''}`}
+                >
+                  <span className={`material-symbols-outlined mb-2 text-3xl ${restoreFile ? 'text-emerald-600' : 'text-slate-400 group-hover:text-blue-600'}`}>
+                    {restoreFile ? 'task' : 'upload_file'}
+                  </span>
+                  <span className="max-w-full break-all text-sm font-semibold text-slate-700">
+                    {restoreFile ? restoreFile.name : 'Chọn file backup (.sql)'}
+                  </span>
+                  <span className="mt-1 text-xs text-slate-500">
+                    {restoreFile
+                      ? `${(restoreFile.size / (1024 * 1024)).toFixed(2)} MB · Nhấn để chọn file khác`
+                      : 'Nhấn để duyệt file trên thiết bị'}
+                  </span>
+                </label>
+                <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                  <span>Giới hạn mặc định: 100 MB</span>
+                  {restoreFile && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRestoreFile(null);
+                        if (restoreFileInputRef.current) restoreFileInputRef.current.value = '';
+                      }}
+                      disabled={restoreLoading}
+                      className="font-semibold text-slate-600 underline-offset-2 hover:text-rose-600 hover:underline disabled:opacity-50"
+                    >
+                      Bỏ chọn
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRestoreClick}
+                  disabled={!restoreFile || restoreLoading}
+                  className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-3.5 font-semibold text-white shadow-sm transition hover:bg-rose-700 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-rose-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
+                >
+                  <span className={`material-symbols-outlined ${restoreLoading ? 'animate-spin' : ''}`}>
+                    {restoreLoading ? 'progress_activity' : 'warning'}
+                  </span>
+                  {restoreLoading ? 'Đang phục hồi database...' : 'Bắt đầu phục hồi'}
+                </button>
+              </section>
+            </div>
+          </div>
+        ) :
         // Placeholder for other tabs
         <div className="flex flex-col items-center justify-center h-full text-gray-400 animate-fade-in">
               <span className="material-symbols-outlined text-6xl mb-4 opacity-50">

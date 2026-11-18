@@ -99,6 +99,33 @@ export const getAllPhongApi = async () => {
 };
 
 /**
+ * GET /phong/ten-phong
+ */
+export const getDistinctTenPhongApi = async () => {
+  try {
+    const response = await fetchClient(`${API_URL}/phong/ten-phong`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      let errorMsg = `Lỗi: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorMsg;
+      } catch { /* ignore parse error */ }
+      throw new Error(errorMsg);
+    }
+    const names = await response.json();
+    if (!Array.isArray(names) || names.some(name => typeof name !== 'string')) {
+      throw new Error('Dữ liệu tên phòng từ máy chủ không hợp lệ.');
+    }
+    return names;
+  } catch (error) {
+    console.error("Error in getDistinctTenPhongApi:", error);
+    throw error;
+  }
+};
+
+/**
  * GET /phong/by-chuc-vu/{maChucVu}
  */
 export const getPhongByChucVuApi = async maChucVu => {

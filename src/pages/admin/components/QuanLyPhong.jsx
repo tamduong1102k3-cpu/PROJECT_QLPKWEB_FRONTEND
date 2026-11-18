@@ -1,6 +1,8 @@
 import * as danhMucApi from '../../../api/danhMucApi';
 import React, { useState, useEffect } from 'react';
 import { useNotification } from '../../../components/NotificationContext';
+const TECHNICIAN_POSITION_IDS = [13, 15];
+const isTechnicianPosition = maChucVu => TECHNICIAN_POSITION_IDS.includes(Number(maChucVu));
 const empty = {
   tenPhong: '',
   loaiPhong: '',
@@ -39,6 +41,9 @@ const LOAI_PHONG_OPTIONS = [
 export default function QuanLyPhong() {
   const { showSuccess, showError, showWarning, showConfirm } = useNotification();
   const [phongList, setPhongList] = useState([]);
+  const [allRoomNames, setAllRoomNames] = useState([]);
+  const [filteredNames, setFilteredNames] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [chucVuList, setChucVuList] = useState([]);
   const [ckList, setCkList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +56,24 @@ export default function QuanLyPhong() {
   useEffect(() => {
     fetchAll();
   }, []);
+  useEffect(() => {
+    if (!modal) return undefined;
+
+    let active = true;
+    danhMucApi.getDistinctTenPhongApi()
+      .then(names => {
+        if (active) setAllRoomNames(names);
+      })
+      .catch(error => {
+        console.error('Không thể tải gợi ý tên phòng:', error);
+        if (active) showError('Không thể tải danh sách tên phòng gợi ý.');
+      });
+
+    return () => {
+      active = false;
+      setShowSuggestions(false);
+    };
+  }, [modal, showError]);
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -69,30 +92,43 @@ export default function QuanLyPhong() {
   const tenChucVu = id => chucVuList.find(c => c.id === id)?.tenChucVu || '—';
   const tenCK = id => ckList.find(c => c.maChuyenKhoa === id)?.tenChuyenKhoa || '—';
   const getRoomCapacitySummary = () => {
-    if (form.maChuyenKhoa === '') return null;
+    if (form.maChuyenKhoa === '' || !isTechnicianPosition(form.maChucVu)) return null;
 
     const selectedKhoa = ckList.find(
       khoa => Number(khoa.maChuyenKhoa) === Number(form.maChuyenKhoa)
     );
     if (!selectedKhoa || selectedKhoa.soLuongToiDa == null) return null;
 
-    const currentTotal = phongList
+    const roomTotals = phongList
       .filter(phong => (
         Number(phong.maChuyenKhoa) === Number(form.maChuyenKhoa)
-        && !(modal === 'edit' && Number(phong.maPhong) === Number(editId))
+        && isTechnicianPosition(phong.maChucVu)
       ))
-      .reduce((total, phong) => total + (Number(phong.soLuongToiDa) || 0), 0);
-    const totalAfterSave = currentTotal + (Number(form.soLuongToiDa) || 0);
+      .reduce((totals, phong) => {
+        const quantity = Number(phong.soLuongToiDa) || 0;
+        totals.current += quantity;
+        if (!(modal === 'edit' && Number(phong.maPhong) === Number(editId))) {
+          totals.excludingEditedRoom += quantity;
+        }
+        return totals;
+      }, { current: 0, excludingEditedRoom: 0 });
     const specialtyLimit = Number(selectedKhoa.soLuongToiDa);
 
     return {
-      total: totalAfterSave,
+      used: roomTotals.current,
       limit: specialtyLimit,
-      remaining: specialtyLimit - totalAfterSave
+      remaining: specialtyLimit - roomTotals.current,
+      totalAfterSave: roomTotals.excludingEditedRoom + (Number(form.soLuongToiDa) || 0)
     };
   };
   const displayed = phongList.filter(p => p.tenPhong?.toLowerCase().includes(search.toLowerCase()) || p.loaiPhong?.toLowerCase().includes(search.toLowerCase()));
   const roomCapacitySummary = getRoomCapacitySummary();
+  const isLimitExceeded = Boolean(
+    roomCapacitySummary && (
+      (modal === 'add' && roomCapacitySummary.remaining <= 0)
+      || roomCapacitySummary.totalAfterSave > roomCapacitySummary.limit
+    )
+  );
 
   // Open modal
   const openAdd = () => {
@@ -112,6 +148,30 @@ export default function QuanLyPhong() {
     setModal('edit');
   };
 
+  const handleRoomNameChange = event => {
+    const value = event.target.value;
+    setForm(current => ({ ...current, tenPhong: value }));
+
+    const query = value.trim().toLocaleLowerCase('vi');
+    if (!query) {
+      setFilteredNames([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const matches = allRoomNames.filter(name =>
+      name.toLocaleLowerCase('vi').includes(query)
+    );
+    setFilteredNames(matches);
+    setShowSuggestions(matches.length > 0);
+  };
+
+  const selectRoomName = name => {
+    setForm(current => ({ ...current, tenPhong: name }));
+    setFilteredNames([]);
+    setShowSuggestions(false);
+  };
+
   // Save
   const handleSave = async () => {
     if (!form.tenPhong.trim()) {
@@ -123,9 +183,13 @@ export default function QuanLyPhong() {
       return;
     }
     const capacitySummary = getRoomCapacitySummary();
-    if (capacitySummary && capacitySummary.total > capacitySummary.limit) {
+    if (modal === 'add' && isTechnicianPosition(form.maChucVu) && capacitySummary && capacitySummary.remaining <= 0) {
+      showError('Chuyên khoa này đã đạt giới hạn số lượng, không thể thêm phòng mới.');
+      return;
+    }
+    if (isTechnicianPosition(form.maChucVu) && capacitySummary && capacitySummary.totalAfterSave > capacitySummary.limit) {
       showError(
-        `Tổng số lượng các phòng (${capacitySummary.total}) vượt quá giới hạn của chuyên khoa (${capacitySummary.limit}).`
+        `Tổng số lượng các phòng (${capacitySummary.totalAfterSave}) vượt quá giới hạn của chuyên khoa (${capacitySummary.limit}).`
       );
       return;
     }
@@ -438,15 +502,68 @@ export default function QuanLyPhong() {
             }}>Tên Phòng <span style={{
                 color: '#dc2626'
               }}>*</span></span>
-                <input value={form.tenPhong} onChange={e => setForm({
-              ...form,
-              tenPhong: e.target.value
-            })} placeholder="VD: P. Khám Nội Tổng Quát" style={{
-              padding: '10px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              fontSize: '13px'
-            }} />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    value={form.tenPhong}
+                    onChange={handleRoomNameChange}
+                    onBlur={() => window.setTimeout(() => setShowSuggestions(false), 200)}
+                    aria-autocomplete="list"
+                    aria-expanded={showSuggestions}
+                    placeholder="VD: P. Khám Nội Tổng Quát"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '13px'
+                    }}
+                  />
+                  {showSuggestions && filteredNames.length > 0 && (
+                    <ul
+                      role="listbox"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 10,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        margin: 0,
+                        padding: 0,
+                        listStyle: 'none',
+                        background: '#fff',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
+                      }}
+                    >
+                      {filteredNames.map(name => (
+                        <li key={name} role="option" aria-selected="false">
+                          <button
+                            type="button"
+                            onMouseDown={event => event.preventDefault()}
+                            onClick={() => selectRoomName(name)}
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              padding: '9px 12px',
+                              border: 'none',
+                              background: '#fff',
+                              color: '#374151',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              fontSize: '13px'
+                            }}
+                          >
+                            {name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </label>
 
               <label style={{
@@ -483,7 +600,7 @@ export default function QuanLyPhong() {
               fontWeight: 600,
               color: '#374151'
             }}>Số Lượng Bệnh Nhân Tối Đa</span>
-                <input type="number" min="1" step="1" value={form.soLuongToiDa} onChange={e => setForm({
+                <input type="number" min="1" step="1" disabled={modal === 'add' && isTechnicianPosition(form.maChucVu) && Boolean(roomCapacitySummary) && roomCapacitySummary.remaining <= 0} value={form.soLuongToiDa} onChange={e => setForm({
               ...form,
               soLuongToiDa: e.target.value
             })} placeholder="VD: 20" style={{
@@ -494,7 +611,14 @@ export default function QuanLyPhong() {
             }} />
                 {roomCapacitySummary && (
                   <small style={{ color: roomCapacitySummary.remaining < 0 ? '#dc2626' : '#6b7280' }}>
-                    Đã sử dụng: {roomCapacitySummary.total} / {roomCapacitySummary.limit}. Còn trống: {roomCapacitySummary.remaining}
+                    Đã sử dụng: {roomCapacitySummary.used} / {roomCapacitySummary.limit}. Còn trống: {roomCapacitySummary.remaining}
+                  </small>
+                )}
+                {isLimitExceeded && (
+                  <small style={{ color: '#dc2626' }}>
+                    {modal === 'add' && roomCapacitySummary.remaining <= 0
+                      ? `Tổng số lượng các phòng KTV thuộc chuyên khoa này đã đạt giới hạn (${Math.max(roomCapacitySummary.used, roomCapacitySummary.totalAfterSave)}/${roomCapacitySummary.limit}). Không thể thêm phòng mới.`
+                      : `Tổng số lượng các phòng KTV thuộc chuyên khoa này sẽ vượt quá giới hạn (${roomCapacitySummary.totalAfterSave}/${roomCapacitySummary.limit}). Không thể lưu thay đổi.`}
                   </small>
                 )}
               </label>
@@ -570,13 +694,13 @@ export default function QuanLyPhong() {
             cursor: 'pointer',
             fontSize: '13px'
           }}>Hủy</button>
-              <button onClick={handleSave} disabled={saving} style={{
+              <button onClick={handleSave} disabled={saving || isLimitExceeded} style={{
             padding: '9px 24px',
-            background: 'linear-gradient(135deg,#005bc0,#0077e6)',
+            background: isLimitExceeded ? '#9ca3af' : 'linear-gradient(135deg,#005bc0,#0077e6)',
             color: '#fff',
             border: 'none',
             borderRadius: '8px',
-            cursor: saving ? 'not-allowed' : 'pointer',
+            cursor: saving || isLimitExceeded ? 'not-allowed' : 'pointer',
             fontSize: '13px',
             fontWeight: 600,
             opacity: saving ? 0.7 : 1

@@ -70,13 +70,20 @@ const getLatestEligibleBirthDate = () => {
   return `${eligibleYear}-${String(month).padStart(2, '0')}-${String(Math.min(day, lastDayOfMonth)).padStart(2, '0')}`;
 };
 
+const isSpecialtyNotApplicable = (jobTitle, role) => {
+  const normalizedJobTitle = removeVietnameseTones(jobTitle || '').toLowerCase();
+  const normalizedRole = String(role || '').trim().toUpperCase();
+
+  return ['duoc si', 'le tan', 'nhan vien kho', 'quan tri vien', 'thu ngan']
+    .some(position => normalizedJobTitle.includes(position))
+    || ['DUOC_SI', 'LE_TAN', 'NHAN_VIEN_KHO', 'QUAN_TRI_VIEN', 'THU_NGAN'].includes(normalizedRole);
+};
+
 const isSpecialtyRequired = (jobTitle, role) => {
   const normalizedJobTitle = removeVietnameseTones(jobTitle || '').toLowerCase();
   const normalizedRole = String(role || '').trim().toUpperCase();
 
-  return normalizedJobTitle.includes('duoc si')
-    || normalizedJobTitle.includes('bac si')
-    || normalizedRole === 'DUOC_SI'
+  return normalizedJobTitle.includes('bac si')
     || normalizedRole.startsWith('BAC_SI')
     || normalizedRole.startsWith('TRO_LY_BAC_SI');
 };
@@ -222,6 +229,7 @@ const QuanLyNhanVien = () => {
   };
 
   const handleEdit = (emp) => {
+    const role = getRoleCodeForPosition(emp.chucVu, dsVaiTro);
     setFormData({
       ho_ten: emp.hoTen || '',
       gioi_tinh: emp.gioiTinh !== null ? emp.gioiTinh.toString() : '1',
@@ -230,13 +238,13 @@ const QuanLyNhanVien = () => {
       dia_chi: emp.diaChi || '',
       so_dien_thoai: emp.soDienThoai || '',
       email: emp.email || '',
-      chuyen_khoa: emp.chuyenKhoa ? emp.chuyenKhoa.toString() : '',
+      chuyen_khoa: isSpecialtyNotApplicable(emp.chucVu, role) ? '' : emp.chuyenKhoa ? emp.chuyenKhoa.toString() : '',
       bang_cap: emp.bangCap || '',
       chuc_vu: emp.chucVu || '',
       ngay_vao_lam: emp.ngayVaoLam ? emp.ngayVaoLam.split('T')[0] : '',
     
       username: '',
-      role: getRoleCodeForPosition(emp.chucVu, dsVaiTro)
+      role
     });
     setEditId(emp.maNhanVien);
     setIsEditMode(true);
@@ -314,10 +322,12 @@ const QuanLyNhanVien = () => {
 
   const handleChucVuChange = (e) => {
     const selectedValue = e.target.value;
+    const role = getRoleCodeForPosition(selectedValue, dsVaiTro);
     setFormData(prev => ({
       ...prev,
       chuc_vu: selectedValue,
-      role: getRoleCodeForPosition(selectedValue, dsVaiTro)
+      role,
+      chuyen_khoa: isSpecialtyNotApplicable(selectedValue, role) ? '' : prev.chuyen_khoa
     }));
   };
 
@@ -406,7 +416,9 @@ const QuanLyNhanVien = () => {
       diaChi: formData.dia_chi,
       soDienThoai: formData.so_dien_thoai.trim(),
       email: formData.email.trim(),
-      chuyenKhoa: formData.chuyen_khoa ? parseInt(formData.chuyen_khoa) : null,
+      chuyenKhoa: isSpecialtyNotApplicable(formData.chuc_vu, formData.role)
+        ? null
+        : formData.chuyen_khoa ? parseInt(formData.chuyen_khoa) : null,
       bangCap: formData.bang_cap,
       chucVu: formData.chuc_vu,
       role: formData.role,
@@ -662,17 +674,19 @@ const QuanLyNhanVien = () => {
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Chuyên khoa {isSpecialtyRequired(formData.chuc_vu, formData.role) && <span className="text-red-500">*</span>}
-                      </label>
-                      <select name="chuyen_khoa" value={formData.chuyen_khoa} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none bg-white text-gray-900">
-                        <option value="" className="bg-white text-gray-900">-- Chọn chuyên khoa --</option>
-                        {dsChuyenKhoa.map(ck => (
-                          <option key={ck.maChuyenKhoa} value={ck.maChuyenKhoa} className="bg-white text-gray-900">{ck.tenChuyenKhoa}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {!isSpecialtyNotApplicable(formData.chuc_vu, formData.role) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Chuyên khoa {isSpecialtyRequired(formData.chuc_vu, formData.role) && <span className="text-red-500">*</span>}
+                        </label>
+                        <select name="chuyen_khoa" value={formData.chuyen_khoa} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none bg-white text-gray-900">
+                          <option value="" className="bg-white text-gray-900">-- Chọn chuyên khoa --</option>
+                          {dsChuyenKhoa.map(ck => (
+                            <option key={ck.maChuyenKhoa} value={ck.maChuyenKhoa} className="bg-white text-gray-900">{ck.tenChuyenKhoa}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Bằng cấp</label>
                       <input type="text" placeholder="VD: Thạc sĩ, Cử nhân..." name="bang_cap" value={formData.bang_cap} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
