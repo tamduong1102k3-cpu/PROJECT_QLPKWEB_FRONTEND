@@ -1,6 +1,7 @@
 import fetchClient from './fetchClient';
 import { setAccessToken, getAccessToken, clearAccessToken } from './tokenStore';
 import { API_ORIGIN, API_BASE_URL } from './config';
+import { throwApiError } from './apiError';
 
 const API_URL = `${API_BASE_URL}/taikhoan`;
 
@@ -15,21 +16,7 @@ const handleResponse = async (response) => {
 /**
  * Helper: xử lý lỗi response
  */
-const handleError = async (response) => {
-  let errorMsg = `Lỗi: ${response.status}`;
-  try {
-    const text = await response.text();
-    if (text) {
-      try {
-        const errorData = JSON.parse(text);
-        errorMsg = errorData.message || errorData || errorMsg;
-      } catch {
-        errorMsg = text;
-      }
-    }
-  } catch (e) {}
-  throw new Error(errorMsg);
-};
+const handleError = response => throwApiError(response);
 
 /**
  * GET /

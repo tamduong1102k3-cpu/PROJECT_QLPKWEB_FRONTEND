@@ -10,6 +10,7 @@ const QuanLyChuyenKhoa = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [formData, setFormData] = useState({
     tenChuyenKhoa: '',
     moTa: '',
@@ -39,12 +40,14 @@ const QuanLyChuyenKhoa = () => {
 
   const handleOpenAdd = () => {
     setEditing(null);
+    setFieldErrors({});
     setFormData({ tenChuyenKhoa: '', moTa: '', soLuongToiDa: 0 });
     setShowModal(true);
   };
 
   const handleOpenEdit = (item) => {
     setEditing(item);
+    setFieldErrors({});
     setFormData({
       tenChuyenKhoa: item.tenChuyenKhoa || '',
       moTa: item.moTa || '',
@@ -56,6 +59,7 @@ const QuanLyChuyenKhoa = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditing(null);
+    setFieldErrors({});
     setFormData({ tenChuyenKhoa: '', moTa: '', soLuongToiDa: 0 });
   };
 
@@ -81,7 +85,11 @@ const QuanLyChuyenKhoa = () => {
       showSuccess(editing ? 'Cập nhật chuyên khoa thành công!' : 'Thêm chuyên khoa thành công!');
     } catch (err) {
       console.error('Error saving chuyen khoa:', err);
-      showError('Lỗi kết nối máy chủ. Vui lòng thử lại.');
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length > 0) {
+        setFieldErrors(err.fieldErrors);
+      } else {
+        showError(err.message || 'Lỗi kết nối máy chủ. Vui lòng thử lại.');
+      }
     }
   };
 
@@ -119,11 +127,20 @@ const QuanLyChuyenKhoa = () => {
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Tên Chuyên Khoa</label>
-            <input type="text" maxLength={200} value={formData.tenChuyenKhoa} onChange={e => setFormData({ ...formData, tenChuyenKhoa: e.target.value })}
-              style={{ width: '100%', minWidth: 0, padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+            <input type="text" maxLength={200} value={formData.tenChuyenKhoa} onChange={e => {
+              setFormData({ ...formData, tenChuyenKhoa: e.target.value });
+              setFieldErrors(current => {
+                if (!current.tenChuyenKhoa) return current;
+                const next = { ...current };
+                delete next.tenChuyenKhoa;
+                return next;
+              });
+            }}
+              style={{ width: '100%', minWidth: 0, padding: '8px 12px', border: `1px solid ${fieldErrors.tenChuyenKhoa ? '#dc2626' : '#e5e7eb'}`, borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
               onFocus={e => { e.target.style.borderColor = '#005bbf'; e.target.style.boxShadow = '0 0 0 2px rgba(0,91,191,0.15)'; }}
-              onBlur={e => { e.target.style.borderColor = '#e5e7eb'; e.target.style.boxShadow = 'none'; }}
+              onBlur={e => { e.target.style.borderColor = fieldErrors.tenChuyenKhoa ? '#dc2626' : '#e5e7eb'; e.target.style.boxShadow = 'none'; }}
               placeholder="Nhập tên chuyên khoa" />
+            {fieldErrors.tenChuyenKhoa && <p className="mt-1 text-sm text-red-600">{fieldErrors.tenChuyenKhoa}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Mô Tả</label>

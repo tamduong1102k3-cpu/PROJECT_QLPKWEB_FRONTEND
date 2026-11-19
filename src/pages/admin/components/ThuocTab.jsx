@@ -13,6 +13,7 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
   const { showSuccess, showError, showWarning } = useNotification();
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -91,8 +92,9 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
       showSuccess(editing?.maThuoc ? 'Đã cập nhật thuốc thành công!' : 'Đã thêm thuốc mới thành công!');
       onRefresh();
     } catch (err) {
-      // : khoThuocApi giờ gắn err.status + err.errorCode
-      if (err.status === 409 && err.errorCode === 'VERSION_CONFLICT') {
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length > 0) {
+        setFieldErrors(err.fieldErrors);
+      } else if (err.status === 409 && err.errorCode === 'VERSION_CONFLICT') {
         showWarning('⚠️ Dữ liệu đã được cập nhật bởi người dùng khác. Vui lòng tải lại dữ liệu mới nhất!');
         setEditing(null);
         onRefresh();
@@ -115,7 +117,7 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
           style={{ width: '100%', paddingLeft: '38px', paddingRight: '12px', height: '40px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', outline: 'none' }} />
       </div>
       {(!readOnly || isPharmacist) && (
-        <button onClick={() => setEditing({})}
+        <button onClick={() => { setFieldErrors({}); setEditing({}); }}
           style={{ background: '#005bc0', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <span className="material-symbols-outlined">add</span> Thêm Thuốc Mới
         </button>
@@ -151,7 +153,7 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
               {readOnly && !isPharmacist
                 ? <span style={{ fontSize: '12px', color: '#9ca3af' }}>—</span>
                 : <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => setEditing(i)}
+                    <button onClick={() => { setFieldErrors({}); setEditing(i); }}
                       style={{ background: 'none', border: 'none', color: '#005bc0', cursor: 'pointer' }} title="Sửa">
                       <span className="material-symbols-outlined">edit</span>
                     </button>
@@ -193,7 +195,14 @@ const ThuocTab = ({ items, onRefresh, readOnly, isPharmacist }) => {
           <div style={{ gridColumn: 'span 2' }}>
             <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>Tên thuốc *</label>
             <input name="tenThuoc" defaultValue={editing.tenThuoc} required maxLength={200}
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db' }} />
+              onChange={() => setFieldErrors(current => {
+                if (!current.tenThuoc) return current;
+                const next = { ...current };
+                delete next.tenThuoc;
+                return next;
+              })}
+              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: fieldErrors.tenThuoc ? '1px solid #dc2626' : '1px solid #d1d5db' }} />
+            {fieldErrors.tenThuoc && <span style={{ display: 'block', color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{fieldErrors.tenThuoc}</span>}
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>Hoạt chất</label>

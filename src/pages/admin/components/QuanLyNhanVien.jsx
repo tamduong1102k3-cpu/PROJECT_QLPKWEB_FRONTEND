@@ -212,6 +212,7 @@ const QuanLyNhanVien = () => {
     username: '', 
     role: ''
   });
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const resetForm = () => {
     setFormData({
@@ -219,6 +220,7 @@ const QuanLyNhanVien = () => {
       so_dien_thoai: '', email: '', chuyen_khoa: '', bang_cap: '', 
       chuc_vu: '', ngay_vao_lam: '', username: '', role: ''
     });
+    setFieldErrors({});
     setIsEditMode(false);
     setEditId(null);
   };
@@ -229,6 +231,7 @@ const QuanLyNhanVien = () => {
   };
 
   const handleEdit = (emp) => {
+    setFieldErrors({});
     const role = getRoleCodeForPosition(emp.chucVu, dsVaiTro);
     setFormData({
       ho_ten: emp.hoTen || '',
@@ -315,9 +318,22 @@ const QuanLyNhanVien = () => {
         ho_ten: value,
         username: createUsernameFromName(value)
       }));
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next.ho_ten;
+        delete next.username;
+        return next;
+      });
       return;
     }
     setFormData(prev => ({ ...prev, [name]: value }));
+    const field = name === 'so_dien_thoai' ? 'soDienThoai' : name;
+    setFieldErrors(prev => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
   };
 
   const handleChucVuChange = (e) => {
@@ -438,7 +454,11 @@ const QuanLyNhanVien = () => {
       fetchEmployees();
       resetForm();
     } catch (error) {
-      showError('Lỗi: ' + error.message);
+      if (error.fieldErrors && Object.keys(error.fieldErrors).length > 0) {
+        setFieldErrors(error.fieldErrors);
+      } else {
+        showError('Lỗi: ' + error.message);
+      }
     }
   };
 
@@ -644,15 +664,18 @@ const QuanLyNhanVien = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Số CCCD <span className="text-red-500">*</span></label>
-                      <input required type="text" name="cccd" value={formData.cccd} maxLength={12} inputMode="numeric" onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                      <input required type="text" name="cccd" value={formData.cccd} maxLength={12} inputMode="numeric" onChange={handleInputChange} className={`w-full px-3 py-2 border rounded-md focus:ring-primary focus:border-primary outline-none ${fieldErrors.cccd ? 'border-red-500' : 'border-gray-300'}`} />
+                      {fieldErrors.cccd && <p className="mt-1 text-sm text-red-600">{fieldErrors.cccd}</p>}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại <span className="text-red-500">*</span></label>
-                      <input required type="tel" name="so_dien_thoai" value={formData.so_dien_thoai} maxLength={10} inputMode="numeric" onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                      <input required type="tel" name="so_dien_thoai" value={formData.so_dien_thoai} maxLength={10} inputMode="numeric" onChange={handleInputChange} className={`w-full px-3 py-2 border rounded-md focus:ring-primary focus:border-primary outline-none ${fieldErrors.soDienThoai ? 'border-red-500' : 'border-gray-300'}`} />
+                      {fieldErrors.soDienThoai && <p className="mt-1 text-sm text-red-600">{fieldErrors.soDienThoai}</p>}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
-                      <input required type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                      <input required type="email" name="email" value={formData.email} onChange={handleInputChange} className={`w-full px-3 py-2 border rounded-md focus:ring-primary focus:border-primary outline-none ${fieldErrors.email ? 'border-red-500' : 'border-gray-300'}`} />
+                      {fieldErrors.email && <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>}
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ</label>
@@ -708,7 +731,8 @@ const QuanLyNhanVien = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập (Username) <span className="text-red-500">*</span></label>
-                        <input required={!isEditMode} type="text" name="username" value={formData.username} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary outline-none" />
+                        <input required={!isEditMode} type="text" name="username" value={formData.username} onChange={handleInputChange} className={`w-full px-3 py-2 border rounded-md focus:ring-primary focus:border-primary outline-none ${fieldErrors.username ? 'border-red-500' : 'border-gray-300'}`} />
+                        {fieldErrors.username && <p className="mt-1 text-sm text-red-600">{fieldErrors.username}</p>}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Quyền (Role) <span className="text-red-500">*</span></label>

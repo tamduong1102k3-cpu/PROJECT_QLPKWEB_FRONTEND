@@ -75,6 +75,7 @@ const QuanLyTaiKhoan = () => {
   const [formVaiTro, setFormVaiTro] = useState('');
   const [formPassword, setFormPassword] = useState('');
   const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Fetch ─────────────────────────────────────────────────────
@@ -141,6 +142,7 @@ const QuanLyTaiKhoan = () => {
   // ── Open edit modal ───────────────────────────────────────────
   const openEdit = acc => {
     setEditTarget(acc);
+    setFieldErrors({});
     setFormVaiTro(acc.vaiTro || '');
     setFormPassword('');
     setFormError('');
@@ -173,7 +175,12 @@ const QuanLyTaiKhoan = () => {
       setShowModal(false);
       fetchAccounts();
     } catch (err) {
-      setFormError(err.message);
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length > 0) {
+        setFieldErrors(err.fieldErrors);
+        setFormError('');
+      } else {
+        setFormError(err.message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -563,6 +570,7 @@ const QuanLyTaiKhoan = () => {
                 fontSize: '13px',
                 color: '#6b7280'
               }}>{editTarget.username}</p>
+                  {fieldErrors.username && <p style={{ margin: 0, color: '#dc2626', fontSize: '12px' }}>{fieldErrors.username}</p>}
                 </div>
               </div>
               <button onClick={() => setShowModal(false)} style={{
@@ -617,6 +625,7 @@ const QuanLyTaiKhoan = () => {
                 color: '#374151',
                 fontWeight: 500
               }}>{editTarget.email}</span>
+                  {fieldErrors.email && <><span></span><span style={{ color: '#dc2626', fontSize: '12px' }}>{fieldErrors.email}</span></>}
                   <span>Nhân viên:</span><span style={{
                 color: '#374151',
                 fontWeight: 500

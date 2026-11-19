@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
 import { API_BASE_URL } from './config';
+import { throwApiError } from './apiError';
 const API_URL = `${API_BASE_URL}/benh-nhan`;
 
 /**
@@ -10,14 +11,7 @@ export const getAllApi = async () => {
     const response = await fetchClient(`${API_URL}`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -36,14 +30,7 @@ export const searchApi = async (params = {}) => {
     const response = await fetchClient(url, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -60,14 +47,7 @@ export const getByIdApi = async id => {
     const response = await fetchClient(`${API_URL}/${id}`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -84,14 +64,7 @@ export const getHoSoApi = async id => {
     const response = await fetchClient(`${API_URL}/${id}/ho-so`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -112,14 +85,7 @@ export const createApi = async data => {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -140,14 +106,7 @@ export const updateApi = async (id, data) => {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -164,14 +123,7 @@ export const deleteApi = async id => {
     const response = await fetchClient(`${API_URL}/${id}`, {
       method: 'DELETE'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -189,14 +141,7 @@ export const resetQuaHenApi = async id => {
     const response = await fetchClient(`${API_URL}/${id}/reset-qua-hen`, {
       method: 'PUT'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch (e) {}
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {

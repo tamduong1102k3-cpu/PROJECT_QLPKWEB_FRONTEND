@@ -209,7 +209,11 @@ const DangKyBenhNhan = ({
       }
       onSuccess(data);
     } catch (error) {
-      showError(`Lỗi ${editPatient ? 'cập nhật' : 'đăng ký'}: ${error.message}`);
+      if (error.fieldErrors && Object.keys(error.fieldErrors).length > 0) {
+        setErrors(prev => ({ ...prev, ...error.fieldErrors }));
+      } else {
+        showError(`Lỗi ${editPatient ? 'cập nhật' : 'đăng ký'}: ${error.message}`);
+      }
     }
   };
   return <div className="bg-white rounded-3xl">

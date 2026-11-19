@@ -36,6 +36,7 @@ export default function QuanLyDichVu() {
   const [filterLoai, setFilterLoai] = useState('');
   const [modal, setModal] = useState(null); // null | 'add' | 'edit'
   const [form, setForm] = useState(empty);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
@@ -107,6 +108,7 @@ export default function QuanLyDichVu() {
     return matchSearch && matchLoai;
   });
   const openAdd = () => {
+    setFieldErrors({});
     nhomRequestId.current += 1;
     setFormNhomList([]);
     setLoadingNhom(false);
@@ -115,6 +117,7 @@ export default function QuanLyDichVu() {
     setModal('add');
   };
   const openEdit = d => {
+    setFieldErrors({});
     setForm({
       tenDichVu: d.tenDichVu || '',
       donGia: d.donGia ?? '',
@@ -178,6 +181,10 @@ export default function QuanLyDichVu() {
       fetchAll();
       showSuccess(modal === 'edit' ? 'Cập nhật dịch vụ thành công!' : 'Thêm dịch vụ thành công!');
     } catch (e) {
+      if (e.fieldErrors && Object.keys(e.fieldErrors).length > 0) {
+        setFieldErrors(e.fieldErrors);
+        return;
+      }
       const status = e.status || e.response?.status;
       const msg = e.message || '';
       const isConflict = status === 409
@@ -537,15 +544,21 @@ export default function QuanLyDichVu() {
             }}>Tên Dịch Vụ <span style={{
                 color: '#dc2626'
               }}>*</span></span>
-                <input maxLength={200} value={form.tenDichVu} onChange={e => setForm({
-              ...form,
-              tenDichVu: e.target.value
-            })} placeholder="VD: Khám Nội Tổng Quát" style={{
+                <input maxLength={200} value={form.tenDichVu} onChange={e => {
+              setForm({ ...form, tenDichVu: e.target.value });
+              setFieldErrors(current => {
+                if (!current.tenDichVu) return current;
+                const next = { ...current };
+                delete next.tenDichVu;
+                return next;
+              });
+            }} placeholder="VD: Khám Nội Tổng Quát" style={{
               padding: '10px 12px',
-              border: '1px solid #d1d5db',
+              border: fieldErrors.tenDichVu ? '1px solid #dc2626' : '1px solid #d1d5db',
               borderRadius: '8px',
               fontSize: '13px'
             }} />
+                {fieldErrors.tenDichVu && <span style={{ color: '#dc2626', fontSize: '12px' }}>{fieldErrors.tenDichVu}</span>}
               </label>
 
               <div style={{

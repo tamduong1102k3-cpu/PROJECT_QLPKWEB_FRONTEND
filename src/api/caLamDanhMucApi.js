@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
 import { API_BASE_URL } from './config';
+import { throwApiError } from './apiError';
 const CA_LAM_DANH_MUC_URL = `${API_BASE_URL}/ca-lam-danh-muc`;
 
 /**
@@ -10,9 +11,7 @@ export const getAllCaLamDanhMucApi = async () => {
     const response = await fetchClient(`${CA_LAM_DANH_MUC_URL}`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      throw new Error(`Lỗi: ${response.status} - Không thể tải danh mục ca`);
-    }
+    if (!response.ok) await throwApiError(response, `Lỗi: ${response.status} - Không thể tải danh mục ca`);
     const data = await response.json();
     return data;
   } catch (error) {
@@ -33,10 +32,7 @@ export const createCaLamDanhMucApi = async (data) => {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Không thể tạo ca làm việc");
-    }
+    if (!response.ok) await throwApiError(response, "Không thể tạo ca làm việc");
     return await response.json();
   } catch (error) {
     console.error("Error in createCaLamDanhMucApi:", error);
@@ -56,10 +52,7 @@ export const updateCaLamDanhMucApi = async (id, data) => {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Không thể cập nhật ca làm việc");
-    }
+    if (!response.ok) await throwApiError(response, "Không thể cập nhật ca làm việc");
     return await response.json();
   } catch (error) {
     console.error("Error in updateCaLamDanhMucApi:", error);
@@ -75,9 +68,7 @@ export const deleteCaLamDanhMucApi = async (id) => {
     const response = await fetchClient(`${CA_LAM_DANH_MUC_URL}/${id}`, {
       method: 'DELETE'
     });
-    if (!response.ok) {
-      throw new Error(`Lỗi: ${response.status} - Không thể xóa ca làm việc`);
-    }
+    if (!response.ok) await throwApiError(response, `Lỗi: ${response.status} - Không thể xóa ca làm việc`);
     return true;
   } catch (error) {
     console.error("Error in deleteCaLamDanhMucApi:", error);

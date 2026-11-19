@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
 import { API_BASE_URL } from './config';
+import { throwApiError } from './apiError';
 
 const API_URL = `${API_BASE_URL}/nhan_vien`;
 
@@ -14,14 +15,7 @@ const handleResponse = async (response) => {
 /**
  * Helper: xử lý lỗi response
  */
-const handleError = async (response) => {
-  let errorMsg = `Lỗi: ${response.status}`;
-  try {
-    const errorData = await response.json();
-    errorMsg = errorData.message || errorMsg;
-  } catch (e) {}
-  throw new Error(errorMsg);
-};
+const handleError = response => throwApiError(response);
 
 /**
  * GET /

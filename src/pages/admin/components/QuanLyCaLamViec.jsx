@@ -277,6 +277,7 @@ export default function QuanLyCaLamViec() {
   const [caLamLoading, setCaLamLoading] = useState(false);
   const [caLamError, setCaLamError] = useState(null);
   const [caLamForm, setCaLamForm] = useState(emptyCaLamForm());
+  const [caLamFieldErrors, setCaLamFieldErrors] = useState({});
   const [editingCaLamId, setEditingCaLamId] = useState(null);
   const [openCaLamModal, setOpenCaLamModal] = useState(false);
   const [caLamSaving, setCaLamSaving] = useState(false);
@@ -1216,6 +1217,16 @@ const calDeleteDefault = async (m) => {
   /* ============================================================
      SECTION: SHIFT CATEGORY LOGIC
      ============================================================ */
+  const updateCaLamFormField = (field, value) => {
+    setCaLamForm(current => ({ ...current, [field]: value }));
+    setCaLamFieldErrors(current => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
   const saveCaLam = async () => {
     if (!caLamForm.tenCa.trim()) {
       showError("Vui lòng nhập tên ca!");
@@ -1243,7 +1254,11 @@ const calDeleteDefault = async (m) => {
       await fetchData();
       showSuccess(editingCaLamId ? "Đã cập nhật ca" : "Đã thêm ca mới");
     } catch (e) {
-      showError("Lỗi lưu ca: " + e.message);
+      if (e.fieldErrors && Object.keys(e.fieldErrors).length > 0) {
+        setCaLamFieldErrors(e.fieldErrors);
+      } else {
+        showError("Lỗi lưu ca: " + e.message);
+      }
     } finally {
       setCaLamSaving(false);
     }
@@ -3612,6 +3627,7 @@ const calDeleteDefault = async (m) => {
               onClick={() => {
                 setEditingCaLamId(null);
                 setCaLamForm({ tenCa: "", gioBatDau: "", gioKetThuc: "" });
+                setCaLamFieldErrors({});
                 setOpenCaLamModal(true);
               }}
               style={{
@@ -3675,6 +3691,7 @@ const calDeleteDefault = async (m) => {
                         <button
                           onClick={() => {
                             setEditingCaLamId(ca.id);
+                            setCaLamFieldErrors({});
                             setCaLamForm({
                               tenCa: ca.tenCa,
                               gioBatDau: fmtGio(ca.gioBatDau),
@@ -3773,9 +3790,7 @@ const calDeleteDefault = async (m) => {
                     Tên ca:
                     <input
                       value={caLamForm.tenCa}
-                      onChange={(e) =>
-                        setCaLamForm({ ...caLamForm, tenCa: e.target.value })
-                      }
+                      onChange={(e) => updateCaLamFormField("tenCa", e.target.value)}
                       placeholder="vd: Ca sáng"
                       disabled={caLamSaving}
                       style={{
@@ -3783,9 +3798,10 @@ const calDeleteDefault = async (m) => {
                         padding: "8px",
                         marginTop: "4px",
                         borderRadius: "5px",
-                        border: "1px solid #ddd",
+                        border: caLamFieldErrors.tenCa ? "1px solid #dc2626" : "1px solid #ddd",
                       }}
                     />
+                    {caLamFieldErrors.tenCa && <span style={{ display: "block", color: "#dc2626", marginTop: "4px" }}>{caLamFieldErrors.tenCa}</span>}
                   </label>
                   <div
                     style={{
@@ -3800,42 +3816,34 @@ const calDeleteDefault = async (m) => {
                       <input
                         type="time"
                         value={caLamForm.gioBatDau}
-                        onChange={(e) =>
-                          setCaLamForm({
-                            ...caLamForm,
-                            gioBatDau: e.target.value,
-                          })
-                        }
+                        onChange={(e) => updateCaLamFormField("gioBatDau", e.target.value)}
                         disabled={caLamSaving}
                         style={{
                           width: "100%",
                           padding: "8px",
                           marginTop: "4px",
                           borderRadius: "5px",
-                          border: "1px solid #ddd",
+                          border: caLamFieldErrors.gioBatDau ? "1px solid #dc2626" : "1px solid #ddd",
                         }}
                       />
+                      {caLamFieldErrors.gioBatDau && <span style={{ display: "block", color: "#dc2626", marginTop: "4px" }}>{caLamFieldErrors.gioBatDau}</span>}
                     </label>
                     <label style={{ fontSize: "13px" }}>
                       Giờ kết thúc:{" "}
                       <input
                         type="time"
                         value={caLamForm.gioKetThuc}
-                        onChange={(e) =>
-                          setCaLamForm({
-                            ...caLamForm,
-                            gioKetThuc: e.target.value,
-                          })
-                        }
+                        onChange={(e) => updateCaLamFormField("gioKetThuc", e.target.value)}
                         disabled={caLamSaving}
                         style={{
                           width: "100%",
                           padding: "8px",
                           marginTop: "4px",
                           borderRadius: "5px",
-                          border: "1px solid #ddd",
+                          border: caLamFieldErrors.gioKetThuc ? "1px solid #dc2626" : "1px solid #ddd",
                         }}
                       />
+                      {caLamFieldErrors.gioKetThuc && <span style={{ display: "block", color: "#dc2626", marginTop: "4px" }}>{caLamFieldErrors.gioKetThuc}</span>}
                     </label>
                   </div>
                   <div

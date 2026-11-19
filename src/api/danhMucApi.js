@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
 import { API_BASE_URL } from './config';
+import { throwApiError } from './apiError';
 const API_URL = `${API_BASE_URL}/danhmuc`;
 
 /**
@@ -10,14 +11,7 @@ export const getAllChucVuApi = async () => {
     const response = await fetchClient(`${API_URL}/chuc-vu`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -34,14 +28,7 @@ export const getAllChuyenKhoaApi = async () => {
     const response = await fetchClient(`${API_URL}/chuyen-khoa`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -58,14 +45,7 @@ export const getAllVaiTroApi = async () => {
     const response = await fetchClient(`${API_URL}/vai-tro`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -82,14 +62,7 @@ export const getAllPhongApi = async () => {
     const response = await fetchClient(`${API_URL}/phong`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -106,14 +79,7 @@ export const getDistinctTenPhongApi = async () => {
     const response = await fetchClient(`${API_URL}/phong/ten-phong`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const names = await response.json();
     if (!Array.isArray(names) || names.some(name => typeof name !== 'string')) {
       throw new Error('Dữ liệu tên phòng từ máy chủ không hợp lệ.');
@@ -133,14 +99,7 @@ export const getPhongByChucVuApi = async maChucVu => {
     const response = await fetchClient(`${API_URL}/phong/by-chuc-vu/${maChucVu}`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -157,19 +116,7 @@ export const getPhongByChuyenKhoaApi = async (maChuyenKhoa) => {
     const response = await fetchClient(`${API_URL}/phong/by-chuyen-khoa/${maChuyenKhoa}`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) { /* ignore parse error */ }
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -190,14 +137,7 @@ export const createPhongApi = async data => {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -218,14 +158,7 @@ export const updatePhongApi = async (id, data) => {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -242,14 +175,7 @@ export const deletePhongApi = async id => {
     const response = await fetchClient(`${API_URL}/phong/${id}`, {
       method: 'DELETE'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch { /* ignore parse error */ }
-      throw new Error(errorMsg);
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -270,19 +196,7 @@ export const getAllNhomDichVuApi = async maChuyenKhoa => {
     const response = await fetchClient(`${API_BASE_URL}/nhom-dich-vu${query}`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {

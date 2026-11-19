@@ -51,6 +51,7 @@ export default function QuanLyPhong() {
   const [modal, setModal] = useState(null); // null | 'add' | 'edit'
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
   useEffect(() => {
@@ -132,11 +133,13 @@ export default function QuanLyPhong() {
 
   // Open modal
   const openAdd = () => {
+    setFieldErrors({});
     setForm(empty);
     setEditId(null);
     setModal('add');
   };
   const openEdit = p => {
+    setFieldErrors({});
     setForm({
       tenPhong: p.tenPhong || '',
       loaiPhong: p.loaiPhong || '',
@@ -151,6 +154,12 @@ export default function QuanLyPhong() {
   const handleRoomNameChange = event => {
     const value = event.target.value;
     setForm(current => ({ ...current, tenPhong: value }));
+    setFieldErrors(current => {
+      if (!current.tenPhong) return current;
+      const next = { ...current };
+      delete next.tenPhong;
+      return next;
+    });
 
     const query = value.trim().toLocaleLowerCase('vi');
     if (!query) {
@@ -168,6 +177,12 @@ export default function QuanLyPhong() {
 
   const selectRoomName = name => {
     setForm(current => ({ ...current, tenPhong: name }));
+    setFieldErrors(current => {
+      if (!current.tenPhong) return current;
+      const next = { ...current };
+      delete next.tenPhong;
+      return next;
+    });
     setFilteredNames([]);
     setShowSuggestions(false);
   };
@@ -211,7 +226,11 @@ export default function QuanLyPhong() {
       fetchAll();
       showSuccess(modal === 'edit' ? 'Cập nhật phòng thành công!' : 'Thêm phòng thành công!');
     } catch (e) {
-      showError(e.message);
+      if (e.fieldErrors && Object.keys(e.fieldErrors).length > 0) {
+        setFieldErrors(e.fieldErrors);
+      } else {
+        showError(e.message);
+      }
     } finally {
       setSaving(false);
     }
@@ -514,7 +533,7 @@ export default function QuanLyPhong() {
                       width: '100%',
                       boxSizing: 'border-box',
                       padding: '10px 12px',
-                      border: '1px solid #d1d5db',
+                      border: fieldErrors.tenPhong ? '1px solid #dc2626' : '1px solid #d1d5db',
                       borderRadius: '8px',
                       fontSize: '13px'
                     }}
@@ -564,6 +583,7 @@ export default function QuanLyPhong() {
                     </ul>
                   )}
                 </div>
+                {fieldErrors.tenPhong && <span style={{ color: '#dc2626', fontSize: '12px' }}>{fieldErrors.tenPhong}</span>}
               </label>
 
               <label style={{

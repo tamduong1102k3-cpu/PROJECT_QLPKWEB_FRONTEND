@@ -1,5 +1,6 @@
 import fetchClient from './fetchClient';
 import { API_BASE_URL } from './config';
+import { throwApiError } from './apiError';
 const API_URL = `${API_BASE_URL}/kho-thuoc`;
 
 /**
@@ -10,19 +11,7 @@ export const getAllThuocApi = async () => {
     const response = await fetchClient(`${API_URL}/thuoc`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -43,19 +32,7 @@ export const createThuocApi = async data => {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -76,19 +53,7 @@ export const updateThuocApi = async (id, data) => {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -105,19 +70,7 @@ export const deleteThuocApi = async id => {
     const response = await fetchClient(`${API_URL}/thuoc/${id}`, {
       method: 'DELETE'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -134,19 +87,7 @@ export const getAllKhoApi = async () => {
     const response = await fetchClient(`${API_URL}`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -163,19 +104,7 @@ export const getKhoCanhBaoApi = async () => {
     const response = await fetchClient(`${API_URL}/canh-bao`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -192,19 +121,7 @@ export const getThuocCanhBaoApi = async () => {
     const response = await fetchClient(`${API_URL}/canh-bao/thuoc`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -221,19 +138,7 @@ export const getThuocSapHetApi = async (threshold = 20) => {
     const response = await fetchClient(`${API_URL}/sap-het?threshold=${threshold}`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -250,19 +155,7 @@ export const getAllPhieuNhapApi = async () => {
     const response = await fetchClient(`${API_URL}/phieu-nhap`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -279,19 +172,7 @@ export const getPhieuNhapByIdApi = async id => {
     const response = await fetchClient(`${API_URL}/phieu-nhap/${id}`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -308,19 +189,7 @@ export const getChiTietPhieuNhapApi = async id => {
     const response = await fetchClient(`${API_URL}/phieu-nhap/${id}/chi-tiet`, {
       method: 'GET'
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -341,19 +210,7 @@ export const createPhieuNhapApi = async data => {
       },
       body: JSON.stringify(data)
     });
-    if (!response.ok) {
-      let errorMsg = `Lỗi: ${response.status}`;
-      let errorCode = null;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-        errorCode = errorData.errorCode;
-      } catch (e) {}
-      const error = new Error(errorMsg);
-      error.status = response.status;
-      error.errorCode = errorCode;
-      throw error;
-    }
+    if (!response.ok) await throwApiError(response);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
