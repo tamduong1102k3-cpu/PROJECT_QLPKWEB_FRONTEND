@@ -437,47 +437,69 @@ const BangDieuKhienAdmin = ({
   const navItems = [{
     id: 'dashboard',
     label: 'Tổng Quan',
-    icon: 'dashboard'
+    icon: 'dashboard',
+    iconColor: 'text-blue-600',
+    iconBackground: 'bg-blue-50'
   }, {
     id: 'patients',
     label: 'Bệnh Nhân',
-    icon: 'person_search'
+    icon: 'person_search',
+    iconColor: 'text-teal-600',
+    iconBackground: 'bg-teal-50'
   }, {
     id: 'employees',
     label: 'Nhân Viên',
-    icon: 'badge'
+    icon: 'badge',
+    iconColor: 'text-indigo-600',
+    iconBackground: 'bg-indigo-50'
   }, {
     id: 'pharmacy',
     label: 'Kho Thuốc',
-    icon: 'medication'
+    icon: 'medication',
+    iconColor: 'text-emerald-600',
+    iconBackground: 'bg-emerald-50'
   }, {
     id: 'shifts',
     label: 'Ca Làm Việc',
-    icon: 'calendar_month'
+    icon: 'calendar_month',
+    iconColor: 'text-amber-600',
+    iconBackground: 'bg-amber-50'
   }, {
     id: 'rooms',
     label: 'Phòng Chức Năng',
-    icon: 'meeting_room'
+    icon: 'meeting_room',
+    iconColor: 'text-violet-600',
+    iconBackground: 'bg-violet-50'
   }, {
     id: 'services',
     label: 'Dịch Vụ',
-    icon: 'medical_services'
+    icon: 'medical_services',
+    iconColor: 'text-rose-500',
+    iconBackground: 'bg-rose-50'
   }, {
     id: 'statistics',
     label: 'Thống Kê',
-    icon: 'bar_chart'
+    icon: 'bar_chart',
+    iconColor: 'text-cyan-600',
+    iconBackground: 'bg-cyan-50'
   }, {
     id: 'accounts',
     label: 'Tài Khoản',
-    icon: 'manage_accounts'
+    icon: 'manage_accounts',
+    iconColor: 'text-sky-600',
+    iconBackground: 'bg-sky-50'
   }, {
     id: 'specialties',
     label: 'Chuyên Khoa',
-    icon: 'local_hospital'
+    icon: 'local_hospital',
+    iconColor: 'text-red-500',
+    iconBackground: 'bg-red-50'
   }, {
     id: 'backup',
     label: 'Sao Lưu',
-    icon: 'database'
+    icon: 'database',
+    iconColor: 'text-orange-500',
+    iconBackground: 'bg-orange-50'
   }];
   return <div className="flex h-screen bg-[#f3f4f6] font-body-md text-on-background overflow-hidden">
       
@@ -527,7 +549,9 @@ const BangDieuKhienAdmin = ({
                   setActiveTab(item.id);
                   if (item.id === 'backup') loadCloudBackups();
                 }} className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${activeTab === item.id ? 'bg-primary-container/10 text-primary font-semibold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
-                  <span className="material-symbols-outlined">{item.icon}</span>
+                  <span className={`material-symbols-outlined rounded-lg p-1.5 ${item.iconColor} ${item.iconBackground}`}>
+                    {item.icon}
+                  </span>
                   {isSidebarOpen && <span>{item.label}</span>}
                 </button>
               </li>)}

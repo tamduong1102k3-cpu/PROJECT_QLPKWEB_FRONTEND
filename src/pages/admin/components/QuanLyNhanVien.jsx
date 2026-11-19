@@ -5,6 +5,7 @@ import {
   addNhanVienApi as createEmployeeApi, 
   updateNhanVienApi as updateEmployeeApi, 
   deleteNhanVienApi as deleteEmployeeApi,
+  checkDeleteNhanVienApi,
   permanentlyDeleteNhanVienApi,
   activateNhanVienAccountApi
 } from '../../../api/employeeApi';
@@ -38,6 +39,8 @@ const ROLE_CODE_BY_POSITION = {
   'ky thuat vien chan doan hinh anh': 'KY_THUAT_VIEN_CHAN_DOAN_HINH_ANH',
   'quan tri vien': 'QUAN_TRI_VIEN'
 };
+
+const DELETE_BLOCKED_MESSAGE = 'Không thể xóa nhân viên này vì còn dữ liệu liên quan.';
 
 const normalizeCategoryLabel = label => removeVietnameseTones(String(label || ''))
   .trim()
@@ -98,6 +101,8 @@ const QuanLyNhanVien = () => {
   const [filterChuyenKhoa, setFilterChuyenKhoa] = useState('');
   const [filterVaiTro, setFilterVaiTro] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteBusyId, setDeleteBusyId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState(null);
 
   // --- DỮ LIỆU DANH MỤC TỪ DATABASE ---
   const [dsChuyenKhoa, setDsChuyenKhoa] = useState([]);
@@ -266,19 +271,60 @@ const QuanLyNhanVien = () => {
     });
   };
 
-  const handlePermanentDelete = async (id) => {
-    showConfirm(
-      "Xóa vĩnh viễn hồ sơ nhân viên và tài khoản? Chỉ xóa được khi nhân viên chưa có dữ liệu liên quan. Nếu đã phát sinh dữ liệu, hãy dùng chức năng khóa tài khoản.",
-      async () => {
-        try {
-          await permanentlyDeleteNhanVienApi(id);
-          showSuccess("Xóa nhân viên và tài khoản thành công!");
-          fetchEmployees();
-        } catch (error) {
-          showError(error.message);
-        }
+  const permanentlyDeleteEmployee = async (employee) => {
+    setDeleteBusyId(employee.maNhanVien);
+    try {
+      await permanentlyDeleteNhanVienApi(employee.maNhanVien);
+      setDeleteDialog(null);
+      showSuccess("Xóa nhân viên và tài khoản thành công!");
+      fetchEmployees();
+    } catch (error) {
+      setDeleteDialog(null);
+      showError(error.message);
+    } finally {
+      setDeleteBusyId(null);
+    }
+  };
+
+  const keepAndLockEmployee = async (employee) => {
+    setDeleteBusyId(employee.maNhanVien);
+    try {
+      await deleteEmployeeApi(employee.maNhanVien);
+      setDeleteDialog(null);
+      showSuccess("Đã giữ lại nhân viên và khóa tài khoản.");
+      fetchEmployees();
+    } catch (error) {
+      setDeleteDialog(null);
+      showError(error.message);
+    } finally {
+      setDeleteBusyId(null);
+    }
+  };
+
+  const handlePermanentDelete = async (employee) => {
+    if (deleteBusyId !== null) return;
+    setDeleteBusyId(employee.maNhanVien);
+    try {
+      const check = await checkDeleteNhanVienApi(employee.maNhanVien);
+      if (!check.canDelete) {
+        showError(check.message || DELETE_BLOCKED_MESSAGE);
+        return;
       }
-    );
+
+      if (check.hasAccount) {
+        setDeleteDialog({ employee, username: check.username });
+        return;
+      }
+
+      showConfirm(
+        `Bạn có chắc muốn xóa nhân viên ${employee.hoTen}?`,
+        () => permanentlyDeleteEmployee(employee)
+      );
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setDeleteBusyId(null);
+    }
   };
 
   const handleActivate = async (id) => {
@@ -587,12 +633,15 @@ const QuanLyNhanVien = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => handlePermanentDelete(emp.maNhanVien)}
+                      onClick={() => handlePermanentDelete(emp)}
+                      disabled={deleteBusyId === emp.maNhanVien}
                       title="Xóa hồ sơ và tài khoản (chỉ khi chưa có dữ liệu liên quan)"
                       aria-label="Xóa hồ sơ và tài khoản nhân viên"
                       className="text-gray-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition-colors ml-2"
                     >
-                      <span className="material-symbols-outlined text-[20px]">delete</span>
+                      <span className="material-symbols-outlined text-[20px]">
+                        {deleteBusyId === emp.maNhanVien ? 'hourglass_empty' : 'delete'}
+                      </span>
                     </button>
                   </td>
                 </tr>
@@ -619,6 +668,53 @@ const QuanLyNhanVien = () => {
           />
         )}
       </div>
+
+      {deleteDialog && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-employee-title"
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+          >
+            <h2 id="delete-employee-title" className="text-lg font-semibold text-gray-900">
+              Xác nhận xóa nhân viên
+            </h2>
+            <p className="mt-3 text-sm text-gray-700">
+              Nhân viên {deleteDialog.employee.hoTen} đang liên kết với tài khoản
+              {' '}<span className="font-semibold">`{deleteDialog.username}`</span>.
+              {' '}Bạn có muốn xóa luôn tài khoản của nhân viên này không?
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => permanentlyDeleteEmployee(deleteDialog.employee)}
+                disabled={deleteBusyId !== null}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Có, xóa nhân viên &amp; tài khoản
+              </button>
+              <button
+                type="button"
+                onClick={() => keepAndLockEmployee(deleteDialog.employee)}
+                disabled={deleteBusyId !== null}
+                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Không, chỉ khóa tài khoản
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteDialog(null)}
+                disabled={deleteBusyId !== null}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Add Employee Modal */}
       {showAddModal && createPortal(

@@ -128,6 +128,17 @@ export const deleteNhanVienApi = async id => {
   }
 };
 
+export const checkDeleteNhanVienApi = async id => {
+  try {
+    const response = await fetchClient(`${API_URL}/${id}/delete-check`, { method: 'GET' });
+    if (!response.ok) await handleError(response);
+    return await handleResponse(response);
+  } catch (error) {
+    console.error("Error in checkDeleteNhanVienApi:", error);
+    throw error;
+  }
+};
+
 export const permanentlyDeleteNhanVienApi = async id => {
   try {
     const response = await fetchClient(`${API_URL}/${id}/permanent`, { method: 'DELETE' });
