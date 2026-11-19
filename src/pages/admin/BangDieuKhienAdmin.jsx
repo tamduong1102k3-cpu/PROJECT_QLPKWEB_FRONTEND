@@ -17,6 +17,18 @@ import QuanLyPhong from './components/QuanLyPhong';
 import QuanLyDichVu from './components/QuanLyDichVu';
 import QuanLyBenhNhan from './components/QuanLyBenhNhan';
 import QuanLyChuyenKhoa from './components/QuanLyChuyenKhoa';
+
+const MAX_BACKUP_FILE_SIZE = 100 * 1024 * 1024;
+
+const getResponseErrorMessage = async (response, fallback) => {
+  try {
+    const body = await response.json();
+    return body?.message || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 const BangDieuKhienAdmin = ({
   onLogout,
   user
@@ -30,6 +42,10 @@ const BangDieuKhienAdmin = ({
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreFile, setRestoreFile] = useState(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
+  const [cloudBackups, setCloudBackups] = useState([]);
+  const [cloudBackupsLoading, setCloudBackupsLoading] = useState(false);
+  const [cloudBackupAction, setCloudBackupAction] = useState(null);
+  const [cloudBackupError, setCloudBackupError] = useState('');
   const restoreFileInputRef = useRef(null);
   const [summary, setSummary] = useState({
     tongBenhNhan: 0,
@@ -177,7 +193,7 @@ const BangDieuKhienAdmin = ({
         .replace('T', '_')
         .replace(/\.\d{3}Z$/, '');
       const filename = disposition?.match(/filename="?([^";]+)"?/i)?.[1]
-        || `backup_${timestamp}.sql`;
+        || `backup_${timestamp}.zip`;
       const downloadUrl = window.URL.createObjectURL(blob);
       const downloadLink = document.createElement('a');
       downloadLink.href = downloadUrl;
@@ -204,10 +220,16 @@ const BangDieuKhienAdmin = ({
 
   const handleRestoreFileChange = (event) => {
     const file = event.target.files?.[0] || null;
-    if (file && !file.name.toLowerCase().endsWith('.sql')) {
+    if (file && !file.name.toLowerCase().endsWith('.zip')) {
       event.target.value = '';
       setRestoreFile(null);
-      showError('Chỉ chấp nhận file có định dạng .sql.');
+      showError('Chỉ chấp nhận file có định dạng .zip.');
+      return;
+    }
+    if (file && file.size > MAX_BACKUP_FILE_SIZE) {
+      event.target.value = '';
+      setRestoreFile(null);
+      showError('Dung lượng file backup không được vượt quá 100 MB.');
       return;
     }
     setRestoreFile(file);
@@ -253,6 +275,139 @@ const BangDieuKhienAdmin = ({
     showConfirm(
       'CẢNH BÁO: Hành động này sẽ xóa toàn bộ dữ liệu hiện tại và thay thế bằng dữ liệu trong file. Bạn có chắc chắn muốn tiếp tục?',
       handleDatabaseRestore
+    );
+  };
+
+  const loadCloudBackups = useCallback(async () => {
+    setCloudBackupsLoading(true);
+    setCloudBackupError('');
+    try {
+      const response = await fetchClient(`${API_BASE_URL}/admin/backup/cloud`, { skipLoading: true });
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response, 'Không thể tải danh sách backup cloud.'));
+      }
+
+      const backups = await response.json();
+      if (!Array.isArray(backups)) {
+        throw new Error('Dữ liệu danh sách backup cloud không hợp lệ.');
+      }
+      setCloudBackups(backups);
+      return true;
+    } catch (error) {
+      setCloudBackupError(error?.message || 'Không thể tải danh sách backup cloud.');
+      return false;
+    } finally {
+      setCloudBackupsLoading(false);
+    }
+  }, []);
+
+  const handleCloudBackup = async () => {
+    if (cloudBackupAction) return;
+    setCloudBackupAction('create');
+    try {
+      const response = await fetchClient(`${API_BASE_URL}/admin/backup/cloud`, {
+        method: 'POST',
+        skipLoading: true,
+      });
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response, 'Không thể sao lưu lên cloud.'));
+      }
+
+      showSuccess('Đã tạo bản backup trên Backblaze B2.');
+      await loadCloudBackups();
+    } catch (error) {
+      showError(error?.message || 'Không thể sao lưu lên cloud.');
+    } finally {
+      setCloudBackupAction(null);
+    }
+  };
+
+  const handleCloudBackupDownload = async (backup) => {
+    if (cloudBackupAction) return;
+    setCloudBackupAction(`download:${backup.key}`);
+    try {
+      const response = await fetchClient(
+        `${API_BASE_URL}/admin/backup/cloud/download?key=${encodeURIComponent(backup.key)}`,
+        { skipLoading: true }
+      );
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response, 'Không thể tải backup từ cloud.'));
+      }
+
+      const blob = await response.blob();
+      if (blob.size === 0) {
+        throw new Error('File backup tải về bị rỗng.');
+      }
+      const disposition = response.headers.get('Content-Disposition');
+      const filename = disposition?.match(/filename="?([^";]+)"?/i)?.[1] || backup.filename;
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = downloadUrl;
+      downloadLink.download = filename;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (error) {
+      showError(error?.message || 'Không thể tải backup từ cloud.');
+    } finally {
+      setCloudBackupAction(null);
+    }
+  };
+
+  const handleCloudBackupRestore = (backup) => {
+    showConfirm(
+      `CẢNH BÁO: Phục hồi database từ bản backup cloud "${backup.filename}" sẽ thay thế dữ liệu hiện tại. Bạn có chắc chắn muốn tiếp tục?`,
+      async () => {
+        if (cloudBackupAction) return;
+        setCloudBackupAction(`restore:${backup.key}`);
+        try {
+          const response = await fetchClient(`${API_BASE_URL}/admin/backup/cloud/restore`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: backup.key }),
+            skipLoading: true,
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(result?.message || 'Không thể phục hồi backup từ cloud.');
+          }
+
+          showSuccess(result?.message || 'Phục hồi database thành công.');
+          await loadCloudBackups();
+        } catch (error) {
+          showError(error?.message || 'Không thể phục hồi backup từ cloud.');
+        } finally {
+          setCloudBackupAction(null);
+        }
+      }
+    );
+  };
+
+  const handleCloudBackupDelete = (backup) => {
+    showConfirm(
+      `Bạn có chắc chắn muốn xóa bản backup "${backup.filename}" khỏi Backblaze B2?`,
+      async () => {
+        if (cloudBackupAction) return;
+        setCloudBackupAction(`delete:${backup.key}`);
+        try {
+          const response = await fetchClient(
+            `${API_BASE_URL}/admin/backup/cloud?key=${encodeURIComponent(backup.key)}`,
+            { method: 'DELETE', skipLoading: true }
+          );
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(result?.message || 'Không thể xóa backup trên cloud.');
+          }
+
+          showSuccess(result?.message || 'Đã xóa bản backup cloud.');
+          await loadCloudBackups();
+        } catch (error) {
+          showError(error?.message || 'Không thể xóa backup trên cloud.');
+        } finally {
+          setCloudBackupAction(null);
+        }
+      }
     );
   };
 
@@ -368,7 +523,10 @@ const BangDieuKhienAdmin = ({
         <nav className="flex-1 overflow-y-auto py-4">
           <ul className="space-y-1 px-3">
             {navItems.map(item => <li key={item.id}>
-                <button onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${activeTab === item.id ? 'bg-primary-container/10 text-primary font-semibold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
+                <button onClick={() => {
+                  setActiveTab(item.id);
+                  if (item.id === 'backup') loadCloudBackups();
+                }} className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${activeTab === item.id ? 'bg-primary-container/10 text-primary font-semibold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
                   <span className="material-symbols-outlined">{item.icon}</span>
                   {isSidebarOpen && <span>{item.label}</span>}
                 </button>
@@ -547,7 +705,7 @@ const BangDieuKhienAdmin = ({
                 </div>
                 <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Sao lưu &amp; phục hồi</h2>
                 <p className="mt-2 w-full text-sm leading-6 text-blue-100/80 sm:text-base">
-                  Tạo bản sao lưu SQL hoặc phục hồi dữ liệu hệ thống từ một file backup đã có.
+                  Tạo bản sao lưu ZIP hoặc phục hồi dữ liệu hệ thống từ một file backup đã có.
                 </p>
               </div>
                 <div className="pointer-events-none absolute right-0 top-0 hidden h-20 w-20 items-center justify-center rounded-2xl border border-white/10 bg-white/10 sm:flex">
@@ -564,7 +722,7 @@ const BangDieuKhienAdmin = ({
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-blue-600">01 · BACKUP</p>
                     <h3 className="mt-1 text-lg font-bold text-slate-800">Tạo bản sao lưu</h3>
-                    <p className="mt-1 text-sm leading-5 text-slate-500">Xuất dữ liệu database thành một file SQL.</p>
+                    <p className="mt-1 text-sm leading-5 text-slate-500">Xuất dữ liệu database thành file ZIP chứa file SQL.</p>
                   </div>
                 </div>
 
@@ -584,7 +742,7 @@ const BangDieuKhienAdmin = ({
                   <span className={`material-symbols-outlined ${backupLoading ? 'animate-spin' : ''}`}>
                     {backupLoading ? 'progress_activity' : 'download'}
                   </span>
-                  {backupLoading ? 'Đang tạo file backup...' : 'Tải Backup Database (.sql)'}
+                  {backupLoading ? 'Đang tạo file backup...' : 'Tải Backup Database (.zip)'}
                 </button>
               </section>
 
@@ -596,7 +754,7 @@ const BangDieuKhienAdmin = ({
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-rose-600">02 · RESTORE</p>
                     <h3 className="mt-1 text-lg font-bold text-slate-800">Phục hồi dữ liệu</h3>
-                    <p className="mt-1 text-sm leading-5 text-slate-500">Nạp một file backup SQL vào database hiện tại.</p>
+                    <p className="mt-1 text-sm leading-5 text-slate-500">Nạp một file backup .zip (chứa file SQL) vào database hiện tại.</p>
                   </div>
                 </div>
 
@@ -611,7 +769,7 @@ const BangDieuKhienAdmin = ({
                   ref={restoreFileInputRef}
                   id="database-restore-file"
                   type="file"
-                  accept=".sql"
+                  accept=".zip"
                   onChange={handleRestoreFileChange}
                   disabled={restoreLoading}
                   className="sr-only"
@@ -628,7 +786,7 @@ const BangDieuKhienAdmin = ({
                     {restoreFile ? 'task' : 'upload_file'}
                   </span>
                   <span className="max-w-full break-all text-sm font-semibold text-slate-700">
-                    {restoreFile ? restoreFile.name : 'Chọn file backup (.sql)'}
+                    {restoreFile ? restoreFile.name : 'Chọn file backup (.zip)'}
                   </span>
                   <span className="mt-1 text-xs text-slate-500">
                     {restoreFile
@@ -666,6 +824,121 @@ const BangDieuKhienAdmin = ({
                 </button>
               </section>
             </div>
+
+            <section className="rounded-2xl border border-indigo-200 bg-white p-6 shadow-sm sm:p-7">
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                    <span className="material-symbols-outlined text-2xl">cloud</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+                      03 · CLOUD BACKUP (BACKBLAZE B2)
+                    </p>
+                    <h3 className="mt-1 text-lg font-bold text-slate-800">Sao lưu an toàn lên Cloud</h3>
+                    <p className="mt-1 text-sm leading-5 text-slate-500">
+                      Lưu và quản lý các bản backup ZIP trên Backblaze B2.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={loadCloudBackups}
+                    disabled={cloudBackupsLoading || cloudBackupAction !== null}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className={`material-symbols-outlined text-lg ${cloudBackupsLoading ? 'animate-spin' : ''}`}>
+                      {cloudBackupsLoading ? 'progress_activity' : 'refresh'}
+                    </span>
+                    Làm mới
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCloudBackup}
+                    disabled={cloudBackupsLoading || cloudBackupAction !== null}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className={`material-symbols-outlined text-lg ${cloudBackupAction === 'create' ? 'animate-spin' : ''}`}>
+                      {cloudBackupAction === 'create' ? 'progress_activity' : 'cloud_upload'}
+                    </span>
+                    Sao lưu lên Cloud ngay
+                  </button>
+                </div>
+              </div>
+
+              {cloudBackupError && (
+                <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  {cloudBackupError}
+                </div>
+              )}
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Tên file</th>
+                      <th className="px-4 py-3 font-semibold">Thời gian tạo</th>
+                      <th className="px-4 py-3 font-semibold">Dung lượng</th>
+                      <th className="px-4 py-3 text-right font-semibold">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
+                    {cloudBackupsLoading && cloudBackups.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                          Đang tải danh sách backup cloud...
+                        </td>
+                      </tr>
+                    ) : cloudBackups.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                          Chưa có bản backup trên cloud.
+                        </td>
+                      </tr>
+                    ) : cloudBackups.map((backup) => (
+                      <tr key={backup.key}>
+                        <td className="whitespace-nowrap px-4 py-3 font-medium">{backup.filename}</td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          {backup.lastModified ? new Date(backup.lastModified).toLocaleString('vi-VN') : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          {(Number(backup.size || 0) / (1024 * 1024)).toFixed(2)} MB
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleCloudBackupDownload(backup)}
+                              disabled={cloudBackupAction !== null}
+                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Tải về
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCloudBackupRestore(backup)}
+                              disabled={cloudBackupAction !== null}
+                              className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Phục hồi
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCloudBackupDelete(backup)}
+                              disabled={cloudBackupAction !== null}
+                              className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         ) :
         // Placeholder for other tabs
