@@ -675,8 +675,18 @@ const QuanLyNhanVien = () => {
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-employee-title"
-            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+            className="relative w-full max-w-[32rem] rounded-xl bg-white p-6 shadow-xl"
           >
+            <button
+              type="button"
+              onClick={() => setDeleteDialog(null)}
+              disabled={deleteBusyId !== null}
+              aria-label="Đóng hộp thoại"
+              title="Đóng"
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-xl">close</span>
+            </button>
             <h2 id="delete-employee-title" className="text-lg font-semibold text-gray-900">
               Xác nhận xóa nhân viên
             </h2>
@@ -685,12 +695,12 @@ const QuanLyNhanVien = () => {
               {' '}<span className="font-semibold">`{deleteDialog.username}`</span>.
               {' '}Bạn có muốn xóa luôn tài khoản của nhân viên này không?
             </p>
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => permanentlyDeleteEmployee(deleteDialog.employee)}
                 disabled={deleteBusyId !== null}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-11 w-full rounded-lg bg-red-600 px-3 py-2 text-center text-sm font-medium leading-5 text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Có, xóa nhân viên &amp; tài khoản
               </button>
@@ -698,17 +708,9 @@ const QuanLyNhanVien = () => {
                 type="button"
                 onClick={() => keepAndLockEmployee(deleteDialog.employee)}
                 disabled={deleteBusyId !== null}
-                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-11 w-full rounded-lg bg-amber-500 px-3 py-2 text-center text-sm font-medium leading-5 text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Không, chỉ khóa tài khoản
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeleteDialog(null)}
-                disabled={deleteBusyId !== null}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Hủy
               </button>
             </div>
           </div>

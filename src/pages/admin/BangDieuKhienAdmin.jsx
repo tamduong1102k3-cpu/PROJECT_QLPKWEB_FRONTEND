@@ -1,5 +1,16 @@
 import * as statisticsApi from '../../api/statisticsApi';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { SquaresFourIcon } from '@phosphor-icons/react/dist/csr/SquaresFour';
+import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
+import { IdentificationBadgeIcon } from '@phosphor-icons/react/dist/csr/IdentificationBadge';
+import { PillIcon } from '@phosphor-icons/react/dist/csr/Pill';
+import { CalendarCheckIcon } from '@phosphor-icons/react/dist/csr/CalendarCheck';
+import { HospitalIcon } from '@phosphor-icons/react/dist/csr/Hospital';
+import { FirstAidKitIcon } from '@phosphor-icons/react/dist/csr/FirstAidKit';
+import { ChartBarIcon } from '@phosphor-icons/react/dist/csr/ChartBar';
+import { ShieldCheckIcon } from '@phosphor-icons/react/dist/csr/ShieldCheck';
+import { StethoscopeIcon } from '@phosphor-icons/react/dist/csr/Stethoscope';
+import { DatabaseIcon } from '@phosphor-icons/react/dist/csr/Database';
 import UserMenu from '../../components/UserMenu';
 import NotificationBell from '../../components/NotificationBell';
 import { useNotification } from '../../components/NotificationContext';
@@ -437,70 +448,61 @@ const BangDieuKhienAdmin = ({
   const navItems = [{
     id: 'dashboard',
     label: 'Tổng Quan',
-    icon: 'dashboard',
-    iconColor: 'text-blue-600',
-    iconBackground: 'bg-blue-50'
+    icon: SquaresFourIcon,
+    iconColor: '#2563eb'
   }, {
     id: 'patients',
     label: 'Bệnh Nhân',
-    icon: 'person_search',
-    iconColor: 'text-teal-600',
-    iconBackground: 'bg-teal-50'
+    icon: UsersThreeIcon,
+    iconColor: '#0d9488'
   }, {
     id: 'employees',
     label: 'Nhân Viên',
-    icon: 'badge',
-    iconColor: 'text-indigo-600',
-    iconBackground: 'bg-indigo-50'
+    icon: IdentificationBadgeIcon,
+    iconColor: '#4f46e5'
   }, {
     id: 'pharmacy',
     label: 'Kho Thuốc',
-    icon: 'medication',
-    iconColor: 'text-emerald-600',
-    iconBackground: 'bg-emerald-50'
+    icon: PillIcon,
+    iconColor: '#059669'
   }, {
     id: 'shifts',
     label: 'Ca Làm Việc',
-    icon: 'calendar_month',
-    iconColor: 'text-amber-600',
-    iconBackground: 'bg-amber-50'
+    icon: CalendarCheckIcon,
+    iconColor: '#d97706'
   }, {
     id: 'rooms',
     label: 'Phòng Chức Năng',
-    icon: 'meeting_room',
-    iconColor: 'text-violet-600',
-    iconBackground: 'bg-violet-50'
+    icon: HospitalIcon,
+    iconColor: '#2563eb'
   }, {
     id: 'services',
     label: 'Dịch Vụ',
-    icon: 'medical_services',
-    iconColor: 'text-rose-500',
-    iconBackground: 'bg-rose-50'
+    icon: FirstAidKitIcon,
+    iconColor: '#0d9488'
   }, {
     id: 'statistics',
     label: 'Thống Kê',
-    icon: 'bar_chart',
-    iconColor: 'text-cyan-600',
-    iconBackground: 'bg-cyan-50'
+    icon: ChartBarIcon,
+    iconColor: '#4f46e5'
   }, {
     id: 'accounts',
     label: 'Tài Khoản',
-    icon: 'manage_accounts',
-    iconColor: 'text-sky-600',
-    iconBackground: 'bg-sky-50'
+    icon: ShieldCheckIcon,
+    iconColor: '#2563eb'
   }, {
     id: 'specialties',
     label: 'Chuyên Khoa',
-    icon: 'local_hospital',
-    iconColor: 'text-red-500',
-    iconBackground: 'bg-red-50'
+    icon: StethoscopeIcon,
+    iconColor: '#e11d48'
   }, {
     id: 'backup',
     label: 'Sao Lưu',
-    icon: 'database',
-    iconColor: 'text-orange-500',
-    iconBackground: 'bg-orange-50'
+    icon: DatabaseIcon,
+    iconColor: '#059669'
   }];
+  const activeNavItem = navItems.find(item => item.id === activeTab);
+  const ActiveTabIcon = activeNavItem?.icon || SquaresFourIcon;
   return <div className="flex h-screen bg-[#f3f4f6] font-body-md text-on-background overflow-hidden">
       
       {/* Sidebar */}
@@ -548,10 +550,14 @@ const BangDieuKhienAdmin = ({
                 <button onClick={() => {
                   setActiveTab(item.id);
                   if (item.id === 'backup') loadCloudBackups();
-                }} className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${activeTab === item.id ? 'bg-primary-container/10 text-primary font-semibold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
-                  <span className={`material-symbols-outlined rounded-lg p-1.5 ${item.iconColor} ${item.iconBackground}`}>
-                    {item.icon}
-                  </span>
+                }} className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${activeTab === item.id ? 'bg-blue-50/80 text-blue-700 font-semibold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
+                  <item.icon
+                    weight="duotone"
+                    size={20}
+                    color={item.iconColor}
+                    className="shrink-0"
+                    aria-hidden="true"
+                  />
                   {isSidebarOpen && <span>{item.label}</span>}
                 </button>
               </li>)}
@@ -967,9 +973,13 @@ const BangDieuKhienAdmin = ({
         ) :
         // Placeholder for other tabs
         <div className="flex flex-col items-center justify-center h-full text-gray-400 animate-fade-in">
-              <span className="material-symbols-outlined text-6xl mb-4 opacity-50">
-                {navItems.find(i => i.id === activeTab)?.icon}
-              </span>
+              <ActiveTabIcon
+                size={64}
+                weight="duotone"
+                color={activeNavItem?.iconColor || '#2563eb'}
+                className="mb-4 opacity-50"
+                aria-hidden="true"
+              />
               <h2 className="text-2xl font-bold text-gray-600 mb-2">Chức năng Đang phát triển</h2>
               <p>Màn hình quản lý {navItems.find(i => i.id === activeTab)?.label} sẽ được cập nhật sau.</p>
             </div>}
