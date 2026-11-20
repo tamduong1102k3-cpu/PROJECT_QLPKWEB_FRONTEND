@@ -566,10 +566,10 @@ const DuyetKetQuaCDHA = ({
       {/* Print Template */}
       {currentResult && isApproved && (
         <div id={`cdha-print-area-${currentResult.id || currentResult.maChiTietChiDinh}`} className="hidden print:block p-8 bg-white text-black font-sans text-sm">
-          <div className="flex justify-between items-start border-b-2 border-indigo-900 pb-4 mb-6">
+          <div className="flex justify-between items-start border-b-2 border-indigo-900 pb-4 mb-6 print-keep-together">
             <div>
               <h2 className="text-md font-bold uppercase text-indigo-900">HỆ THỐNG PHÒNG KHÁM QUỐC TẾ MEDCORE</h2>
-              <p className="text-xs text-gray-600">123 Đường Ba Tháng Hai, Quận 10, TP. Hồ Chí Minh</p>
+              <p className="text-xs text-gray-600">Địa chỉ: Hồ Chí Minh</p>
               <p className="text-xs text-gray-600">Điện thoại: 1900 6000 • www.medcore.vn</p>
             </div>
             <div className="text-right">
@@ -577,7 +577,7 @@ const DuyetKetQuaCDHA = ({
               <p className="text-xs text-gray-500 font-bold">Mã kết quả: #{currentResult.maChiTietChiDinh || currentResult.id || 'N/A'}</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 mb-6 border bg-gray-50/50 p-4 rounded-xl text-xs">
+          <div className="grid grid-cols-2 gap-4 mb-6 border bg-gray-50/50 p-4 rounded-xl text-xs print-keep-together">
             <div>
               <p><strong>Họ tên BN:</strong> {patient.hoTen}</p>
               <p><strong>Năm sinh:</strong> {new Date(patient.ngaySinh).getFullYear()} • <strong>Giới tính:</strong> {formatGender(patient.gioiTinh)}</p>
@@ -603,7 +603,7 @@ const DuyetKetQuaCDHA = ({
               <p className="italic">{currentResult.deNghi}</p>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-gray-100">
+          <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-gray-100 print-keep-together">
             <div className="text-center">
               <p className="text-[10px] text-gray-400 uppercase mb-12">KTV thực hiện</p>
               <span className="font-semibold text-xs">Mã NV: #{currentResult.maNhanVienThucHien || 'Chưa rõ'}</span>

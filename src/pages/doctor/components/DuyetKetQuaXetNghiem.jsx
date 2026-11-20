@@ -291,10 +291,10 @@ const DuyetKetQuaXetNghiem = ({
                   {/* --- PHẦN TỬ IN PHIẾU XÉT NGHIỆM (ẨN TRÊN MÀN HÌNH, CHỈ HIỂN THỊ KHI IN) --- */}
                   {isApproved && (
                     <div id={`test-print-area-${result.id}`} className="hidden print:block p-8 bg-white text-black font-sans leading-relaxed text-sm">
-                      <div className="flex justify-between items-start border-b-2 border-indigo-900 pb-4 mb-6">
+                      <div className="flex justify-between items-start border-b-2 border-indigo-900 pb-4 mb-6 print-keep-together">
                         <div>
                           <h2 className="text-md font-bold uppercase text-indigo-900">HỆ THỐNG PHÒNG KHÁM QUỐC TẾ MEDCORE</h2>
-                          <p className="text-xs text-gray-600">Địa chỉ: 123 Đường Ba Tháng Hai, Quận 10, TP. Hồ Chí Minh</p>
+                          <p className="text-xs text-gray-600">Địa chỉ: Hồ Chí Minh</p>
                           <p className="text-xs text-gray-600">Điện thoại: 1900 6000 • Website: www.medcore.vn</p>
                         </div>
                         <div className="text-right">
@@ -303,7 +303,7 @@ const DuyetKetQuaXetNghiem = ({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 mb-6 border bg-gray-50/50 p-4 rounded-xl text-xs">
+                      <div className="grid grid-cols-2 gap-4 mb-6 border bg-gray-50/50 p-4 rounded-xl text-xs print-keep-together">
                         <div>
                           <p><strong>Họ tên bệnh nhân:</strong> <span className="font-bold text-sm">{patient.hoTen}</span></p>
                           <p><strong>Năm sinh:</strong> {new Date(patient.ngaySinh).getFullYear()} • <strong>Giới tính:</strong> {formatGender(patient.gioiTinh)}</p>
@@ -333,7 +333,7 @@ const DuyetKetQuaXetNghiem = ({
                         <p className="font-bold text-gray-800 text-sm whitespace-pre-wrap leading-relaxed">{result.ketLuan}</p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-gray-100">
+                      <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-gray-100 print-keep-together">
                         <div className="text-center min-w-[200px]">
                           <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-12">Kỹ thuật viên thực hiện</p>
                           <span className="font-semibold text-xs text-gray-600">{result.tenNguoiThucHien || `Mã NV: #${result.nguoiThucHien || '---'}`}</span>

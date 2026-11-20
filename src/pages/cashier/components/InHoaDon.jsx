@@ -1,4 +1,6 @@
 import React from 'react';
+import { useNotification } from '../../../components/NotificationContext';
+import escapeHtml from '../../../utils/escapeHtml';
 
 const formatCurrency = (amount) => {
   if (amount == null) return '—';
@@ -6,24 +8,30 @@ const formatCurrency = (amount) => {
 };
 
 const InHoaDon = ({ invoice, patient, invoiceDetails, className = '' }) => {
+  const { showError } = useNotification();
+
   const handlePrint = () => {
     const w = window.open('', '_blank', 'width=750,height=700');
-    if (!w) return;
+    if (!w) {
+      showError("Không thể mở cửa sổ in. Vui lòng cho phép popup trên trình duyệt.");
+      return;
+    }
 
     const d = new Date();
     const date = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
     const rows = (invoiceDetails || []).map(i => `<tr>
-      <td class="c">${i.noiDung || '—'}</td>
-      <td class="r">${i.soLuong || 0}</td>
-      <td class="r">${formatCurrency(i.donGia)}</td>
-      <td class="r b">${formatCurrency(i.thanhTien)}</td>
+      <td class="c">${escapeHtml(i.noiDung || '—')}</td>
+      <td class="r">${escapeHtml(i.soLuong || 0)}</td>
+      <td class="r">${escapeHtml(formatCurrency(i.donGia))}</td>
+      <td class="r b">${escapeHtml(formatCurrency(i.thanhTien))}</td>
     </tr>`).join('');
 
     w.document.write(`<!DOCTYPE html><html>
-<head><meta charset="UTF-8"><title>Hóa đơn #${invoice?.maHoaDon || ''}</title>
+<head><meta charset="UTF-8"><title>Hóa đơn #${escapeHtml(invoice?.maHoaDon || '')}</title>
 <style>
+@page{size:A4 portrait;margin:10mm}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:30px}
 .paper{width:680px;background:#fff;padding:48px 44px 36px;box-shadow:0 2px 20px rgba(0,0,0,.07);position:relative}
@@ -49,23 +57,23 @@ td.c{color:#334155}
 .tr{display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:#64748b}
 .tr.g{font-size:17px;font-weight:600;color:#059669;padding-top:10px;margin-top:8px;border-top:1.5px solid #059669}
 .foot{text-align:center;margin-top:32px;padding-top:20px;border-top:1px dashed #e2e8f0;color:#94a3b8;font-size:11px;letter-spacing:.3px}
-@media print{body{background:#fff;padding:0}.paper{box-shadow:none;padding:40px}}
+@media print{body{background:#fff;padding:0;display:block;min-height:0}.paper{width:100%;box-shadow:none;padding:0}tr{break-inside:avoid;page-break-inside:avoid}}
 </style></head>
 <body><div class="paper">
 <div class="header">
-<div class="titles"><h1>PHÒNG KHÁM MEDCORE</h1><p>Địa chỉ: 123 Nguyễn Huệ, Quận 1, TP.HCM</p></div>
+<div class="titles"><h1>PHÒNG KHÁM MEDCORE</h1><p>Địa chỉ: Hồ Chí Minh</p></div>
 <span class="label">HÓA ĐƠN THANH TOÁN</span>
 </div>
 <div class="grid">
-<div class="grid-i"><div class="l">Số hóa đơn</div><div class="v">#${invoice?.maHoaDon?.toString().padStart(4, '0') || '—'}</div></div>
-<div class="grid-i"><div class="l">Ngày</div><div class="v">${date}</div></div>
-<div class="grid-i"><div class="l">Giờ</div><div class="v">${time}</div></div>
-<div class="grid-i"><div class="l">Mã phiếu khám</div><div class="v">#${invoice?.maPhieuKham?.toString().padStart(4, '0') || '—'}</div></div>
+<div class="grid-i"><div class="l">Số hóa đơn</div><div class="v">#${escapeHtml(invoice?.maHoaDon?.toString().padStart(4, '0') || '—')}</div></div>
+<div class="grid-i"><div class="l">Ngày</div><div class="v">${escapeHtml(date)}</div></div>
+<div class="grid-i"><div class="l">Giờ</div><div class="v">${escapeHtml(time)}</div></div>
+<div class="grid-i"><div class="l">Mã phiếu khám</div><div class="v">#${escapeHtml(invoice?.maPhieuKham?.toString().padStart(4, '0') || '—')}</div></div>
 </div>
-<div class="pat">👤 Bệnh nhân: <strong>${patient?.hoTen || '—'}</strong></div>
+<div class="pat">👤 Bệnh nhân: <strong>${escapeHtml(patient?.hoTen || '—')}</strong></div>
 <table><thead><tr><th style="width:44%">Nội dung</th><th class="r" style="width:12%">Số lượng</th><th class="r" style="width:22%">Đơn giá</th><th class="r" style="width:22%">Thành tiền</th></tr></thead>
 <tbody>${rows}</tbody></table>
-<div class="totals"><div class="tl"><div class="tr g"><span>TỔNG CỘNG</span><span>${formatCurrency(invoice?.tongTien)}</span></div></div></div>
+<div class="totals"><div class="tl"><div class="tr g"><span>TỔNG CỘNG</span><span>${escapeHtml(formatCurrency(invoice?.tongTien))}</span></div></div></div>
 <div class="foot">📞 Hotline: 1900 1234 &nbsp;|&nbsp; ✉ Email: info@medcore.vn<br>Cảm ơn quý khách!</div>
 </div>
 <script>window.onload=function(){window.print()}<\/script></body></html>`);

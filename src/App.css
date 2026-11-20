@@ -83,7 +83,18 @@ input, textarea, select {
 /* ==================== */
 /*   Print Styles       */
 /* ==================== */
+@page {
+  margin: 10mm;
+}
+
 @media print {
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -99,6 +110,36 @@ input, textarea, select {
   }
   .no-print {
     display: none !important;
+  }
+
+  .print-unconstrained {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    transform: none !important;
+    filter: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  tr,
+  img,
+  .print-keep-together {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
   }
 }
 

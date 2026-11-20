@@ -26,7 +26,7 @@ const ModalXemKetQua = ({ viewingResult, user, isImaging, onClose }) => {
   })();
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6 transition-all duration-300 overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6 transition-all duration-300 overflow-y-auto print-unconstrained">
       {/* CSS In ấn giữ nguyên */}
       <style>{`
         @media print {
@@ -34,13 +34,13 @@ const ModalXemKetQua = ({ viewingResult, user, isImaging, onClose }) => {
           #clinical-print-area, #clinical-print-area * { visibility: visible !important; }
           #clinical-print-area {
             position: absolute !important; left: 0 !important; top: 0 !important;
-            width: 100% !important; background: white !important; padding: 30px !important;
+            width: 100% !important; background: white !important; padding: 0 !important;
           }
           .no-print { display: none !important; }
         }
       `}</style>
       
-      <div className="bg-white rounded-[2rem] w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-300 border border-slate-200/50">
+      <div className="bg-white rounded-[2rem] w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-300 border border-slate-200/50 print-unconstrained">
         
         {/* Modal Header */}
         <div className="p-6 sm:p-8 bg-white border-b border-slate-100 flex items-center justify-between no-print z-10 shadow-sm relative">
@@ -59,7 +59,7 @@ const ModalXemKetQua = ({ viewingResult, user, isImaging, onClose }) => {
         </div>
 
         {/* Báo cáo chi tiết (Vùng in) */}
-        <div className="flex-1 p-8 sm:p-10 overflow-y-auto bg-slate-50/50 relative" id="clinical-print-area">
+        <div className="flex-1 p-8 sm:p-10 overflow-y-auto bg-slate-50/50 relative print-unconstrained" id="clinical-print-area">
           {/* Logo Watermark (Visual Only, Non-Print) */}
           <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none no-print">
             <span className="material-symbols-outlined text-[300px]">medical_services</span>

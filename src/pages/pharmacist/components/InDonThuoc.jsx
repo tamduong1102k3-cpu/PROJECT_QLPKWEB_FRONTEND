@@ -1,4 +1,6 @@
 import React from 'react';
+import { useNotification } from '../../../components/NotificationContext';
+import escapeHtml from '../../../utils/escapeHtml';
 
 const formatCurrency = (amount) => {
   if (amount == null) return '—';
@@ -18,9 +20,14 @@ const formatTime = (dateStr) => {
 };
 
 const InDonThuoc = ({ patient, prescriptions, formatDateTime }) => {
+  const { showError } = useNotification();
+
   const handlePrint = () => {
     const w = window.open('', '_blank', 'width=860,height=700');
-    if (!w) return;
+    if (!w) {
+      showError("Không thể mở cửa sổ in. Vui lòng cho phép popup trên trình duyệt.");
+      return;
+    }
 
     const now = new Date();
     const date = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -29,18 +36,18 @@ const InDonThuoc = ({ patient, prescriptions, formatDateTime }) => {
     // Build prescription sections
     const toaHtml = (prescriptions || []).map((toa, idx) => {
       const rows = (toa.chiTietThuoc || []).map((item, i) => `<tr>
-        <td class="c" style="width:4%">${i + 1}</td>
-        <td style="width:20%"><strong>${item.tenThuoc || '—'}</strong>${item.hoatChat ? `<br><span class="sm">${item.hoatChat}</span>` : ''}</td>
-        <td><strong>${item.hamLuong || '—'}</strong></td>
-        <td>${item.donViTinh || '—'}</td>
-        <td>${item.lieuDung || '—'}</td>
-        <td class="r">${item.sang || '—'}</td>
-        <td class="r">${item.trua || '—'}</td>
-        <td class="r">${item.chieu || '—'}</td>
-        <td class="r">${item.toi || '—'}</td>
-        <td class="r">${item.soNgay || '—'}</td>
-        <td>${item.cachDung || '—'}</td>
-        <td>${item.thoiDiemDung || '—'}</td>
+        <td class="c" style="width:4%">${escapeHtml(i + 1)}</td>
+        <td style="width:20%"><strong>${escapeHtml(item.tenThuoc || '—')}</strong>${item.hoatChat ? `<br><span class="sm">${escapeHtml(item.hoatChat)}</span>` : ''}</td>
+        <td><strong>${escapeHtml(item.hamLuong || '—')}</strong></td>
+        <td>${escapeHtml(item.donViTinh || '—')}</td>
+        <td>${escapeHtml(item.lieuDung || '—')}</td>
+        <td class="r">${escapeHtml(item.sang || '—')}</td>
+        <td class="r">${escapeHtml(item.trua || '—')}</td>
+        <td class="r">${escapeHtml(item.chieu || '—')}</td>
+        <td class="r">${escapeHtml(item.toi || '—')}</td>
+        <td class="r">${escapeHtml(item.soNgay || '—')}</td>
+        <td>${escapeHtml(item.cachDung || '—')}</td>
+        <td>${escapeHtml(item.thoiDiemDung || '—')}</td>
       </tr>`).join('');
 
       let statusLabel = '⏳ Chờ cấp thuốc';
@@ -56,10 +63,10 @@ const InDonThuoc = ({ patient, prescriptions, formatDateTime }) => {
       return `
         <div class="toa-section">
           <div class="toa-header">
-            <h3>Toa thuốc #${toa.maToaThuoc}</h3>
+            <h3>Toa thuốc #${escapeHtml(toa.maToaThuoc)}</h3>
             <span class="status ${statusClass}">${statusLabel}</span>
           </div>
-          <div class="toa-meta">Ngày tạo: ${formatDate(toa.ngayTao)} ${formatTime(toa.ngayTao)}${toa.ghiChu ? ` &nbsp;|&nbsp; Ghi chú: ${toa.ghiChu}` : ''}</div>
+          <div class="toa-meta">Ngày tạo: ${escapeHtml(formatDate(toa.ngayTao))} ${escapeHtml(formatTime(toa.ngayTao))}${toa.ghiChu ? ` &nbsp;|&nbsp; Ghi chú: ${escapeHtml(toa.ghiChu)}` : ''}</div>
           <table>
             <thead><tr>
               <th class="c">STT</th><th>Tên thuốc</th><th>Hàm lượng</th><th>ĐVT</th><th>Liều dùng</th>
@@ -73,11 +80,12 @@ const InDonThuoc = ({ patient, prescriptions, formatDateTime }) => {
     }).join('');
 
     w.document.write(`<!DOCTYPE html><html>
-<head><meta charset="UTF-8"><title>Đơn thuốc - ${patient?.hoTen || ''}</title>
+<head><meta charset="UTF-8"><title>Đơn thuốc - ${escapeHtml(patient?.hoTen || '')}</title>
 <style>
+@page{size:A4 landscape;margin:10mm}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#f0f2f5;display:flex;justify-content:center;min-height:100vh;padding:30px}
-.paper{width:900px;background:#fff;padding:44px 40px 36px;box-shadow:0 2px 15px rgba(0,0,0,.06)}
+.paper{width:100%;max-width:1100px;background:#fff;padding:44px 40px 36px;box-shadow:0 2px 15px rgba(0,0,0,.06)}
 .paper:before{content:'';display:block;height:3px;background:linear-gradient(90deg,#d97706,#fbbf24);border-radius:0 0 3px 3px;margin-bottom:28px}
 .header{text-align:center;margin-bottom:24px}
 .header h1{font-size:20px;font-weight:700;color:#d97706;letter-spacing:-.3px}
@@ -94,34 +102,37 @@ body{font-family:'Inter','Helvetica Neue',Arial,sans-serif;background:#f0f2f5;di
 .toa-header .status.pending{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
 .toa-header .status.expired{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0}
 .toa-meta{font-size:10px;color:#94a3b8;padding:6px 14px;border-bottom:1px solid #f1f5f9}
-table{width:100%;border-collapse:collapse;font-size:11.5px}
+table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:10px}
 th{font-size:8.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;padding:7px 5px;border-bottom:1.5px solid #e2e8f0;text-align:left}
 th.c{text-align:center}
 th.r{text-align:center}
-td{padding:7px 5px;color:#1e293b;border-bottom:1px solid #f1f5f9}
+td{padding:5px 3px;color:#1e293b;border-bottom:1px solid #f1f5f9;overflow-wrap:anywhere}
+th{padding:5px 3px;overflow-wrap:anywhere}
+thead{display:table-header-group}
+tr{break-inside:avoid;page-break-inside:avoid}
 td.c{text-align:center}
 td.r{text-align:center}
 td strong{color:#0f172a;font-weight:700}
 td .sm{font-size:9.5px;color:#94a3b8}
 .foot{text-align:center;margin-top:20px;padding-top:14px;border-top:1px dashed #e2e8f0;color:#94a3b8;font-size:10.5px}
-@media print{body{background:#fff;padding:0}.paper{box-shadow:none;padding:36px}}
+@media print{body{background:#fff;padding:0;display:block;min-height:0}.paper{width:100%;max-width:none;box-shadow:none;padding:0}}
 </style></head>
 <body><div class="paper">
 <div class="header">
 <h1>PHÒNG KHÁM MEDCORE</h1>
-<p>Địa chỉ: 123 Nguyễn Huệ, Quận 1, TP.HCM &nbsp;|&nbsp; 📞 1900 1234</p>
+<p>Địa chỉ: Hồ Chí Minh &nbsp;|&nbsp; 📞 1900 1234</p>
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 18px;margin-bottom:20px">
 <span class="tt">ĐƠN THUỐC</span>
-<span style="font-size:10px;font-weight:700;color:#d97706;background:#fff;padding:3px 12px;border-radius:20px;border:1px solid #fde68a">Ngày: ${date} - ${time}</span>
+<span style="font-size:10px;font-weight:700;color:#d97706;background:#fff;padding:3px 12px;border-radius:20px;border:1px solid #fde68a">Ngày: ${escapeHtml(date)} - ${escapeHtml(time)}</span>
 </div>
 <div class="pat-info">
 <div class="row">
-<span>Họ tên: <strong>${patient?.hoTen || '—'}</strong></span>
-<span>Mã BN: <strong>#${patient?.maBenhNhan || '—'}</strong></span>
-<span>Mã PK: <strong>#${patient?.maPhieuKham || '—'}</strong></span>
-<span>Mã HĐ: <strong>#${patient?.maHoaDon || '—'}</strong></span>
-<span>SĐT: <strong>${patient?.soDienThoai || 'N/A'}</strong></span>
+<span>Họ tên: <strong>${escapeHtml(patient?.hoTen || '—')}</strong></span>
+<span>Mã BN: <strong>#${escapeHtml(patient?.maBenhNhan || '—')}</strong></span>
+<span>Mã PK: <strong>#${escapeHtml(patient?.maPhieuKham || '—')}</strong></span>
+<span>Mã HĐ: <strong>#${escapeHtml(patient?.maHoaDon || '—')}</strong></span>
+<span>SĐT: <strong>${escapeHtml(patient?.soDienThoai || 'N/A')}</strong></span>
 </div>
 </div>
 ${toaHtml}

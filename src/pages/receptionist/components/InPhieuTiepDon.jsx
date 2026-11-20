@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNotification } from '../../../components/NotificationContext';
+import escapeHtml from '../../../utils/escapeHtml';
 
 const InPhieuTiepDon = ({ printData, className = '' }) => {
   const { showError } = useNotification();
@@ -15,8 +16,13 @@ const InPhieuTiepDon = ({ printData, className = '' }) => {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Phiếu tiếp đón #${printData.soThuTu}</title>
+  <title>Phiếu tiếp đón #${escapeHtml(printData.soThuTu)}</title>
   <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -210,6 +216,8 @@ const InPhieuTiepDon = ({ printData, className = '' }) => {
         box-shadow: none;
         width: 100%;
         padding: 10px 5px;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
       .ticket-container::before {
         display: none;
@@ -227,44 +235,44 @@ const InPhieuTiepDon = ({ printData, className = '' }) => {
     
     <div class="number-box">
       <div class="number-label">Số thứ tự khám</div>
-      <div class="number-val">#${printData.soThuTu}</div>
-      ${printData.tenPhong ? `<div class="number-room" style="margin-top: 4px; font-size: 13px; font-weight: 700; color: #4f46e5;">${printData.tenPhong}</div>` : ''}
+      <div class="number-val">#${escapeHtml(printData.soThuTu)}</div>
+      ${printData.tenPhong ? `<div class="number-room" style="margin-top: 4px; font-size: 13px; font-weight: 700; color: #4f46e5;">${escapeHtml(printData.tenPhong)}</div>` : ''}
     </div>
     
     <div class="info-list">
       <div class="info-item">
         <span class="info-label">Bệnh nhân</span>
-        <span class="info-value">${printData.benhNhan?.hoTen || '—'}</span>
+        <span class="info-value">${escapeHtml(printData.benhNhan?.hoTen || '—')}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Mã BN</span>
-        <span class="info-value">#${printData.benhNhan?.maBenhNhan || '—'}</span>
+        <span class="info-value">#${escapeHtml(printData.benhNhan?.maBenhNhan || '—')}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Chuyên khoa</span>
-        <span class="info-value highlight">${printData.chuyenKhoa?.tenChuyenKhoa || 'N/A'}</span>
+        <span class="info-value highlight">${escapeHtml(printData.chuyenKhoa?.tenChuyenKhoa || 'N/A')}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Dịch vụ</span>
-        <span class="info-value">${printData.dichVu?.tenDichVu || 'Không có'}</span>
+        <span class="info-value">${escapeHtml(printData.dichVu?.tenDichVu || 'Không có')}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Đơn giá</span>
-        <span class="info-value price">${printData.dichVu ? `${new Intl.NumberFormat('vi-VN').format(printData.dichVu.donGia)}đ` : 'N/A'}</span>
+        <span class="info-value price">${printData.dichVu ? `${escapeHtml(new Intl.NumberFormat('vi-VN').format(printData.dichVu.donGia))}đ` : 'N/A'}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Bác sĩ khám</span>
-        <span class="info-value">${printData.bacSi?.hoTen || 'Chưa chỉ định'}</span>
+        <span class="info-value">${escapeHtml(printData.bacSi?.hoTen || 'Chưa chỉ định')}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Thời gian</span>
-        <span class="info-value">${printData.ngayDangKy}</span>
+        <span class="info-value">${escapeHtml(printData.ngayDangKy || '')}</span>
       </div>
       ${printData.ghiChu ? `
       <div class="divider"></div>
       <div class="info-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
         <span class="info-label">Triệu chứng / Ghi chú</span>
-        <span class="info-value" style="text-align: left; max-width: 100%; font-weight: 500; color: #334155;">${printData.ghiChu}</span>
+        <span class="info-value" style="text-align: left; max-width: 100%; font-weight: 500; color: #334155;">${escapeHtml(printData.ghiChu)}</span>
       </div>` : ''}
     </div>
     
@@ -276,7 +284,7 @@ const InPhieuTiepDon = ({ printData, className = '' }) => {
         <span class="w-1"></span><span class="w-3"></span><span class="w-1"></span><span class="w-1"></span>
         <span class="w-2"></span><span class="w-1"></span><span class="w-3"></span><span class="w-1"></span>
       </div>
-      <div class="barcode-code">MC-${printData.benhNhan?.maBenhNhan || '0000'}</div>
+      <div class="barcode-code">MC-${escapeHtml(printData.benhNhan?.maBenhNhan || '0000')}</div>
     </div>
     
     <div class="footer">

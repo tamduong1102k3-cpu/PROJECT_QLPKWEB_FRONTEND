@@ -271,10 +271,10 @@ const TabKeDonThuoc = ({
       {/* --- PHẦN TỬ IN ĐƠN THUỐC (ẨN TRÊN MÀN HÌNH, CHỈ HIỂN THỊ KHI IN) --- */}
       {selectedPatient && (
         <div id="prescription-print-area" className="hidden print:block p-8 bg-white text-black font-sans leading-relaxed text-sm">
-          <div className="flex justify-between items-start border-b border-gray-300 pb-4 mb-6">
+          <div className="flex justify-between items-start border-b border-gray-300 pb-4 mb-6 print-keep-together">
             <div>
               <h2 className="text-md font-bold uppercase text-indigo-900">HỆ THỐNG PHÒNG KHÁM QUỐC TẾ MEDCORE</h2>
-              <p className="text-xs text-gray-600">Địa chỉ: 123 Đường Ba Tháng Hai, Quận 10, TP. Hồ Chí Minh</p>
+              <p className="text-xs text-gray-600">Địa chỉ: Hồ Chí Minh</p>
               <p className="text-xs text-gray-600">Điện thoại: 1900 6000 • Website: www.medcore.vn</p>
             </div>
             <div className="text-right">
@@ -283,7 +283,7 @@ const TabKeDonThuoc = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6 border-b border-gray-100 pb-4">
+          <div className="grid grid-cols-2 gap-4 mb-6 border-b border-gray-100 pb-4 print-keep-together">
             <div>
               <p><strong>Họ tên bệnh nhân:</strong> {selectedPatient.hoTen}</p>
               <p><strong>Ngày sinh:</strong> {selectedPatient.ngaySinh ? new Date(selectedPatient.ngaySinh).toLocaleDateString('vi-VN') : 'N/A'}</p>
@@ -331,7 +331,7 @@ const TabKeDonThuoc = ({
             </table>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-gray-100">
+          <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-gray-100 print-keep-together">
             <div className="text-xs text-gray-500">
               <p><strong>Lời dặn của bác sĩ:</strong></p>
               <p className="mt-1 italic">- Uống thuốc đúng giờ, đúng liều lượng.</p>
