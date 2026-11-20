@@ -113,10 +113,10 @@ const BatBuocDoiMatKhau = ({ user, onPasswordChanged, onLogout }) => {
               <span className="material-symbols-outlined text-base" aria-hidden="true">shield_lock</span>
               Bảo mật tài khoản
             </span>
-            <h2 className="max-w-sm text-3xl font-bold leading-tight tracking-tight">
+            <h2 className="max-w-[22rem] text-3xl font-bold leading-tight tracking-tight">
               Một bước nhỏ để bảo vệ tài khoản của bạn.
             </h2>
-            <p className="mt-4 max-w-sm text-sm leading-6 text-blue-100">
+            <p className="mt-4 max-w-[22rem] text-sm leading-6 text-blue-100">
               Hãy thay mật khẩu mặc định bằng mật khẩu riêng trước khi tiếp tục sử dụng hệ thống.
             </p>
           </div>
@@ -154,7 +154,7 @@ const BatBuocDoiMatKhau = ({ user, onPasswordChanged, onLogout }) => {
             <h1 className="font-headline-lg text-[28px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[32px]">
               Đổi mật khẩu lần đầu
             </h1>
-            <p className="mt-3 max-w-md text-sm leading-6 text-slate-500">
+            <p className="mt-3 max-w-[28rem] text-sm leading-6 text-slate-500">
               Vì lý do bảo mật, bạn cần tạo mật khẩu mới trước khi vào giao diện làm việc.
             </p>
             {user?.username && (
