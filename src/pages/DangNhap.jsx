@@ -142,9 +142,6 @@ const DangNhap = ({ onForgotPassword, onLoginSuccess }) => {
             </form>
           </div>
         </div>
-        <p className="text-center mt-8 text-[11px] text-slate-400 font-bold uppercase tracking-[0.3em]">
-          Secure Access Protocol v2.0
-        </p>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
