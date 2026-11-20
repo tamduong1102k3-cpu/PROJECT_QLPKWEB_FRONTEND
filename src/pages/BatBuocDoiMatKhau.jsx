@@ -103,7 +103,7 @@ const BatBuocDoiMatKhau = ({ user, onPasswordChanged, onLogout }) => {
             <div>
               <label className="block font-label-md text-label-md text-on-surface mb-xs">Nhập lại mật khẩu</label>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">lock_check</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">lock</span>
                 <input
                   type="password"
                   required
