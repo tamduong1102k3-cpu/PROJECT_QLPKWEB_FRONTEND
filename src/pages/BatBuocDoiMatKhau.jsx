@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { firstTimeChangePasswordApi, ensureAuthenticated } from '../api/accountApi';
+import { firstTimeChangePasswordApi, validateSessionApi } from '../api/accountApi';
 import { useNotification } from '../components/NotificationContext';
 
-const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
+const BatBuocDoiMatKhau = ({ user, onPasswordChanged, onLogout }) => {
   const { showSuccess } = useNotification();
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -11,13 +12,20 @@ const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      setError('Mật khẩu nhập lại không khớp!');
+    if (!currentPassword) {
+      setError('Vui lòng nhập mật khẩu hiện tại!');
       return;
     }
-
     if (newPassword.length < 5) {
-      setError('Mật khẩu quá ngắn!');
+      setError('Mật khẩu mới phải có ít nhất 5 ký tự!');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setError('Mật khẩu mới không được trùng mật khẩu hiện tại!');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Mật khẩu nhập lại không khớp!');
       return;
     }
 
@@ -25,13 +33,15 @@ const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
     setError('');
 
     try {
-      await firstTimeChangePasswordApi({ email: user.email, newPassword });
-
-      await ensureAuthenticated();
+      await firstTimeChangePasswordApi({ currentPassword, newPassword });
+      const session = await validateSessionApi();
+      if (session?.mustChangePassword !== false) {
+        throw new Error('Chưa thể xác nhận trạng thái mật khẩu mới. Vui lòng thử lại.');
+      }
       showSuccess('Đổi mật khẩu thành công!');
-      onBackToLogin();
+      onPasswordChanged(session);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Không thể đổi mật khẩu. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }
@@ -60,12 +70,29 @@ const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
 
           <form onSubmit={handleSubmit} className="space-y-md">
             <div>
+              <label className="block font-label-md text-label-md text-on-surface mb-xs">Mật khẩu hiện tại</label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">lock</span>
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  className="w-full pl-10 pr-4 py-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary bg-surface-container-lowest transition-all placeholder:text-outline-variant text-body-md font-body-md"
+                  placeholder="Nhập mật khẩu hiện tại"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
               <label className="block font-label-md text-label-md text-on-surface mb-xs">Mật khẩu mới</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">lock</span>
                 <input
                   type="password"
                   required
+                  minLength={5}
+                  autoComplete="new-password"
                   className="w-full pl-10 pr-4 py-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary bg-surface-container-lowest transition-all placeholder:text-outline-variant text-body-md font-body-md"
                   placeholder="Nhập mật khẩu mới"
                   value={newPassword}
@@ -80,6 +107,8 @@ const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
                 <input
                   type="password"
                   required
+                  minLength={5}
+                  autoComplete="new-password"
                   className="w-full pl-10 pr-4 py-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary bg-surface-container-lowest transition-all placeholder:text-outline-variant text-body-md font-body-md"
                   placeholder="Xác nhận mật khẩu mới"
                   value={confirmPassword}
@@ -96,6 +125,13 @@ const BatBuocDoiMatKhau = ({ user, onBackToLogin }) => {
               {isLoading ? 'Đang xử lý...' : 'Lưu mật khẩu mới'}
             </button>
           </form>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="w-full mt-md py-sm text-outline hover:text-on-surface font-label-md transition-colors"
+          >
+            Đăng xuất
+          </button>
         </div>
       </div>
     </div>

@@ -17,8 +17,7 @@ import BangDieuKhienDuocSi from './pages/pharmacist/BangDieuKhienDuocSi';
 import BangDieuKhienKho from './pages/warehouse/BangDieuKhienKho';
 import PaymentResult from './pages/cashier/components/PaymentResult';
 import PaymentSuccess from './pages/checkout/PaymentSuccess';
-import { logoutApi } from './api/accountApi';
-import { validateSessionApi } from './api/accountApi';
+import { logoutApi, validateSessionApi } from './api/accountApi';
 import { clearAccessToken, getAccessToken, getRoleFromAccessToken, decodeTokenPayload } from './api/tokenStore';
 import { resetSessionExpiredHandling } from './api/fetchClient';
 import './App.css';
@@ -67,6 +66,7 @@ const resolveSession = () => {
   }
 
   const payload = decodeTokenPayload(token) || {};
+  const mustChangePassword = payload.mustChangePassword ?? payload.lanDauDangNhap ?? false;
   const user = {
     username: payload.sub,
     email: payload.email || null,
@@ -75,7 +75,8 @@ const resolveSession = () => {
     maNhanVien: payload.maNhanVien ?? null,
     maTaiKhoan: payload.maTaiKhoan ?? null,
     hoTen: payload.hoTen ?? null,
-    lanDauDangNhap: payload.lanDauDangNhap ?? false,
+    mustChangePassword,
+    lanDauDangNhap: mustChangePassword,
     maChuyenKhoa: payload.maChuyenKhoa ?? null,
     tenChuyenKhoa: payload.tenChuyenKhoa ?? null,
     userType: 'NHAN_VIEN',
@@ -90,17 +91,64 @@ function App() {
   const initialSession = resolveSession();
   const [currentUser, setCurrentUser] = useState(initialSession.user);
   const [currentView, setCurrentView] = useState(initialSession.view);
+  const [isSessionChecking, setIsSessionChecking] = useState(
+    Boolean(initialSession.user) && initialSession.view !== 'force-change-password'
+  );
   const [showSessionExpiredDialog, setShowSessionExpiredDialog] = useState(false);
   const validationPromiseRef = useRef(null);
+  const initialSessionCheckRef = useRef(
+    Boolean(initialSession.user) && initialSession.view !== 'force-change-password'
+  );
 
   const runSessionValidation = useCallback(() => {
-    if (!getAccessToken()) return;
-    if (currentView === 'DangNhap' || currentView === 'forgot-password') return;
-    if (validationPromiseRef.current) return;
-    validationPromiseRef.current = validateSessionApi().finally(() => {
-      validationPromiseRef.current = null;
-    });
-    validationPromiseRef.current.catch(() => {});
+    if (!getAccessToken()) {
+      if (initialSessionCheckRef.current) {
+        initialSessionCheckRef.current = false;
+        setCurrentUser(null);
+        setCurrentView('DangNhap');
+      }
+      setIsSessionChecking(false);
+      return;
+    }
+    if (currentView === 'DangNhap' || currentView === 'forgot-password' || currentView === 'force-change-password') {
+      setIsSessionChecking(false);
+      return;
+    }
+    if (validationPromiseRef.current) return validationPromiseRef.current;
+
+    const validation = validateSessionApi()
+      .then((session) => {
+        if (typeof session?.mustChangePassword !== 'boolean') {
+          if (initialSessionCheckRef.current) {
+            clearAccessToken();
+            setCurrentUser(null);
+            setCurrentView('DangNhap');
+          }
+          return;
+        }
+
+        initialSessionCheckRef.current = false;
+        const mustChangePassword = session.mustChangePassword;
+        setCurrentUser((user) => user ? {
+          ...user,
+          mustChangePassword,
+          lanDauDangNhap: mustChangePassword
+        } : user);
+        setCurrentView((view) => {
+          if (mustChangePassword) return 'force-change-password';
+          if (view === 'force-change-password') {
+            return getViewForRole(getRoleFromAccessToken() || '');
+          }
+          return view;
+        });
+      })
+      .finally(() => {
+        validationPromiseRef.current = null;
+        setIsSessionChecking(false);
+      });
+
+    validationPromiseRef.current = validation;
+    return validation;
   }, [currentView]);
 
   useEffect(() => {
@@ -155,6 +203,8 @@ function App() {
 
   const handleLoginSuccess = (user) => {
     resetSessionExpiredHandling();
+    initialSessionCheckRef.current = false;
+    setIsSessionChecking(false);
     const loginRole = getRoleFromAccessToken() || user.vaiTro || user.role || '';
     const view = getViewForRole(loginRole);
 
@@ -166,6 +216,11 @@ function App() {
     }
 
     const payload = decodeTokenPayload(getAccessToken()) || {};
+    const mustChangePassword = user.mustChangePassword
+      ?? user.lanDauDangNhap
+      ?? payload.mustChangePassword
+      ?? payload.lanDauDangNhap
+      ?? false;
     const resolvedUser = {
       username: payload.sub || user.username,
       email: payload.email || user.email,
@@ -174,7 +229,8 @@ function App() {
       maNhanVien: payload.maNhanVien ?? user.maNhanVien ?? null,
       maTaiKhoan: payload.maTaiKhoan ?? user.maTaiKhoan ?? null,
       hoTen: payload.hoTen || user.hoTen || null,
-      lanDauDangNhap: payload.lanDauDangNhap ?? user.lanDauDangNhap ?? false,
+      mustChangePassword,
+      lanDauDangNhap: mustChangePassword,
       maChuyenKhoa: payload.maChuyenKhoa ?? user.maChuyenKhoa ?? null,
       tenChuyenKhoa: payload.tenChuyenKhoa ?? user.tenChuyenKhoa ?? null,
       userType: 'NHAN_VIEN',
@@ -182,12 +238,22 @@ function App() {
 
     setCurrentUser(resolvedUser);
 
-    if (resolvedUser.lanDauDangNhap) {
+    if (resolvedUser.mustChangePassword) {
       setCurrentView('force-change-password');
       return;
     }
 
     setCurrentView(view);
+  };
+
+  const handleFirstTimePasswordChanged = () => {
+    setCurrentUser((user) => user ? {
+      ...user,
+      mustChangePassword: false,
+      lanDauDangNhap: false
+    } : user);
+    const role = getRoleFromAccessToken() || currentUser?.vaiTro || currentUser?.role || '';
+    setCurrentView(getViewForRole(role));
   };
 
   const renderMainContent = () => {
@@ -203,6 +269,25 @@ function App() {
         <div className="w-full min-h-screen">
           <PaymentResult />
         </div>
+      );
+    }
+    if (isSessionChecking) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600">
+          <div className="flex items-center gap-3">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            <span>Đang xác thực phiên đăng nhập...</span>
+          </div>
+        </div>
+      );
+    }
+    if (currentUser?.mustChangePassword || currentView === 'force-change-password') {
+      return (
+        <BatBuocDoiMatKhau
+          user={currentUser}
+          onPasswordChanged={handleFirstTimePasswordChanged}
+          onLogout={handleLogout}
+        />
       );
     }
     if (currentView === 'admin') return <BangDieuKhienAdmin onLogout={handleLogout} />;
@@ -249,12 +334,6 @@ function App() {
           )}
           {currentView === 'forgot-password' && (
             <QuenMatKhau onBackToLogin={() => setCurrentView('DangNhap')} />
-          )}
-          {currentView === 'force-change-password' && (
-            <BatBuocDoiMatKhau
-              user={currentUser}
-              onBackToLogin={() => setCurrentView('DangNhap')}
-            />
           )}
         </main>
         <Footer />

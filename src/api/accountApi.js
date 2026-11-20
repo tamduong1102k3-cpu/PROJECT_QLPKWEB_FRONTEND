@@ -305,11 +305,11 @@ export const verifyOtpApi = async (data) => {
 
 /**
  * POST /first-time-change-password
- * Không cần JWT (public endpoint)
+ * Cần JWT; backend xác minh mật khẩu hiện tại và tài khoản trong phiên.
  */
 export const firstTimeChangePasswordApi = async data => {
   try {
-    const response = await fetch(`${API_URL}/first-time-change-password`, {
+    const response = await fetchClient(`${API_URL}/first-time-change-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
